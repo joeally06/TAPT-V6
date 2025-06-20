@@ -58,61 +58,38 @@ export const AdminDashboard: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      // Get conference registration stats
-      const { count: confCount } = await supabase
-        .from('conference_registrations')
-        .select('*', { count: 'exact', head: true });
-
-      // Get tech conference registration stats
-      const { count: techConfCount } = await supabase
-        .from('tech_conference_registrations')
-        .select('*', { count: 'exact', head: true });
-
-      // Get nomination stats
-      const { count: nomCount } = await supabase
-        .from('hall_of_fame_nominations')
-        .select('*', { count: 'exact', head: true });
-
-      // Get pending nominations count
-      const { count: pendingCount } = await supabase
-        .from('hall_of_fame_nominations')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
-
-      // Get total users count
-      const { count: usersCount } = await supabase
-        .from('users')
-        .select('*', { count: 'exact', head: true });
-
-      // Get upcoming events count
-      const { count: eventsCount } = await supabase
-        .from('content')
-        .select('*', { count: 'exact', head: true })
-        .eq('type', 'event')
-        .gt('date', new Date().toISOString());
-
-      // Get recent activities
-      const { data: activities, error: activitiesError } = await supabase
-        .from('admin_logs')
-        .select('*')
-        .eq('outcome', 'success')
-        .order('timestamp', { ascending: false })
-        .limit(5);
-
-      if (activitiesError) {
-        console.error('Error fetching activities:', activitiesError);
-      } else {
-        setRecentActivities(activities || []);
+      // Get the Supabase URL from environment variables
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      if (!supabaseUrl) {
+        throw new Error('VITE_SUPABASE_URL is not defined');
       }
 
-      setStats({
-        conferenceRegistrations: confCount || 0,
-        techConferenceRegistrations: techConfCount || 0,
-        nominations: nomCount || 0,
-        totalUsers: usersCount || 0,
-        pendingNominations: pendingCount || 0,
-        upcomingEvents: eventsCount || 0
+      // Get the current session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No active session');
+      }
+
+      // Call the Edge Function to get dashboard stats
+      const response = await fetch(`${supabaseUrl}/functions/v1/get-dashboard-stats`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch dashboard statistics');
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch dashboard statistics');
+      }
+
+      setStats(result.stats);
+      setRecentActivities(result.recentActivities || []);
     } catch (error) {
       console.error('Error fetching stats:', error);
       setError('Failed to load dashboard statistics');
@@ -347,3 +324,5 @@ export const AdminDashboard: React.FC = () => {
     </AdminLayout>
   );
 };
+
+export default AdminDashboard;
