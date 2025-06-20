@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, Phone, MapPin, Send, AlertCircle } from 'lucide-react';
+import { Mail, Phone, MapPin, Send, AlertCircle, Clock } from 'lucide-react';
 import { getSiteSetting } from '../lib/siteSettings';
 
 export const Contact: React.FC = () => {
   const [contactEmail, setContactEmail] = useState<string>('contact@tapt.org');
   const [contactPhone, setContactPhone] = useState<string>('615-406-9199');
+  const [businessHoursDays, setBusinessHoursDays] = useState<string>('Monday – Friday');
+  const [businessHoursTime, setBusinessHoursTime] = useState<string>('8:00 AM – 4:30 PM CST');
   const [formState, setFormState] = useState({
     name: '',
     email: '',
@@ -27,6 +29,12 @@ export const Contact: React.FC = () => {
 
         const phone = await getSiteSetting('contact_phone');
         if (phone) setContactPhone(phone);
+
+        const hoursDays = await getSiteSetting('business_hours_days');
+        if (hoursDays) setBusinessHoursDays(hoursDays);
+
+        const hoursTime = await getSiteSetting('business_hours_time');
+        if (hoursTime) setBusinessHoursTime(hoursTime);
       } catch (error) {
         console.error('Error fetching contact settings:', error);
       }
@@ -108,9 +116,10 @@ export const Contact: React.FC = () => {
                     <p className="mt-1 text-gray-600">
                       <a href={`tel:+1${contactPhone.replace(/\D/g, '')}`} className="hover:text-primary transition-colors">{contactPhone}</a>
                     </p>
-                    <p className="mt-1 text-gray-500 text-sm">
-                      Monday – Friday, 8:00 AM – 4:30 PM CST
-                    </p>
+                    <div className="mt-1 text-gray-500 text-sm flex items-center">
+                      <Clock className="h-4 w-4 mr-1" />
+                      <span>{businessHoursDays}, {businessHoursTime}</span>
+                    </div>
                   </div>
                 </div>
 

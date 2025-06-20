@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, Upload, X, Image, AlertCircle, CheckCircle, Mail, Phone, Globe, Type } from 'lucide-react';
+import { ArrowLeft, Save, Upload, X, Image, AlertCircle, CheckCircle, Mail, Phone, Globe, Type, Clock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { getSiteSetting, updateSiteSetting } from '../lib/siteSettings';
@@ -12,6 +12,8 @@ interface SiteSettingsState {
   siteTagline: string;
   contactEmail: string;
   contactPhone: string;
+  businessHoursDays: string;
+  businessHoursTime: string;
   socialFacebook: string;
   socialTwitter: string;
   socialInstagram: string;
@@ -30,6 +32,8 @@ export const AdminSiteSettings: React.FC = () => {
     siteTagline: '',
     contactEmail: '',
     contactPhone: '',
+    businessHoursDays: '',
+    businessHoursTime: '',
     socialFacebook: '',
     socialTwitter: '',
     socialInstagram: '',
@@ -71,6 +75,8 @@ export const AdminSiteSettings: React.FC = () => {
       const siteTagline = await getSiteSetting('site_tagline');
       const contactEmail = await getSiteSetting('contact_email');
       const contactPhone = await getSiteSetting('contact_phone');
+      const businessHoursDays = await getSiteSetting('business_hours_days');
+      const businessHoursTime = await getSiteSetting('business_hours_time');
       const socialFacebook = await getSiteSetting('social_facebook');
       const socialTwitter = await getSiteSetting('social_twitter');
       const socialInstagram = await getSiteSetting('social_instagram');
@@ -83,6 +89,8 @@ export const AdminSiteSettings: React.FC = () => {
         siteTagline: siteTagline || 'Promoting safe and efficient student transportation across Tennessee',
         contactEmail: contactEmail || 'contact@tapt.org',
         contactPhone: contactPhone || '615-406-9199',
+        businessHoursDays: businessHoursDays || 'Monday – Friday',
+        businessHoursTime: businessHoursTime || '8:00 AM – 4:30 PM CST',
         socialFacebook: socialFacebook || '',
         socialTwitter: socialTwitter || '',
         socialInstagram: socialInstagram || '',
@@ -175,6 +183,8 @@ export const AdminSiteSettings: React.FC = () => {
       await updateSiteSetting('site_tagline', settings.siteTagline);
       await updateSiteSetting('contact_email', settings.contactEmail);
       await updateSiteSetting('contact_phone', settings.contactPhone);
+      await updateSiteSetting('business_hours_days', settings.businessHoursDays);
+      await updateSiteSetting('business_hours_time', settings.businessHoursTime);
       await updateSiteSetting('social_facebook', settings.socialFacebook);
       await updateSiteSetting('social_twitter', settings.socialTwitter);
       await updateSiteSetting('social_instagram', settings.socialInstagram);
@@ -480,6 +490,52 @@ export const AdminSiteSettings: React.FC = () => {
                 </div>
                 <p className="mt-1 text-sm text-gray-500">
                   Primary contact phone number displayed on the website.
+                </p>
+              </div>
+
+              <div>
+                <label htmlFor="businessHoursDays" className="block text-sm font-medium text-gray-700 mb-1">
+                  Business Hours (Days)
+                </label>
+                <div className="mt-1 relative rounded-md shadow-sm">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Clock className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    id="businessHoursDays"
+                    name="businessHoursDays"
+                    value={settings.businessHoursDays}
+                    onChange={handleChange}
+                    placeholder="Monday – Friday"
+                    className="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+                  />
+                </div>
+                <p className="mt-1 text-sm text-gray-500">
+                  Days when your office is open (e.g., "Monday – Friday").
+                </p>
+              </div>
+
+              <div>
+                <label htmlFor="businessHoursTime" className="block text-sm font-medium text-gray-700 mb-1">
+                  Business Hours (Time)
+                </label>
+                <div className="mt-1 relative rounded-md shadow-sm">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Clock className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    id="businessHoursTime"
+                    name="businessHoursTime"
+                    value={settings.businessHoursTime}
+                    onChange={handleChange}
+                    placeholder="8:00 AM – 4:30 PM CST"
+                    className="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+                  />
+                </div>
+                <p className="mt-1 text-sm text-gray-500">
+                  Hours when your office is open (e.g., "8:00 AM – 4:30 PM CST").
                 </p>
               </div>
             </div>

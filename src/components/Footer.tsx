@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Facebook, Twitter, Instagram, Mail, Phone, MapPin } from 'lucide-react';
+import { Facebook, Twitter, Instagram, Mail, Phone, MapPin, Clock } from 'lucide-react';
 import { getSiteSetting } from '../lib/siteSettings';
 
 export const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
   const [contactEmail, setContactEmail] = useState<string>('contact@tapt.org');
   const [contactPhone, setContactPhone] = useState<string>('615-406-9199');
+  const [businessHoursDays, setBusinessHoursDays] = useState<string>('Monday – Friday');
+  const [businessHoursTime, setBusinessHoursTime] = useState<string>('8:00 AM – 4:30 PM CST');
   const [socialFacebook, setSocialFacebook] = useState<string>('https://facebook.com');
   const [socialTwitter, setSocialTwitter] = useState<string>('https://twitter.com');
   const [socialInstagram, setSocialInstagram] = useState<string>('https://instagram.com');
@@ -20,6 +22,12 @@ export const Footer: React.FC = () => {
 
         const phone = await getSiteSetting('contact_phone');
         if (phone) setContactPhone(phone);
+
+        const hoursDays = await getSiteSetting('business_hours_days');
+        if (hoursDays) setBusinessHoursDays(hoursDays);
+
+        const hoursTime = await getSiteSetting('business_hours_time');
+        if (hoursTime) setBusinessHoursTime(hoursTime);
 
         const facebook = await getSiteSetting('social_facebook');
         if (facebook) setSocialFacebook(facebook);
@@ -101,9 +109,15 @@ export const Footer: React.FC = () => {
                 <MapPin size={20} className="mr-2 mt-1 flex-shrink-0" />
                 <span className="text-gray-300">P.O. Box 700<br />Portland, TN 37148</span>
               </div>
-              <div className="flex items-center mb-3">
-                <Phone size={20} className="mr-2 flex-shrink-0" />
-                <a href={`tel:+1${contactPhone.replace(/\D/g, '')}`} className="text-gray-300 hover:text-white">{contactPhone}</a>
+              <div className="flex items-start mb-3">
+                <Phone size={20} className="mr-2 mt-1 flex-shrink-0" />
+                <div>
+                  <a href={`tel:+1${contactPhone.replace(/\D/g, '')}`} className="text-gray-300 hover:text-white">{contactPhone}</a>
+                  <div className="text-gray-400 text-sm flex items-center mt-1">
+                    <Clock size={14} className="mr-1" />
+                    <span>{businessHoursDays}, {businessHoursTime}</span>
+                  </div>
+                </div>
               </div>
               <div className="flex items-center">
                 <Mail size={20} className="mr-2 flex-shrink-0" />
@@ -127,3 +141,5 @@ export const Footer: React.FC = () => {
     </footer>
   );
 };
+
+export default Footer;
