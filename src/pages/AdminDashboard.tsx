@@ -14,6 +14,15 @@ import {
   FileText
 } from 'lucide-react';
 
+interface ActivityLog {
+  id: string;
+  user_id: string;
+  action: string;
+  outcome: string;
+  timestamp: string;
+  details: any;
+}
+
 export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
@@ -27,6 +36,7 @@ export const AdminDashboard: React.FC = () => {
     pendingNominations: 0,
     upcomingEvents: 0
   });
+  const [recentActivities, setRecentActivities] = useState<ActivityLog[]>([]);
 
   useEffect(() => {
     if (!authLoading) {
@@ -81,6 +91,20 @@ export const AdminDashboard: React.FC = () => {
         .eq('type', 'event')
         .gt('date', new Date().toISOString());
 
+      // Get recent activities
+      const { data: activities, error: activitiesError } = await supabase
+        .from('admin_logs')
+        .select('*')
+        .eq('outcome', 'success')
+        .order('timestamp', { ascending: false })
+        .limit(5);
+
+      if (activitiesError) {
+        console.error('Error fetching activities:', activitiesError);
+      } else {
+        setRecentActivities(activities || []);
+      }
+
       setStats({
         conferenceRegistrations: confCount || 0,
         techConferenceRegistrations: techConfCount || 0,
@@ -94,6 +118,68 @@ export const AdminDashboard: React.FC = () => {
       setError('Failed to load dashboard statistics');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Helper function to format timestamp to relative time
+  const formatRelativeTime = (timestamp: string): string => {
+    const now = new Date();
+    const activityTime = new Date(timestamp);
+    const diffInSeconds = Math.floor((now.getTime() - activityTime.getTime()) / 1000);
+    
+    if (diffInSeconds < 60) {
+      return 'just now';
+    } else if (diffInSeconds < 3600) {
+      const minutes = Math.floor(diffInSeconds / 60);
+      return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+    } else if (diffInSeconds < 86400) {
+      const hours = Math.floor(diffInSeconds / 3600);
+      return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+    } else {
+      const days = Math.floor(diffInSeconds / 86400);
+      return `${days} day${days > 1 ? 's' : ''} ago`;
+    }
+  };
+
+  // Helper function to get activity icon and message
+  const getActivityDetails = (activity: ActivityLog): { icon: React.ReactNode; message: string } => {
+    const action = activity.action;
+    
+    if (action.includes('conference_registration')) {
+      return {
+        icon: <CheckCircle className="h-5 w-5 text-green-500" />,
+        message: 'New conference registration submitted'
+      };
+    } else if (action.includes('tech_conference_registration')) {
+      return {
+        icon: <CheckCircle className="h-5 w-5 text-green-500" />,
+        message: 'New tech conference registration submitted'
+      };
+    } else if (action.includes('nomination')) {
+      return {
+        icon: <Clock className="h-5 w-5 text-orange-500" />,
+        message: 'New Hall of Fame nomination received'
+      };
+    } else if (action.includes('user') || action.includes('create_user')) {
+      return {
+        icon: <Users className="h-5 w-5 text-blue-500" />,
+        message: 'New user account created'
+      };
+    } else if (action.includes('content')) {
+      return {
+        icon: <FileText className="h-5 w-5 text-purple-500" />,
+        message: 'Content updated'
+      };
+    } else if (action.includes('membership')) {
+      return {
+        icon: <Users className="h-5 w-5 text-indigo-500" />,
+        message: 'New membership application received'
+      };
+    } else {
+      return {
+        icon: <CheckCircle className="h-5 w-5 text-gray-500" />,
+        message: `Activity: ${action}`
+      };
     }
   };
 
@@ -191,34 +277,24 @@ export const AdminDashboard: React.FC = () => {
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h2 className="text-lg font-medium text-gray-900 mb-4">Recent Activity</h2>
           <div className="space-y-4">
-            {[
-              {
-                icon: CheckCircle,
-                color: 'text-green-500',
-                message: 'New conference registration submitted',
-                time: '5 minutes ago'
-              },
-              {
-                icon: Clock,
-                color: 'text-orange-500',
-                message: 'New Hall of Fame nomination received',
-                time: '1 hour ago'
-              },
-              {
-                icon: Users,
-                color: 'text-blue-500',
-                message: 'New user account created',
-                time: '2 hours ago'
-              }
-            ].map((activity, index) => (
-              <div key={index} className="flex items-center">
-                <activity.icon className={`h-5 w-5 ${activity.color}`} />
-                <div className="ml-3">
-                  <p className="text-sm text-gray-900">{activity.message}</p>
-                  <p className="text-xs text-gray-500">{activity.time}</p>
-                </div>
+            {recentActivities.length > 0 ? (
+              recentActivities.map((activity) => {
+                const { icon, message } = getActivityDetails(activity);
+                return (
+                  <div key={activity.id} className="flex items-center">
+                    {icon}
+                    <div className="ml-3">
+                      <p className="text-sm text-gray-900">{message}</p>
+                      <p className="text-xs text-gray-500">{formatRelativeTime(activity.timestamp)}</p>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-center py-4 text-gray-500">
+                <p>No recent activity found</p>
               </div>
-            ))}
+            )}
           </div>
         </div>
 
