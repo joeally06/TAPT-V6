@@ -4,7 +4,10 @@ const allowedOrigins = [
   'https://tapt.org',
   'https://admin.tapt.org',
   'http://localhost:5173',
-  'https://localhost:5173'
+  'https://localhost:5173',
+  // Add WebContainer domains
+  'https://*.webcontainer-api.io',
+  'http://*.webcontainer-api.io'
 ];
 
 const securityHeaders = {
@@ -15,10 +18,18 @@ const securityHeaders = {
 
 Deno.serve(async (req) => {
   const origin = req.headers.get('Origin') || '';
-  const allowOrigin = allowedOrigins.includes(origin) ? origin : '';
+  // Check if origin matches any allowed pattern (including wildcards)
+  const allowOrigin = allowedOrigins.some(allowed => {
+    if (allowed.includes('*')) {
+      const pattern = allowed.replace(/\*/g, '.*');
+      return new RegExp(`^${pattern}$`).test(origin);
+    }
+    return allowed === origin;
+  }) ? origin : '';
+  
   const corsHeaders = {
     'Access-Control-Allow-Origin': allowOrigin,
-    'Access-Control-Allow-Methods': 'POST, DELETE, OPTIONS',
+    'Access-Control-Allow-Methods': 'POST, DELETE, PATCH, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     ...securityHeaders
   };
@@ -71,6 +82,47 @@ Deno.serve(async (req) => {
           console.error('Storage delete error:', storageError.message);
         }
       }
+      return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
+    }
+
+    if (req.method === 'PATCH') {
+      // Handle reordering
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader) {
+        return new Response(JSON.stringify({ error: 'No authorization header' }), { status: 401, headers: corsHeaders });
+      }
+      const token = authHeader.replace('Bearer ', '');
+      const supabaseAdmin = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false,
+          },
+        }
+      );
+      const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+      if (authError || !user) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+      }
+      const body = await req.json();
+      if (!body.reorder || !body.members || !Array.isArray(body.members)) {
+        return new Response(JSON.stringify({ error: 'Invalid reorder request' }), { status: 400, headers: corsHeaders });
+      }
+      
+      // Update order for each member
+      for (const member of body.members) {
+        const { error: updateError } = await supabaseAdmin
+          .from('board_members')
+          .update({ order: member.order })
+          .eq('id', member.id);
+        
+        if (updateError) {
+          return new Response(JSON.stringify({ error: updateError.message }), { status: 400, headers: corsHeaders });
+        }
+      }
+      
       return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
     }
 
