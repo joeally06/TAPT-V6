@@ -169,21 +169,17 @@ export const AdminSiteSettings: React.FC = () => {
         if (!imageUrl) throw new Error('Failed to upload image');
       }
       
-      // Update all settings
-      const updates = [
-        updateSiteSetting('hero_image_url', imageUrl),
-        updateSiteSetting('site_title', settings.siteTitle),
-        updateSiteSetting('site_tagline', settings.siteTagline),
-        updateSiteSetting('contact_email', settings.contactEmail),
-        updateSiteSetting('contact_phone', settings.contactPhone),
-        updateSiteSetting('social_facebook', settings.socialFacebook),
-        updateSiteSetting('social_twitter', settings.socialTwitter),
-        updateSiteSetting('social_instagram', settings.socialInstagram),
-        updateSiteSetting('footer_text', settings.footerText),
-        updateSiteSetting('about_text', settings.aboutText)
-      ];
-      
-      await Promise.all(updates);
+      // Update settings sequentially to avoid race conditions
+      await updateSiteSetting('hero_image_url', imageUrl);
+      await updateSiteSetting('site_title', settings.siteTitle);
+      await updateSiteSetting('site_tagline', settings.siteTagline);
+      await updateSiteSetting('contact_email', settings.contactEmail);
+      await updateSiteSetting('contact_phone', settings.contactPhone);
+      await updateSiteSetting('social_facebook', settings.socialFacebook);
+      await updateSiteSetting('social_twitter', settings.socialTwitter);
+      await updateSiteSetting('social_instagram', settings.socialInstagram);
+      await updateSiteSetting('footer_text', settings.footerText);
+      await updateSiteSetting('about_text', settings.aboutText);
       
       setSettings(prev => ({
         ...prev,
