@@ -80,7 +80,6 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       submenu: [
         { name: 'News & Events', path: '/admin/content' },
         { name: 'Board Members', path: '/admin/board-members' },
-        { name: 'Resources', path: '/admin/resources' },
         { name: 'Site Settings', path: '/admin/site-settings' }
       ]
     },
