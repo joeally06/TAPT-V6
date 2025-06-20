@@ -32,12 +32,15 @@ const NewsCard: React.FC<{ item: NewsItem; categoryName: string }> = React.memo(
       <div className="flex items-center text-sm text-gray-500 mb-4">
         <Calendar className="h-4 w-4 mr-2" />
         {new Date(item.date || item.created_at).toLocaleDateString()}
-        <Tag className="h-4 w-4 ml-4 mr-2" />
-        {categoryName}
-        {item.type === 'announcement' && (
+        {item.type === 'announcement' ? (
           <span className="ml-4 px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
             Announcement
           </span>
+        ) : (
+          <>
+            <Tag className="h-4 w-4 ml-4 mr-2" />
+            {categoryName}
+          </>
         )}
       </div>
       <h2 className="text-xl font-bold text-secondary mb-2">{item.title}</h2>
@@ -146,6 +149,12 @@ export const News: React.FC = () => {
         item.title.toLowerCase().includes(filters.searchQuery.toLowerCase()) || 
         item.description.toLowerCase().includes(filters.searchQuery.toLowerCase());
         
+      // For announcements, check if the filter is 'all' or 'announcements'
+      if (item.type === 'announcement') {
+        return matchesSearch && (filters.category === 'all' || filters.category === 'announcements');
+      }
+      
+      // For news items, check category as before
       const matchesCategory = filters.category === 'all' || item.category === filters.category;
       
       return matchesSearch && matchesCategory;
@@ -215,7 +224,7 @@ export const News: React.FC = () => {
                 <NewsCard 
                   key={item.id} 
                   item={item} 
-                  categoryName={categoryMap[item.category] || item.category || 'Uncategorized'} 
+                  categoryName={item.type === 'announcement' ? 'Announcement' : (categoryMap[item.category] || 'Uncategorized')} 
                 />
               ))}
             </div>
