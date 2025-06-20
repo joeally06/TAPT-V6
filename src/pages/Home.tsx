@@ -3,15 +3,26 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, CheckCircle, Users, Calendar, BookOpen, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { NewsItem } from '../lib/types/news';
+import { getSiteSetting } from '../lib/siteSettings';
 
 export const Home: React.FC = () => {
   const [featuredEvents, setFeaturedEvents] = useState<NewsItem[]>([]);
+  const [heroImageUrl, setHeroImageUrl] = useState<string>('https://images.pexels.com/photos/5905700/pexels-photo-5905700.jpeg');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     window.scrollTo(0, 0);
     
-    const fetchFeaturedEvents = async () => {
+    const fetchData = async () => {
+      setLoading(true);
       try {
+        // Fetch hero image URL from site settings
+        const imageUrl = await getSiteSetting('hero_image_url');
+        if (imageUrl) {
+          setHeroImageUrl(imageUrl);
+        }
+        
+        // Fetch featured events
         const { data, error } = await supabase
           .from('content')
           .select('*')
@@ -23,18 +34,20 @@ export const Home: React.FC = () => {
         if (error) throw error;
         setFeaturedEvents(data || []);
       } catch (error) {
-        console.error('Error fetching featured events:', error);
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
       }
     };
 
-    fetchFeaturedEvents();
+    fetchData();
   }, []);
 
   return (
     <div className="pt-16">
       {/* Hero Section */}
       <section className="relative bg-gradient-to-r from-secondary to-primary text-white">
-        <div className="absolute inset-0 bg-[url('https://images.pexels.com/photos/5905700/pexels-photo-5905700.jpeg')] bg-cover bg-center mix-blend-overlay opacity-20"></div>
+        <div className="absolute inset-0 bg-cover bg-center mix-blend-overlay opacity-20" style={{ backgroundImage: `url('${heroImageUrl}')` }}></div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28 lg:py-32 relative z-10">
           <div className="md:max-w-2xl lg:max-w-3xl">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight mb-6 slide-in-left">
@@ -178,3 +191,5 @@ export const Home: React.FC = () => {
     </div>
   );
 };
+
+export default Home;

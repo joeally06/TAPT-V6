@@ -70,6 +70,7 @@ export const Navbar = () => {
     { name: 'Dashboard', path: '/admin' },
     { name: 'Users', path: '/admin/users' },
     { name: 'Board Members', path: '/admin/board-members' },
+    { name: 'Site Settings', path: '/admin/site-settings' },
     { name: 'Conference Settings', path: '/admin/conference-settings' },
     { name: 'Conference Registrations', path: '/admin/conference-registrations' },
     { name: 'Tech Conference Settings', path: '/admin/tech-conference-settings' },

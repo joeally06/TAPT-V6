@@ -13,7 +13,8 @@ import {
   Archive,
   ChevronDown,
   ChevronRight,
-  Home
+  Home,
+  Image
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -58,6 +59,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       name: 'Settings',
       icon: Settings,
       submenu: [
+        { name: 'Site Settings', path: '/admin/site-settings' },
         { name: 'Conference', path: '/admin/conference-settings' },
         { name: 'Tech Conference', path: '/admin/tech-conference-settings' },
         { name: 'Hall of Fame', path: '/admin/hall-of-fame-settings' }

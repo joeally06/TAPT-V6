@@ -28,6 +28,7 @@ import { AdminHallOfFameNominations } from './pages/AdminHallOfFameNominations';
 import { AdminHallOfFameMembers } from './pages/AdminHallOfFameMembers';
 import { HallOfFameNomination } from './pages/HallOfFameNomination';
 import { HallOfFameMembers } from './pages/HallOfFameMembers';
+import AdminSiteSettings from './pages/AdminSiteSettings';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import './index.css';
@@ -150,6 +151,11 @@ function App() {
           <Route path="/admin/hall-of-fame-members" element={
             <ProtectedRoute requireAdmin>
               <AdminHallOfFameMembers />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/site-settings" element={
+            <ProtectedRoute requireAdmin>
+              <AdminSiteSettings />
             </ProtectedRoute>
           } />
         </Routes>
