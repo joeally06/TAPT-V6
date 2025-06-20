@@ -56,10 +56,9 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       path: '/admin'
     },
     {
-      name: 'Settings',
+      name: 'Form Settings',
       icon: Settings,
       submenu: [
-        { name: 'Site Settings', path: '/admin/site-settings' },
         { name: 'Conference', path: '/admin/conference-settings' },
         { name: 'Tech Conference', path: '/admin/tech-conference-settings' },
         { name: 'Hall of Fame', path: '/admin/hall-of-fame-settings' }
@@ -81,7 +80,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       submenu: [
         { name: 'News & Events', path: '/admin/content' },
         { name: 'Board Members', path: '/admin/board-members' },
-        { name: 'Resources', path: '/admin/resources' }
+        { name: 'Resources', path: '/admin/resources' },
+        { name: 'Site Settings', path: '/admin/site-settings' }
       ]
     },
     {
