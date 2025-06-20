@@ -33,7 +33,8 @@ export const getSiteSetting = async (key: string): Promise<any> => {
         if (response.ok) {
           const result = await response.json();
           if (result.success && result.data && result.data.length > 0) {
-            return JSON.parse(result.data[0].setting_value);
+            // The value is already parsed by the Supabase client
+            return result.data[0].setting_value;
           }
         }
       } catch (error) {
@@ -51,7 +52,9 @@ export const getSiteSetting = async (key: string): Promise<any> => {
 
     if (error) throw error;
     
-    return data ? JSON.parse(data.setting_value) : null;
+    // Return the value directly without parsing it again
+    // Supabase client already deserializes JSONB columns
+    return data ? data.setting_value : null;
   } catch (error) {
     console.error(`Error getting site setting ${key}:`, error);
     return null;
