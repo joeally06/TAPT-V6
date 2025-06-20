@@ -43,12 +43,12 @@ export const getSiteSetting = async (key: string): Promise<any> => {
       }
     }
 
-    // Fall back to direct query
+    // Fall back to direct query - use maybeSingle() instead of single()
     const { data, error } = await supabase
       .from('site_settings')
       .select('setting_value')
       .eq('setting_key', key)
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
     
