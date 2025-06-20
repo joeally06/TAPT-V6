@@ -4,7 +4,10 @@ const allowedOrigins = [
   'https://tapt.org',
   'https://admin.tapt.org',
   'http://localhost:5173',
-  'https://localhost:5173'
+  'https://localhost:5173',
+  // Add WebContainer domains
+  'https://*.webcontainer-api.io',
+  'http://*.webcontainer-api.io'
 ];
 
 const securityHeaders = {
@@ -15,8 +18,17 @@ const securityHeaders = {
 
 Deno.serve(async (req) => {
   const origin = req.headers.get('Origin') || '';
+  // Check if origin matches any allowed pattern (including wildcards)
+  const allowOrigin = allowedOrigins.some(allowed => {
+    if (allowed.includes('*')) {
+      const pattern = allowed.replace(/\*/g, '.*');
+      return new RegExp(`^${pattern}$`).test(origin);
+    }
+    return allowed === origin;
+  }) ? origin : '*';
+  
   const corsHeaders = {
-    'Access-Control-Allow-Origin': allowedOrigins.includes(origin) ? origin : '*',
+    'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     ...securityHeaders
@@ -104,12 +116,14 @@ Deno.serve(async (req) => {
         throw new Error('Missing required fields: key and value');
       }
       
-      // Upsert the setting - let Supabase handle JSONB conversion
+      // Upsert the setting with explicit onConflict option
       const { data, error } = await supabaseAdmin
         .from('site_settings')
         .upsert({
           setting_key: body.key,
           setting_value: body.value
+        }, {
+          onConflict: 'setting_key'  // Explicitly specify the conflict resolution column
         })
         .select()
         .single();
