@@ -34,6 +34,11 @@ const NewsCard: React.FC<{ item: NewsItem; categoryName: string }> = React.memo(
         {new Date(item.date || item.created_at).toLocaleDateString()}
         <Tag className="h-4 w-4 ml-4 mr-2" />
         {categoryName}
+        {item.type === 'announcement' && (
+          <span className="ml-4 px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+            Announcement
+          </span>
+        )}
       </div>
       <h2 className="text-xl font-bold text-secondary mb-2">{item.title}</h2>
       <p className="text-gray-600 mb-4">{item.description}</p>
@@ -81,7 +86,7 @@ export const News: React.FC = () => {
         const { data, error } = await supabase
           .from('content')
           .select('*')
-          .eq('type', 'news')
+          .in('type', ['news', 'announcement'])  // Fetch both news and announcements
           .eq('status', 'published')
           .order('date', { ascending: false, nullsLast: true })
           .order('created_at', { ascending: false });
@@ -210,7 +215,7 @@ export const News: React.FC = () => {
                 <NewsCard 
                   key={item.id} 
                   item={item} 
-                  categoryName={categoryMap[item.category] || item.category} 
+                  categoryName={categoryMap[item.category] || item.category || 'Uncategorized'} 
                 />
               ))}
             </div>
@@ -226,3 +231,5 @@ export const News: React.FC = () => {
     </div>
   );
 };
+
+export default News;
