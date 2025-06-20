@@ -104,12 +104,12 @@ Deno.serve(async (req) => {
         throw new Error('Missing required fields: key and value');
       }
       
-      // Upsert the setting
+      // Upsert the setting - let Supabase handle JSONB conversion
       const { data, error } = await supabaseAdmin
         .from('site_settings')
         .upsert({
           setting_key: body.key,
-          setting_value: JSON.stringify(body.value)
+          setting_value: body.value
         })
         .select()
         .single();
