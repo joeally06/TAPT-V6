@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Mail, Phone, MapPin, Send, AlertCircle } from 'lucide-react';
+import { getSiteSetting } from '../lib/siteSettings';
 
 export const Contact: React.FC = () => {
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, []);
-
+  const [contactEmail, setContactEmail] = useState<string>('contact@tapt.org');
+  const [contactPhone, setContactPhone] = useState<string>('615-406-9199');
   const [formState, setFormState] = useState({
     name: '',
     email: '',
@@ -16,6 +16,24 @@ export const Contact: React.FC = () => {
     error: false,
     loading: false
   });
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    
+    const fetchSettings = async () => {
+      try {
+        const email = await getSiteSetting('contact_email');
+        if (email) setContactEmail(email);
+
+        const phone = await getSiteSetting('contact_phone');
+        if (phone) setContactPhone(phone);
+      } catch (error) {
+        console.error('Error fetching contact settings:', error);
+      }
+    };
+
+    fetchSettings();
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -88,7 +106,7 @@ export const Contact: React.FC = () => {
                   <div className="ml-4">
                     <h3 className="text-lg font-semibold text-secondary">Phone</h3>
                     <p className="mt-1 text-gray-600">
-                      <a href="tel:+16154069199" className="hover:text-primary transition-colors">615-406-9199</a>
+                      <a href={`tel:+1${contactPhone.replace(/\D/g, '')}`} className="hover:text-primary transition-colors">{contactPhone}</a>
                     </p>
                     <p className="mt-1 text-gray-500 text-sm">
                       Monday – Friday, 8:00 AM – 4:30 PM CST
@@ -103,7 +121,7 @@ export const Contact: React.FC = () => {
                   <div className="ml-4">
                     <h3 className="text-lg font-semibold text-secondary">Email</h3>
                     <p className="mt-1 text-gray-600">
-                      <a href="mailto:contact@tapt.org" className="hover:text-primary transition-colors">contact@tapt.org</a>
+                      <a href={`mailto:${contactEmail}`} className="hover:text-primary transition-colors">{contactEmail}</a>
                     </p>
                     <p className="mt-1 text-gray-500 text-sm">
                       We'll respond as quickly as possible
@@ -323,3 +341,5 @@ export const Contact: React.FC = () => {
     </div>
   );
 };
+
+export default Contact;

@@ -1,10 +1,26 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, Users, Award, MapPin } from 'lucide-react';
+import { getSiteSetting } from '../lib/siteSettings';
 
 export const About: React.FC = () => {
+  const [aboutText, setAboutText] = useState<string>('');
+
   useEffect(() => {
     window.scrollTo(0, 0);
+    
+    const fetchSettings = async () => {
+      try {
+        const text = await getSiteSetting('about_text');
+        if (text) {
+          setAboutText(text);
+        }
+      } catch (error) {
+        console.error('Error fetching about text:', error);
+      }
+    };
+    
+    fetchSettings();
   }, []);
 
   const boardMembers = [
@@ -101,6 +117,14 @@ export const About: React.FC = () => {
               </p>
             </div>
           </div>
+          
+          {/* About Text from Site Settings */}
+          {aboutText && (
+            <div className="mt-12 bg-white p-8 rounded-lg shadow-md border-t-4 border-primary">
+              <h2 className="text-2xl font-bold text-secondary mb-4">About Our Organization</h2>
+              <p className="text-gray-700 leading-relaxed">{aboutText}</p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -238,3 +262,5 @@ export const About: React.FC = () => {
     </div>
   );
 };
+
+export default About;

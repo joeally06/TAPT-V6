@@ -3,10 +3,13 @@ import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, ChevronDown } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { getSiteSetting } from '../lib/siteSettings';
 
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [siteTitle, setSiteTitle] = useState('TAPT');
+  const [siteTagline, setSiteTagline] = useState('Tennessee Association of Pupil Transportation');
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const location = useLocation();
@@ -34,6 +37,23 @@ export const Navbar = () => {
   useEffect(() => {
     setIsOpen(false);
   }, [location]);
+
+  // Fetch site settings
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const title = await getSiteSetting('site_title');
+        if (title) setSiteTitle('TAPT'); // Keep the short title as TAPT for the navbar
+        
+        const tagline = await getSiteSetting('site_tagline');
+        if (tagline) setSiteTagline(tagline);
+      } catch (error) {
+        console.error('Error fetching navbar settings:', error);
+      }
+    };
+
+    fetchSettings();
+  }, []);
 
   const navItems = [
     { name: 'Home', path: '/' },
@@ -97,8 +117,8 @@ export const Navbar = () => {
         <div className="flex justify-between items-center">
           <div className="flex items-center">
             <Link to="/" className="flex items-center">
-              <span className="text-primary font-bold text-2xl">TAPT</span>
-              <span className="ml-2 hidden md:block text-secondary text-sm font-medium">Tennessee Association of Pupil Transportation</span>
+              <span className="text-primary font-bold text-2xl">{siteTitle}</span>
+              <span className="ml-2 hidden md:block text-secondary text-sm font-medium">{siteTagline}</span>
             </Link>
           </div>
 

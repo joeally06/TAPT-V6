@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, CheckCircle, Users, Calendar, BookOpen, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -8,6 +8,7 @@ import { getSiteSetting } from '../lib/siteSettings';
 export const Home: React.FC = () => {
   const [featuredEvents, setFeaturedEvents] = useState<NewsItem[]>([]);
   const [heroImageUrl, setHeroImageUrl] = useState<string>('https://images.pexels.com/photos/5905700/pexels-photo-5905700.jpeg');
+  const [siteTagline, setSiteTagline] = useState<string>('Promoting safe and efficient student transportation across Tennessee');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -20,6 +21,12 @@ export const Home: React.FC = () => {
         const imageUrl = await getSiteSetting('hero_image_url');
         if (imageUrl) {
           setHeroImageUrl(imageUrl);
+        }
+        
+        // Fetch site tagline
+        const tagline = await getSiteSetting('site_tagline');
+        if (tagline) {
+          setSiteTagline(tagline);
         }
         
         // Fetch featured events
@@ -54,7 +61,7 @@ export const Home: React.FC = () => {
               Student Safety is Our Priority
             </h1>
             <p className="text-lg md:text-xl text-gray-100 mb-8 slide-in-left" style={{ animationDelay: '0.1s' }}>
-              Education is Our Destination! The Tennessee Association of Pupil Transportation promotes safe transportation for all Tennessee school children through education, training, and advocacy.
+              Education is Our Destination! {siteTagline}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 slide-in-left" style={{ animationDelay: '0.2s' }}>
               <Link to="/about" className="bg-white text-primary hover:bg-gray-100 px-6 py-3 rounded-md font-medium inline-flex items-center transition-all">

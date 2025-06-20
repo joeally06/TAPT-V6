@@ -1,9 +1,44 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Facebook, Twitter, Instagram, Mail, Phone, MapPin } from 'lucide-react';
+import { getSiteSetting } from '../lib/siteSettings';
 
 export const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
+  const [contactEmail, setContactEmail] = useState<string>('contact@tapt.org');
+  const [contactPhone, setContactPhone] = useState<string>('615-406-9199');
+  const [socialFacebook, setSocialFacebook] = useState<string>('https://facebook.com');
+  const [socialTwitter, setSocialTwitter] = useState<string>('https://twitter.com');
+  const [socialInstagram, setSocialInstagram] = useState<string>('https://instagram.com');
+  const [footerText, setFooterText] = useState<string>('Promoting safe and efficient student transportation across Tennessee since 1977.');
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const email = await getSiteSetting('contact_email');
+        if (email) setContactEmail(email);
+
+        const phone = await getSiteSetting('contact_phone');
+        if (phone) setContactPhone(phone);
+
+        const facebook = await getSiteSetting('social_facebook');
+        if (facebook) setSocialFacebook(facebook);
+
+        const twitter = await getSiteSetting('social_twitter');
+        if (twitter) setSocialTwitter(twitter);
+
+        const instagram = await getSiteSetting('social_instagram');
+        if (instagram) setSocialInstagram(instagram);
+
+        const footer = await getSiteSetting('footer_text');
+        if (footer) setFooterText(footer);
+      } catch (error) {
+        console.error('Error fetching footer settings:', error);
+      }
+    };
+
+    fetchSettings();
+  }, []);
 
   return (
     <footer className="bg-secondary text-white">
@@ -13,17 +48,23 @@ export const Footer: React.FC = () => {
             <div className="flex flex-col h-full">
               <h2 className="text-xl font-bold text-white mb-4">TAPT</h2>
               <p className="text-gray-300 mb-4">Tennessee Association of Pupil Transportation</p>
-              <p className="text-gray-300 mb-6">Promoting safe and efficient student transportation across Tennessee since 1977.</p>
+              <p className="text-gray-300 mb-6">{footerText}</p>
               <div className="flex space-x-4 mt-auto">
-                <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="text-gray-300 hover:text-white">
-                  <Facebook size={20} />
-                </a>
-                <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="text-gray-300 hover:text-white">
-                  <Twitter size={20} />
-                </a>
-                <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="text-gray-300 hover:text-white">
-                  <Instagram size={20} />
-                </a>
+                {socialFacebook && (
+                  <a href={socialFacebook} target="_blank" rel="noopener noreferrer" className="text-gray-300 hover:text-white">
+                    <Facebook size={20} />
+                  </a>
+                )}
+                {socialTwitter && (
+                  <a href={socialTwitter} target="_blank" rel="noopener noreferrer" className="text-gray-300 hover:text-white">
+                    <Twitter size={20} />
+                  </a>
+                )}
+                {socialInstagram && (
+                  <a href={socialInstagram} target="_blank" rel="noopener noreferrer" className="text-gray-300 hover:text-white">
+                    <Instagram size={20} />
+                  </a>
+                )}
               </div>
             </div>
           </div>
@@ -62,11 +103,11 @@ export const Footer: React.FC = () => {
               </div>
               <div className="flex items-center mb-3">
                 <Phone size={20} className="mr-2 flex-shrink-0" />
-                <a href="tel:+16154069199" className="text-gray-300 hover:text-white">615-406-9199</a>
+                <a href={`tel:+1${contactPhone.replace(/\D/g, '')}`} className="text-gray-300 hover:text-white">{contactPhone}</a>
               </div>
               <div className="flex items-center">
                 <Mail size={20} className="mr-2 flex-shrink-0" />
-                <a href="mailto:contact@tapt.org" className="text-gray-300 hover:text-white">contact@tapt.org</a>
+                <a href={`mailto:${contactEmail}`} className="text-gray-300 hover:text-white">{contactEmail}</a>
               </div>
             </address>
           </div>
