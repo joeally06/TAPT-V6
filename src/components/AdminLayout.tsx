@@ -14,7 +14,8 @@ import {
   ChevronDown,
   ChevronRight,
   Home,
-  Image
+  Image,
+  MessageSquare
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -98,6 +99,11 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         { name: 'Members', path: '/admin/hall-of-fame-members' },
         { name: 'Nominations', path: '/admin/hall-of-fame-nominations' }
       ]
+    },
+    {
+      name: 'Messages',
+      icon: MessageSquare,
+      path: '/admin/contact-messages'
     },
     {
       name: 'Archives',

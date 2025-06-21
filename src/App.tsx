@@ -29,6 +29,7 @@ import { AdminHallOfFameMembers } from './pages/AdminHallOfFameMembers';
 import { HallOfFameNomination } from './pages/HallOfFameNomination';
 import { HallOfFameMembers } from './pages/HallOfFameMembers';
 import AdminSiteSettings from './pages/AdminSiteSettings';
+import AdminContactMessages from './pages/AdminContactMessages';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import './index.css';
@@ -156,6 +157,11 @@ function App() {
           <Route path="/admin/site-settings" element={
             <ProtectedRoute requireAdmin>
               <AdminSiteSettings />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/contact-messages" element={
+            <ProtectedRoute requireAdmin>
+              <AdminContactMessages />
             </ProtectedRoute>
           } />
         </Routes>

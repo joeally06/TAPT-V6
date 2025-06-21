@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, Phone, MapPin, Send, AlertCircle, Clock } from 'lucide-react';
 import { getSiteSetting } from '../lib/siteSettings';
+import { supabase } from '../lib/supabase';
 
 export const Contact: React.FC = () => {
   const [contactEmail, setContactEmail] = useState<string>('contact@tapt.org');
@@ -50,26 +51,65 @@ export const Contact: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFormState(prev => ({ ...prev, loading: true }));
+    setFormState(prev => ({ ...prev, loading: true, error: false }));
 
-    // Simulate form submission
-    setTimeout(() => {
-      if (Math.random() > 0.1) { // 90% success rate for demo
-        setFormState(prev => ({
-          ...prev,
-          submitted: true,
-          error: false,
-          loading: false
-        }));
-      } else {
-        setFormState(prev => ({
-          ...prev,
-          submitted: false,
-          error: true,
-          loading: false
-        }));
+    try {
+      // Get the Supabase URL from environment variables
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      if (!supabaseUrl) {
+        throw new Error('SUPABASE_URL environment variable is not defined');
       }
-    }, 1500);
+
+      // Prepare the request payload
+      const payload = {
+        name: formState.name,
+        email: formState.email,
+        phone: formState.phone || undefined,
+        district: formState.district || undefined,
+        message: formState.message
+      };
+
+      // Make the request to the Edge Function
+      const response = await fetch(`${supabaseUrl}/functions/v1/submit-contact-message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      // Check if the request was successful
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to submit message');
+      }
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to submit message');
+      }
+
+      setFormState(prev => ({
+        ...prev,
+        submitted: true,
+        error: false,
+        loading: false,
+        name: '',
+        email: '',
+        phone: '',
+        district: '',
+        message: ''
+      }));
+    } catch (error: any) {
+      console.error('Error submitting message:', error);
+      setFormState(prev => ({
+        ...prev,
+        error: true,
+        loading: false,
+        submitted: false
+      }));
+    }
   };
 
   return (
