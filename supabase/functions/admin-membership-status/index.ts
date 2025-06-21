@@ -4,7 +4,10 @@ const allowedOrigins = [
   'https://tapt.org',
   'https://admin.tapt.org',
   'http://localhost:5173',
-  'https://localhost:5173'
+  'https://localhost:5173',
+  // Add WebContainer domains
+  'https://*.webcontainer-api.io',
+  'http://*.webcontainer-api.io'
 ];
 
 const securityHeaders = {
@@ -15,9 +18,18 @@ const securityHeaders = {
 
 Deno.serve(async (req) => {
   const origin = req.headers.get('Origin') || '';
+  // Check if origin matches any allowed pattern (including wildcards)
+  const allowOrigin = allowedOrigins.some(allowed => {
+    if (allowed.includes('*')) {
+      const pattern = allowed.replace(/\*/g, '.*');
+      return new RegExp(`^${pattern}$`).test(origin);
+    }
+    return allowed === origin;
+  }) ? origin : '*';
+  
   const corsHeaders = {
-    'Access-Control-Allow-Origin': allowedOrigins.includes(origin) ? origin : '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Methods': 'POST, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     ...securityHeaders
   };
@@ -32,10 +44,10 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log("Processing membership status update request");
+    console.log(`Processing ${req.method} request for membership status`);
     
     // Verify request method
-    if (req.method !== 'POST') {
+    if (!['POST', 'DELETE'].includes(req.method)) {
       throw new Error('Method not allowed');
     }
 
@@ -83,7 +95,7 @@ Deno.serve(async (req) => {
       throw new Error('Unauthorized - Admin access required');
     }
 
-    // Get request body
+    // Parse request body
     let body;
     try {
       body = await req.json();
@@ -93,54 +105,97 @@ Deno.serve(async (req) => {
       throw new Error('Invalid request format: Unable to parse JSON');
     }
 
-    const { id, status } = body;
-
-    if (!id) {
+    if (!body.id) {
       throw new Error('Application ID is required');
     }
 
-    if (!status || !['approved', 'rejected'].includes(status)) {
-      throw new Error('Valid status (approved or rejected) is required');
-    }
-
-    // Update application status
-    const { error: updateError } = await supabaseAdmin
-      .from('membership_applications')
-      .update({ status })
-      .eq('id', id);
-
-    if (updateError) {
-      console.error("Error updating application status:", updateError);
-      throw updateError;
-    }
-
-    // Log the action
-    try {
-      await supabaseAdmin.from('admin_logs').insert([{
-        user_id: user.id,
-        action: `update_membership_status`,
-        outcome: 'success',
-        details: { application_id: id, status }
-      }]);
-    } catch (logError) {
-      // Don't fail the request if logging fails
-      console.error("Error logging action:", logError);
-    }
-
-    console.log("Membership status updated successfully");
-    return new Response(
-      JSON.stringify({ 
-        success: true,
-        message: `Application status updated to ${status}`
-      }),
-      { 
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
+    // Handle POST request (update status)
+    if (req.method === 'POST') {
+      if (!body.status || !['approved', 'rejected'].includes(body.status)) {
+        throw new Error('Valid status (approved or rejected) is required');
       }
-    );
 
+      // Update application status
+      const { error: updateError } = await supabaseAdmin
+        .from('membership_applications')
+        .update({ status: body.status })
+        .eq('id', body.id);
+
+      if (updateError) {
+        console.error("Error updating application status:", updateError);
+        throw updateError;
+      }
+
+      // Log the action
+      try {
+        await supabaseAdmin.from('admin_logs').insert([{
+          user_id: user.id,
+          action: `update_membership_status_${body.status}`,
+          outcome: 'success',
+          details: { application_id: body.id, status: body.status }
+        }]);
+      } catch (logError) {
+        // Don't fail the request if logging fails
+        console.error("Error logging action:", logError);
+      }
+
+      console.log("Membership status updated successfully");
+      return new Response(
+        JSON.stringify({ 
+          success: true,
+          message: `Application status updated to ${body.status}`
+        }),
+        { 
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+    }
+    
+    // Handle DELETE request
+    if (req.method === 'DELETE') {
+      // Delete the application
+      const { error: deleteError } = await supabaseAdmin
+        .from('membership_applications')
+        .delete()
+        .eq('id', body.id);
+
+      if (deleteError) {
+        console.error("Error deleting application:", deleteError);
+        throw deleteError;
+      }
+
+      // Log the action
+      try {
+        await supabaseAdmin.from('admin_logs').insert([{
+          user_id: user.id,
+          action: 'delete_membership_application',
+          outcome: 'success',
+          details: { application_id: body.id }
+        }]);
+      } catch (logError) {
+        // Don't fail the request if logging fails
+        console.error("Error logging action:", logError);
+      }
+
+      console.log("Membership application deleted successfully");
+      return new Response(
+        JSON.stringify({ 
+          success: true,
+          message: 'Application deleted successfully'
+        }),
+        { 
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+    }
+
+    throw new Error(`Unsupported method: ${req.method}`);
   } catch (error) {
     console.error("Error in admin-membership-status function:", error);
     return new Response(

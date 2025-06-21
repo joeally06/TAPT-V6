@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Download, Search, CheckCircle, XCircle, Eye, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Download, Search, CheckCircle, XCircle, Eye, AlertCircle, Trash2 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useAuth } from '../context/AuthContext';
@@ -115,6 +115,64 @@ export const AdminMemberships: React.FC = () => {
     } catch (error: any) {
       console.error('Error updating application status:', error);
       setError(`Error updating application status: ${error.message}`);
+    }
+  };
+
+  const handleDeleteApplication = async (applicationId: string) => {
+    if (!confirm('Are you sure you want to delete this membership application? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      setError(null);
+      setSuccess(null);
+      
+      // Get the current session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        throw new Error(`Session error: ${sessionError.message}`);
+      }
+      
+      if (!session || !session.access_token) {
+        throw new Error('No active session');
+      }
+      
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      if (!supabaseUrl) {
+        throw new Error('VITE_SUPABASE_URL is not defined');
+      }
+      
+      console.log(`Deleting application ${applicationId}`);
+      
+      // Use Edge Function for secure deletion
+      const response = await fetch(`${supabaseUrl}/functions/v1/admin-membership-status`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ id: applicationId })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Failed to parse error response' }));
+        throw new Error(errorData.message || `Request failed with status ${response.status}`);
+      }
+
+      // Remove the deleted application from state
+      setApplications(prev => prev.filter(app => app.id !== applicationId));
+      
+      // If the deleted application was selected, close the modal
+      if (selectedApplication?.id === applicationId) {
+        setSelectedApplication(null);
+        setShowDetailsModal(false);
+      }
+
+      setSuccess('Application deleted successfully');
+    } catch (error: any) {
+      console.error('Error deleting application:', error);
+      setError(`Error deleting application: ${error.message}`);
     }
   };
 
@@ -351,6 +409,7 @@ export const AdminMemberships: React.FC = () => {
                             setShowDetailsModal(true);
                           }}
                           className="text-primary hover:text-primary/80 mr-3"
+                          title="View details"
                         >
                           <Eye className="h-5 w-5" />
                         </button>
@@ -359,17 +418,26 @@ export const AdminMemberships: React.FC = () => {
                             <button
                               onClick={() => handleStatusChange(application.id, 'approved')}
                               className="text-green-600 hover:text-green-800 mr-3"
+                              title="Approve application"
                             >
                               <CheckCircle className="h-5 w-5" />
                             </button>
                             <button
                               onClick={() => handleStatusChange(application.id, 'rejected')}
-                              className="text-red-600 hover:text-red-800"
+                              className="text-red-600 hover:text-red-800 mr-3"
+                              title="Reject application"
                             >
                               <XCircle className="h-5 w-5" />
                             </button>
                           </>
                         )}
+                        <button
+                          onClick={() => handleDeleteApplication(application.id)}
+                          className="text-red-600 hover:text-red-800"
+                          title="Delete application"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -440,13 +508,51 @@ export const AdminMemberships: React.FC = () => {
                 </ul>
               </div>
 
-              <div className="mt-6 flex justify-end">
-                <button
-                  onClick={() => setShowDetailsModal(false)}
-                  className="bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200"
-                >
-                  Close
-                </button>
+              <div className="mt-6 flex justify-between">
+                <div className="flex space-x-3">
+                  {selectedApplication.status === 'pending' && (
+                    <>
+                      <button
+                        onClick={() => {
+                          handleStatusChange(selectedApplication.id, 'approved');
+                          setShowDetailsModal(false);
+                        }}
+                        className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+                      >
+                        <CheckCircle className="mr-2 h-5 w-5" />
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleStatusChange(selectedApplication.id, 'rejected');
+                          setShowDetailsModal(false);
+                        }}
+                        className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
+                      >
+                        <XCircle className="mr-2 h-5 w-5" />
+                        Reject
+                      </button>
+                    </>
+                  )}
+                </div>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => {
+                      handleDeleteApplication(selectedApplication.id);
+                      setShowDetailsModal(false);
+                    }}
+                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
+                  >
+                    <Trash2 className="mr-2 h-5 w-5" />
+                    Delete
+                  </button>
+                  <button
+                    onClick={() => setShowDetailsModal(false)}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           </div>
