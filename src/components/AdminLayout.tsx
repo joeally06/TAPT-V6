@@ -37,8 +37,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       await supabase.auth.signOut();
       console.log('Sign out successful, refreshing auth state...');
       await refreshAuth();
-      console.log('Auth state refreshed, navigating to login page...');
-      navigate('/admin/login');
+      console.log('Auth state refreshed, navigating to home page...');
+      navigate('/');
     } catch (error) {
       console.error('Error signing out:', error);
     }
@@ -123,10 +123,6 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       return location.pathname === path;
     }
     return location.pathname.startsWith(path);
-  };
-
-  const isSubmenuActive = (submenu: { name: string; path: string }[]) => {
-    return submenu.some(item => location.pathname.startsWith(item.path));
   };
 
   return (
@@ -242,3 +238,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 };
 
 export default AdminLayout;
+
+function isSubmenuActive(submenu: { name: string; path: string }[]) {
+  const location = useLocation();
+  return submenu.some(item => location.pathname.startsWith(item.path));
+}
