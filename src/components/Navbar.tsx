@@ -58,30 +58,30 @@ export const Navbar = () => {
   const navItems = [
     { name: 'Home', path: '/' },
     { 
-      name: 'About', 
-      path: '/about',
-      subItems: [
-        { name: 'Board Members', path: '/board-members' },
-        { name: 'Contact', path: '/contact' }
-      ]
-    },
-    { name: 'Resources', path: '/resources' },
-    { name: 'News', path: '/news' },
-    { 
-      name: 'Events',
+      name: 'Events', 
       path: '/events',
       subItems: [
         { name: 'Conference Registration', path: '/conference-registration' },
         { name: 'Tech Conference Registration', path: '/tech-conference-registration' }
       ]
     },
-    { name: 'Members', path: '/members' },
     { 
       name: 'Hall of Fame',
       path: '/hall-of-fame',
       subItems: [
         { name: 'Members', path: '/hall-of-fame-members' },
         { name: 'Nomination Form', path: '/hall-of-fame-nomination' }
+      ]
+    },
+    { name: 'Members', path: '/members' },
+    { name: 'News', path: '/news' },
+    { name: 'Resources', path: '/resources' },
+    { 
+      name: 'About', 
+      path: '/about',
+      subItems: [
+        { name: 'Board Members', path: '/board-members' },
+        { name: 'Contact', path: '/contact' }
       ]
     }
   ];
@@ -280,3 +280,5 @@ export const Navbar = () => {
     </nav>
   );
 };
+
+export default Navbar;
