@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Download, Search, CheckCircle, XCircle, Eye, AlertCircle } from 'lucide-react';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { useAuth } from '../context/AuthContext';
 
 interface MembershipApplication {
@@ -162,8 +162,8 @@ export const AdminMemberships: React.FC = () => {
         new Date(app.created_at).toLocaleDateString()
       ]);
 
-      // Add the table
-      (doc as any).autoTable({
+      // Add the table using autoTable
+      autoTable(doc, {
         head: [columns],
         body: data,
         startY: 40,
@@ -187,7 +187,7 @@ export const AdminMemberships: React.FC = () => {
       setSuccess('PDF exported successfully');
     } catch (error: any) {
       console.error('Error exporting PDF:', error);
-      setError('Failed to export PDF');
+      setError('Failed to export PDF: ' + error.message);
     }
   };
 
