@@ -18,6 +18,7 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -28,10 +29,15 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
   const location = useLocation();
   const navigate = useNavigate();
+  const { refreshAuth } = useAuth();
 
   const handleLogout = async () => {
     try {
+      console.log('Logging out user...');
       await supabase.auth.signOut();
+      console.log('Sign out successful, refreshing auth state...');
+      await refreshAuth();
+      console.log('Auth state refreshed, navigating to login page...');
       navigate('/admin/login');
     } catch (error) {
       console.error('Error signing out:', error);
