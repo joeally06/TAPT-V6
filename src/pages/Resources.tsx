@@ -208,14 +208,6 @@ export const Resources: React.FC = () => {
             </div>
             {/* Results */}
             <div className="space-y-6">
-              {/* Debug output for troubleshooting */}
-              <div className="bg-yellow-100 text-yellow-800 p-2 text-xs rounded mb-2">
-                <div><b>Debug:</b></div>
-                <div>Resources: {JSON.stringify(resources)}</div>
-                <div>Error: {JSON.stringify(error)}</div>
-                <div>Supabase URL: {supabase?.restUrl || 'N/A'}</div>
-                <div>Supabase Key: {supabase?.auth?.api?.getUrl ? supabase.auth.api.getUrl() : 'N/A'}</div>
-              </div>
               {loading ? (
                 <div className="flex justify-center items-center py-12">
                   <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
@@ -298,3 +290,5 @@ export const Resources: React.FC = () => {
     </div>
   );
 };
+
+export default Resources;
