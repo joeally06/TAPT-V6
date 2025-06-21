@@ -25,16 +25,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshAuth = async () => {
     try {
+      console.log('AuthContext: refreshAuth started, setting loading to true');
       setState(prev => ({ ...prev, loading: true, error: null }));
       
       // Get the current session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      console.log('AuthContext: getSession completed, session:', session);
       
       if (sessionError) {
         throw sessionError;
       }
       
       if (!session) {
+        console.log('AuthContext: No session found, setting loading to false');
         setState({
           user: null,
           loading: false,
@@ -45,6 +48,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       // Use RPC function to get role without recursion
+      console.log('AuthContext: Fetching user role for ID:', session.user.id);
       const { data: role, error: roleError } = await supabase.rpc(
         'get_user_role',
         { user_id: session.user.id }
@@ -61,6 +65,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
+      console.log('AuthContext: User role fetched, setting loading to false');
       setState({
         user: { 
           ...session.user, 
@@ -73,6 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     } catch (error) {
       console.error('Auth refresh error:', error);
+      console.log('AuthContext: Error during refreshAuth, setting loading to false. Error:', error);
       setState(prev => ({
         ...prev,
         user: null,
@@ -94,6 +100,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     const { data: authListener } = supabase.auth.onAuthStateChange(async () => {
       if (mounted) {
+        console.log('AuthContext: Auth state changed, refreshing auth');
         await refreshAuth();
       }
     });
