@@ -88,7 +88,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }));
     }
   };
-
   useEffect(() => {
     let mounted = true;
     
@@ -98,9 +97,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     initAuth();
     
-    const { data: authListener } = supabase.auth.onAuthStateChange(async () => {
-      if (mounted) {
-        console.log('AuthContext: Auth state changed, refreshing auth');
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+
+      console.log('AuthContext: Auth event:', event);
+
+      if (event === 'SIGNED_OUT') {
+        console.log('AuthContext: User signed out, clearing state and redirecting');
+        // Immediately clear state and redirect
+        setState({
+          user: null,
+          loading: false, // Critical: Set loading to false immediately
+          error: null,
+          refreshAuth
+        });
+        
+        // Force redirect to login page
+        console.log('AuthContext: Redirecting to /admin/login');
+        window.location.href = '/admin/login';
+        return;
+      }
+
+      if (event === 'SIGNED_IN' && session?.user) {
+        console.log('AuthContext: User signed in, refreshing auth');
+        setState(prev => ({ ...prev, loading: true }));
+        await refreshAuth();
+      } else if (event === 'TOKEN_REFRESHED') {
+        console.log('AuthContext: Token refreshed, refreshing auth');
         await refreshAuth();
       }
     });
@@ -110,6 +133,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       authListener.subscription.unsubscribe();
     };
   }, []);
+
+  // Add safety timeout to prevent infinite loading states
+  useEffect(() => {
+    if (!state.loading) return;
+
+    const timeoutId = setTimeout(() => {
+      console.warn('AuthContext: Auth loading timeout - forcing state reset');
+      setState(prev => ({ 
+        ...prev, 
+        loading: false,
+        error: new Error('Authentication timeout')
+      }));
+    }, 10000); // 10 second timeout
+
+    return () => clearTimeout(timeoutId);
+  }, [state.loading]);
 
   return <AuthContext.Provider value={state}>{children}</AuthContext.Provider>;
 };

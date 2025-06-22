@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Settings, 
@@ -18,29 +18,25 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../context/AuthContext';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
 }
 
-const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
   const location = useLocation();
-  const navigate = useNavigate();
-  const { refreshAuth } = useAuth();
-
   const handleLogout = async () => {
     try {
-      console.log('Logging out user...');
+      console.log('AdminLayout: Logging out user...');
       await supabase.auth.signOut();
-      console.log('Sign out successful, refreshing auth state...');
-      await refreshAuth();
-      console.log('Auth state refreshed, navigating to home page...');
-      navigate('/');
+      console.log('AdminLayout: Sign out successful - AuthContext will handle redirect');
+      // Don't navigate here - let AuthContext handle it via the auth state change
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error('AdminLayout: Error signing out:', error);
+      // Force redirect even if signOut fails
+      console.log('AdminLayout: Forcing redirect due to signout error');
+      window.location.href = '/admin/login';
     }
   };
 
