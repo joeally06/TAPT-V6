@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, MapPin, DollarSign, Clock, Save, AlertCircle, ArrowLeft, Trash2, Archive } from 'lucide-react';
+import { Calendar, MapPin, DollarSign, Clock, Save, AlertCircle, ArrowLeft, Trash2, Archive, ToggleLeft, ToggleRight } from 'lucide-react';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { useAuth } from '../context/AuthContext';
 
@@ -30,6 +30,7 @@ export const AdminConferenceSettings: React.FC = () => {
   const [showRolloverModal, setShowRolloverModal] = useState(false);
   const [showClearModal, setShowClearModal] = useState(false);
   const [isRollingOver, setIsRollingOver] = useState(false);
+  const [allSettings, setAllSettings] = useState<ConferenceSettings[]>([]);
   
   const [settings, setSettings] = useState<ConferenceSettings>({
     id: '',
@@ -65,6 +66,16 @@ export const AdminConferenceSettings: React.FC = () => {
       setLoading(true);
       setError(null);
 
+      // Fetch all settings
+      const { data: allData, error: allError } = await supabase
+        .from('conference_settings')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (allError) throw allError;
+      setAllSettings(allData || []);
+
+      // Fetch active setting
       const { data, error } = await supabase
         .from('conference_settings')
         .select('*')
@@ -283,6 +294,40 @@ export const AdminConferenceSettings: React.FC = () => {
     }
   };
 
+  const handleToggleActive = async (settingId: string) => {
+    try {
+      setError(null);
+      setSuccess(null);
+      
+      // Get the current session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No active session');
+      }
+
+      // First, deactivate all settings
+      const { error: deactivateError } = await supabase
+        .from('conference_settings')
+        .update({ is_active: false })
+        .neq('id', 'no-match'); // Update all records
+
+      if (deactivateError) throw deactivateError;
+
+      // Then activate the selected setting
+      const { error: activateError } = await supabase
+        .from('conference_settings')
+        .update({ is_active: true })
+        .eq('id', settingId);
+
+      if (activateError) throw activateError;
+
+      setSuccess('Active conference setting updated successfully!');
+      await fetchSettings();
+    } catch (error: any) {
+      setError(`Failed to update active setting: ${error.message}`);
+    }
+  };
+
   if (loading || authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -336,6 +381,84 @@ export const AdminConferenceSettings: React.FC = () => {
           </div>
         )}
 
+        {/* Available Conference Settings */}
+        {allSettings.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-bold text-secondary mb-4">Available Conference Settings</h2>
+            <div className="bg-white shadow-md rounded-lg overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Name
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Dates
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Location
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {allSettings.map((setting) => (
+                    <tr key={setting.id} className={setting.is_active ? "bg-green-50" : ""}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{setting.name}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-500">
+                          {new Date(setting.start_date).toLocaleDateString()} - {new Date(setting.end_date).toLocaleDateString()}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Reg. Deadline: {new Date(setting.registration_end_date).toLocaleDateString()}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-500">{setting.venue}, {setting.location}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          setting.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {setting.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button
+                          onClick={() => {
+                            if (!setting.is_active) {
+                              handleToggleActive(setting.id);
+                            }
+                          }}
+                          disabled={setting.is_active}
+                          className={`inline-flex items-center px-3 py-1 border border-transparent text-sm leading-4 font-medium rounded-md ${
+                            setting.is_active 
+                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                              : 'text-white bg-primary hover:bg-primary/90'
+                          }`}
+                        >
+                          {setting.is_active ? (
+                            <><ToggleRight className="h-4 w-4 mr-1" /> Active</>
+                          ) : (
+                            <><ToggleLeft className="h-4 w-4 mr-1" /> Activate</>
+                          )}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         <div className="mb-6 flex justify-between">
           <button
             onClick={() => setShowClearModal(true)}
@@ -344,7 +467,7 @@ export const AdminConferenceSettings: React.FC = () => {
           >
             {clearing ? (
               <>
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white\" xmlns="http://www.w3.org/2000/svg\" fill="none\" viewBox="0 0 24 24">
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
@@ -561,7 +684,7 @@ export const AdminConferenceSettings: React.FC = () => {
               >
                 {saving ? (
                   <>
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white\" xmlns="http://www.w3.org/2000/svg\" fill="none\" viewBox="0 0 24 24">
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
@@ -629,7 +752,7 @@ export const AdminConferenceSettings: React.FC = () => {
                 >
                   {isRollingOver ? (
                     <>
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline-block\" xmlns="http://www.w3.org/2000/svg\" fill="none\" viewBox="0 0 24 24">
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
