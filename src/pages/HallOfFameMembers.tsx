@@ -31,7 +31,7 @@ export const HallOfFameMembers: React.FC = () => {
   
   // Get current year for default filter
   const currentYear = new Date().getFullYear();
-  const [selectedYear, setSelectedYear] = useState<number | 'all'>(currentYear);
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [inductionYears, setInductionYears] = useState<number[]>([]);
 
   useEffect(() => {
@@ -76,7 +76,7 @@ export const HallOfFameMembers: React.FC = () => {
   
   // Filter members based on selected year and search term
   const filteredMembers = members.filter(member => {
-    const matchesYear = selectedYear === 'all' || member.induction_year === selectedYear;
+    const matchesYear = member.induction_year === selectedYear;
     
     const matchesSearch = searchTerm === '' || 
       member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -126,10 +126,9 @@ export const HallOfFameMembers: React.FC = () => {
               <span className="text-gray-700 font-medium">Filter by Year:</span>
               <select
                 value={selectedYear}
-                onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
                 className="rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
               >
-                <option value="all">All Years</option>
                 {inductionYears.map(year => (
                   <option key={year} value={year}>{year}</option>
                 ))}
@@ -158,9 +157,7 @@ export const HallOfFameMembers: React.FC = () => {
               <Award className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900">No Members Found</h3>
               <p className="mt-1 text-gray-500">
-                {selectedYear === 'all' 
-                  ? 'There are no Hall of Fame members in the database.' 
-                  : `There are no Hall of Fame members for the year ${selectedYear}.`}
+                There are no Hall of Fame members for the year {selectedYear}.
               </p>
             </div>
           ) : (
