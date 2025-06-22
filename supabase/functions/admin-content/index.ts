@@ -4,7 +4,10 @@ const allowedOrigins = [
   'https://tapt.org',
   'https://admin.tapt.org',
   'http://localhost:5173',
-  'https://localhost:5173'
+  'https://localhost:5173',
+  // Add WebContainer domains
+  'https://*.webcontainer-api.io',
+  'http://*.webcontainer-api.io'
 ];
 
 const securityHeaders = {
@@ -36,8 +39,17 @@ Deno.serve(async (req) => {
   console.log("Admin content function called");
   
   const origin = req.headers.get('Origin') || '';
+  // Check if origin matches any allowed pattern (including wildcards)
+  const allowOrigin = allowedOrigins.some(allowed => {
+    if (allowed.includes('*')) {
+      const pattern = allowed.replace(/\./g, '\\.').replace(/\*/g, '.*');
+      return new RegExp(`^${pattern}$`).test(origin);
+    }
+    return allowed === origin;
+  }) ? origin : '*';
+  
   const corsHeaders = {
-    'Access-Control-Allow-Origin': allowedOrigins.includes(origin) ? origin : '*',
+    'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Methods': 'POST, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     ...securityHeaders
@@ -144,6 +156,14 @@ Deno.serve(async (req) => {
         }
       }
 
+      // Validate linked_form_type if present
+      if (body.linked_form_type) {
+        const validFormTypes = ['conference', 'tech-conference', 'hall-of-fame'];
+        if (!validFormTypes.includes(body.linked_form_type)) {
+          throw new Error('Invalid linked form type');
+        }
+      }
+
       // Prepare data for insert/update
       const contentData = {
         title: body.title,
@@ -155,7 +175,8 @@ Deno.serve(async (req) => {
         image_url: body.image_url || null,
         date: body.date || null,
         category: body.category || null,
-        link: body.link || null
+        link: body.link || null,
+        linked_form_type: body.linked_form_type || null
       };
 
       let result;

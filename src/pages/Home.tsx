@@ -50,6 +50,35 @@ export const Home: React.FC = () => {
     fetchData();
   }, []);
 
+  // Function to get the correct link for an event
+  const getEventLink = (event: any) => {
+    if (event.linked_form_type) {
+      switch (event.linked_form_type) {
+        case 'conference':
+          return '/conference-registration';
+        case 'tech-conference':
+          return '/tech-conference-registration';
+        case 'hall-of-fame':
+          return '/hall-of-fame-nomination';
+        default:
+          return `/events/${event.id}`;
+      }
+    }
+    
+    // If there's a custom link, use it
+    if (event.link) {
+      return event.link;
+    }
+    
+    // Default fallback
+    return `/events/${event.id}`;
+  };
+
+  // Function to determine if the link is external
+  const isExternalLink = (event: any) => {
+    return event.link && (event.link.startsWith('http://') || event.link.startsWith('https://'));
+  };
+
   return (
     <div className="pt-16">
       {/* Hero Section */}
@@ -125,13 +154,25 @@ export const Home: React.FC = () => {
                     </div>
                     <h3 className="text-xl font-bold text-secondary mb-2">{event.title}</h3>
                     <p className="text-gray-600 mb-4">{event.description}</p>
-                    <Link
-                      to={`/events/${event.id}`}
-                      className="inline-flex items-center text-primary hover:text-primary/80 font-medium"
-                    >
-                      Learn More
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Link>
+                    {isExternalLink(event) ? (
+                      <a
+                        href={event.link!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center text-primary hover:text-primary/80 font-medium"
+                      >
+                        Learn More
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </a>
+                    ) : (
+                      <Link
+                        to={getEventLink(event)}
+                        className="inline-flex items-center text-primary hover:text-primary/80 font-medium"
+                      >
+                        {event.linked_form_type ? 'Register Now' : 'Learn More'}
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Link>
+                    )}
                   </div>
                 </div>
               ))}

@@ -16,6 +16,7 @@ interface Event {
   category: string;
   link: string | null;
   created_at: string;
+  linked_form_type: 'conference' | 'tech-conference' | 'hall-of-fame' | null;
 }
 
 export const Events: React.FC = () => {
@@ -61,6 +62,35 @@ export const Events: React.FC = () => {
 
   // Find featured event
   const featuredEvent = events.find(event => event.is_featured);
+
+  // Function to get the correct link for an event
+  const getEventLink = (event: Event) => {
+    if (event.linked_form_type) {
+      switch (event.linked_form_type) {
+        case 'conference':
+          return '/conference-registration';
+        case 'tech-conference':
+          return '/tech-conference-registration';
+        case 'hall-of-fame':
+          return '/hall-of-fame-nomination';
+        default:
+          return `/events/${event.id}`;
+      }
+    }
+    
+    // If there's a custom link, use it
+    if (event.link) {
+      return event.link;
+    }
+    
+    // Default fallback
+    return `/events/${event.id}`;
+  };
+
+  // Function to determine if the link is external
+  const isExternalLink = (event: Event) => {
+    return event.link && (event.link.startsWith('http://') || event.link.startsWith('https://'));
+  };
 
   return (
     <div className="pt-16">
@@ -110,9 +140,9 @@ export const Events: React.FC = () => {
                   <p className="mt-4 text-gray-600">
                     {featuredEvent.description}
                   </p>
-                  {featuredEvent.link ? (
+                  {isExternalLink(featuredEvent) ? (
                     <a
-                      href={featuredEvent.link}
+                      href={featuredEvent.link!}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="mt-6 inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary/90"
@@ -122,10 +152,10 @@ export const Events: React.FC = () => {
                     </a>
                   ) : (
                     <Link
-                      to={`/events/${featuredEvent.id}`}
+                      to={getEventLink(featuredEvent)}
                       className="mt-6 inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary/90"
                     >
-                      Event Details
+                      {featuredEvent.linked_form_type ? 'Register Now' : 'Event Details'}
                       <ChevronRight className="ml-2 h-5 w-5" />
                     </Link>
                   )}
@@ -214,9 +244,9 @@ export const Events: React.FC = () => {
                       {event.description}
                     </p>
                     
-                    {event.link ? (
+                    {isExternalLink(event) ? (
                       <a
-                        href={event.link}
+                        href={event.link!}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-block text-primary font-medium hover:underline"
@@ -225,10 +255,10 @@ export const Events: React.FC = () => {
                       </a>
                     ) : (
                       <Link
-                        to={`/events/${event.id}`}
+                        to={getEventLink(event)}
                         className="inline-block text-primary font-medium hover:underline"
                       >
-                        Event Details <ChevronRight className="inline h-4 w-4" />
+                        {event.linked_form_type ? 'Register Now' : 'Event Details'} <ChevronRight className="inline h-4 w-4" />
                       </Link>
                     )}
                   </div>
@@ -279,3 +309,5 @@ export const Events: React.FC = () => {
     </div>
   );
 };
+
+export default Events;

@@ -13,7 +13,8 @@ import {
   Save,
   X,
   Upload,
-  Star
+  Star,
+  Link as LinkIcon
 } from 'lucide-react';
 import { NEWS_CATEGORIES } from '../lib/types/news';
 import { useAuth } from '../context/AuthContext';
@@ -32,6 +33,7 @@ interface ContentItem {
   category: string | null;
   link: string | null;
   is_featured: boolean;
+  linked_form_type: 'conference' | 'tech-conference' | 'hall-of-fame' | null;
 }
 
 interface ResourceItem {
@@ -68,7 +70,8 @@ export const AdminContent: React.FC = () => {
     status: 'draft',
     featured: false,
     is_featured: false,
-    category: null
+    category: null,
+    linked_form_type: null
   });
 
   useEffect(() => {
@@ -243,7 +246,8 @@ export const AdminContent: React.FC = () => {
             ...formData,
             image_url: imagePath,
             type: selectedType,
-            id: editingItem?.id // Pass id for update, undefined for insert
+            id: editingItem?.id, // Pass id for update, undefined for insert
+            linked_form_type: formData.linked_form_type
           })
         });
         
@@ -270,7 +274,8 @@ export const AdminContent: React.FC = () => {
         status: 'draft',
         featured: false,
         is_featured: false,
-        category: selectedType === 'news' ? NEWS_CATEGORIES[1].id : null
+        category: selectedType === 'news' ? NEWS_CATEGORIES[1].id : null,
+        linked_form_type: null
       });
     } catch (error: any) {
       console.error('Error saving content:', error);
@@ -422,7 +427,8 @@ export const AdminContent: React.FC = () => {
                 status: 'draft',
                 featured: false,
                 is_featured: false,
-                category: selectedType === 'news' ? NEWS_CATEGORIES[1].id : null
+                category: selectedType === 'news' ? NEWS_CATEGORIES[1].id : null,
+                linked_form_type: null
               });
               setShowForm(!showForm);
             }}
@@ -561,17 +567,53 @@ export const AdminContent: React.FC = () => {
                           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
                         />
                       </div>
+                      
                       <div>
                         <label className="block text-sm font-medium text-gray-700">
-                          Link (Optional)
+                          Link to Form
                         </label>
-                        <input
-                          type="url"
-                          value={formData.link || ''}
-                          onChange={(e) => setFormData({ ...formData, link: e.target.value })}
+                        <select
+                          value={formData.linked_form_type || ''}
+                          onChange={(e) => {
+                            const value = e.target.value || null;
+                            setFormData({ 
+                              ...formData, 
+                              linked_form_type: value as any,
+                              // Clear manual link if form type is selected
+                              link: value ? null : formData.link
+                            });
+                          }}
                           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                        />
+                        >
+                          <option value="">None (No Form Link)</option>
+                          <option value="conference">Conference Registration</option>
+                          <option value="tech-conference">Tech Conference Registration</option>
+                          <option value="hall-of-fame">Hall of Fame Nomination</option>
+                        </select>
+                        <p className="mt-1 text-sm text-gray-500">
+                          When published, this event will link to the selected form
+                        </p>
                       </div>
+                      
+                      {!formData.linked_form_type && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            Custom Link (Optional)
+                          </label>
+                          <div className="mt-1 relative rounded-md shadow-sm">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                              <LinkIcon className="h-5 w-5 text-gray-400" />
+                            </div>
+                            <input
+                              type="url"
+                              value={formData.link || ''}
+                              onChange={(e) => setFormData({ ...formData, link: e.target.value })}
+                              className="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+                              placeholder="https://example.com"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -729,6 +771,11 @@ export const AdminContent: React.FC = () => {
                         Category
                       </th>
                     )}
+                    {selectedType === 'event' && (
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Form Link
+                      </th>
+                    )}
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
@@ -762,6 +809,25 @@ export const AdminContent: React.FC = () => {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-500">
                             {NEWS_CATEGORIES.find(cat => cat.id === item.category)?.name || item.category}
+                          </div>
+                        </td>
+                      )}
+                      {selectedType === 'event' && (
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-500">
+                            {item.linked_form_type ? (
+                              <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                                {item.linked_form_type === 'conference' && 'Conference Registration'}
+                                {item.linked_form_type === 'tech-conference' && 'Tech Conference Registration'}
+                                {item.linked_form_type === 'hall-of-fame' && 'Hall of Fame Nomination'}
+                              </span>
+                            ) : item.link ? (
+                              <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+                                Custom Link
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">None</span>
+                            )}
                           </div>
                         </td>
                       )}
