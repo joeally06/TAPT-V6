@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
   // Check if origin matches any allowed pattern (including wildcards)
   const allowOrigin = allowedOrigins.some(allowed => {
     if (allowed.includes('*')) {
-      const pattern = allowed.replace(/\*/g, '.*');
+      const pattern = allowed.replace(/\./g, '\\.').replace(/\*/g, '.*');
       return new RegExp(`^${pattern}$`).test(origin);
     }
     return allowed === origin;
