@@ -136,9 +136,8 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Prepare data for insert/update
-      const memberData = {
-        id: body.id || undefined, // Only include ID if updating
+      // Prepare data for insert/update - IMPORTANT: Don't include id in the initial object
+      const memberData: any = {
         name: body.name,
         title: body.title,
         role: body.role ?? null,
@@ -153,6 +152,11 @@ Deno.serve(async (req) => {
         achievements: body.achievements ?? [],
         bio: body.bio
       };
+
+      // Only add id to the object if it exists (for updates)
+      if (body.id) {
+        memberData.id = body.id;
+      }
 
       let result;
       if (body.id) {
