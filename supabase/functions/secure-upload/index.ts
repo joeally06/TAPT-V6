@@ -3,7 +3,11 @@ import { createClient } from "npm:@supabase/supabase-js@2.39.3";
 const allowedOrigins = [
   'https://tapt.org',
   'https://admin.tapt.org',
-  'http://localhost:5173'
+  'http://localhost:5173',
+  'https://localhost:5173',
+  // Add WebContainer domains
+  'https://*.webcontainer-api.io',
+  'http://*.webcontainer-api.io'
 ];
 
 const securityHeaders = {
@@ -81,7 +85,16 @@ const sanitizeError = (error: any): string => {
 
 Deno.serve(async (req) => {
   const origin = req.headers.get('Origin') || '';
-  corsHeaders['Access-Control-Allow-Origin'] = allowedOrigins.includes(origin) ? origin : '';
+  // Check if origin matches any allowed pattern (including wildcards)
+  const allowOrigin = allowedOrigins.some(allowed => {
+    if (allowed.includes('*')) {
+      const pattern = allowed.replace(/\*/g, '.*');
+      return new RegExp(`^${pattern}$`).test(origin);
+    }
+    return allowed === origin;
+  }) ? origin : '';
+  
+  corsHeaders['Access-Control-Allow-Origin'] = allowOrigin;
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -132,7 +145,9 @@ Deno.serve(async (req) => {
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/plain',
+      'text/csv'
     ];
 
     if (!allowedTypes.includes(contentType)) {
@@ -200,11 +215,11 @@ Deno.serve(async (req) => {
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
         {
           auth: {
-            autoRefreshToken: false,
-            persistSession: false,
-          },
-        }
-      );
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
       let userId = null, bucket = null, folder = null, fileName = null, contentType = null, filePath = null;
       try {
         const body = await req.json();
