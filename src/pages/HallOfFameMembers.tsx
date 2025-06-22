@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Award, MapPin, Globe, Mail, ChevronDown, ChevronUp } from 'lucide-react';
+import { Award, MapPin, Globe, Mail, ChevronDown, ChevronUp, Search } from 'lucide-react';
 
 interface HallOfFameMember {
   id: string;
@@ -26,10 +26,16 @@ export const HallOfFameMembers: React.FC = () => {
   const [members, setMembers] = useState<HallOfFameMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedYear, setSelectedYear] = useState<number | 'all'>('all');
   const [expandedBios, setExpandedBios] = useState<Record<string, boolean>>({});
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Get current year for default filter
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState<number | 'all'>(currentYear);
+  const [inductionYears, setInductionYears] = useState<number[]>([]);
 
   useEffect(() => {
+    window.scrollTo(0, 0);
     fetchMembers();
   }, []);
 
@@ -44,6 +50,15 @@ export const HallOfFameMembers: React.FC = () => {
       if (error) throw error;
 
       setMembers(data || []);
+      
+      // Extract unique induction years
+      const years = [...new Set(data?.map(member => member.induction_year) || [])].sort((a, b) => b - a);
+      setInductionYears(years);
+      
+      // If current year isn't in the list, default to most recent year
+      if (years.length > 0 && !years.includes(currentYear)) {
+        setSelectedYear(years[0]);
+      }
     } catch (error: any) {
       console.error('Error fetching members:', error);
       setError('Failed to load Hall of Fame members');
@@ -58,12 +73,18 @@ export const HallOfFameMembers: React.FC = () => {
       [memberId]: !prev[memberId]
     }));
   };
-
-  const inductionYears = [...new Set(members.map(member => member.induction_year))].sort((a, b) => b - a);
   
-  const filteredMembers = selectedYear === 'all' 
-    ? members 
-    : members.filter(member => member.induction_year === selectedYear);
+  // Filter members based on selected year and search term
+  const filteredMembers = members.filter(member => {
+    const matchesYear = selectedYear === 'all' || member.induction_year === selectedYear;
+    
+    const matchesSearch = searchTerm === '' || 
+      member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (member.organization && member.organization.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (member.bio && member.bio.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    return matchesYear && matchesSearch;
+  });
 
   if (loading) {
     return (
@@ -100,18 +121,31 @@ export const HallOfFameMembers: React.FC = () => {
       {/* Filter Section */}
       <section className="bg-gray-50 border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center space-x-4">
-            <span className="text-gray-700 font-medium">Filter by Year:</span>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
-              className="rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-            >
-              <option value="all">All Years</option>
-              {inductionYears.map(year => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-center space-x-4">
+              <span className="text-gray-700 font-medium">Filter by Year:</span>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+                className="rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+              >
+                <option value="all">All Years</option>
+                {inductionYears.map(year => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="relative max-w-xs">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search members..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+              />
+            </div>
           </div>
         </div>
       </section>
@@ -123,7 +157,11 @@ export const HallOfFameMembers: React.FC = () => {
             <div className="text-center py-12">
               <Award className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900">No Members Found</h3>
-              <p className="mt-1 text-gray-500">There are no Hall of Fame members for the selected criteria.</p>
+              <p className="mt-1 text-gray-500">
+                {selectedYear === 'all' 
+                  ? 'There are no Hall of Fame members in the database.' 
+                  : `There are no Hall of Fame members for the year ${selectedYear}.`}
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
