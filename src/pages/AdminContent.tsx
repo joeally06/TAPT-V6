@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { NEWS_CATEGORIES } from '../lib/types/news';
 import { useAuth } from '../context/AuthContext';
+import { uploadFile } from '../lib/upload';
+import { getPublicUrl } from '../lib/storage';
 
 interface ContentItem {
   id: string;
@@ -47,6 +49,7 @@ interface ResourceItem {
 export const AdminContent: React.FC = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -56,6 +59,7 @@ export const AdminContent: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [editingItem, setEditingItem] = useState<ContentItem | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const [formData, setFormData] = useState<Partial<ContentItem>>({
     title: '',
@@ -136,10 +140,64 @@ export const AdminContent: React.FC = () => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
+    setUploading(true);
 
     try {
       if (selectedType === 'resource') {
-        // ...existing resource upload logic (already uses Edge Function)...
+        // Resource upload logic
+        if (!selectedFile) {
+          throw new Error('Please select a file to upload');
+        }
+
+        if (!formData.category) {
+          throw new Error('Please select a category for the resource');
+        }
+
+        if (!user?.access_token) {
+          throw new Error('User not authenticated');
+        }
+
+        // Upload file to Supabase Storage
+        const filePath = await uploadFile(
+          selectedFile, 
+          'resources', 
+          user.access_token, 
+          { 
+            bucket: 'public',
+            allowedTypes: [
+              'application/pdf',
+              'application/msword',
+              'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+              'application/vnd.ms-excel',
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+              'text/plain',
+              'text/csv'
+            ]
+          }
+        );
+
+        // Get public URL for the uploaded file
+        const fileUrl = getPublicUrl('public', filePath);
+
+        // Insert resource record into database
+        const { data: resourceData, error: resourceError } = await supabase
+          .from('resources')
+          .insert([{
+            title: formData.title,
+            description: formData.description,
+            category: formData.category,
+            file_url: fileUrl,
+            file_type: selectedFile.type,
+            file_size: selectedFile.size,
+            created_by: user.id
+          }])
+          .select()
+          .single();
+
+        if (resourceError) throw resourceError;
+
+        setSuccess('Resource uploaded successfully!');
+        fetchResources();
       } else {
         let imagePath = formData.image_url;
         if (selectedFile) {
@@ -212,11 +270,13 @@ export const AdminContent: React.FC = () => {
         status: 'draft',
         featured: false,
         is_featured: false,
-        category: null
+        category: selectedType === 'news' ? NEWS_CATEGORIES[1].id : null
       });
     } catch (error: any) {
       console.error('Error saving content:', error);
       setError(`Error saving content: ${error.message}`);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -441,6 +501,7 @@ export const AdminContent: React.FC = () => {
                     </label>
                     <input
                       type="file"
+                      ref={fileInputRef}
                       onChange={handleFileSelect}
                       required={!editingItem}
                       className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
@@ -568,10 +629,23 @@ export const AdminContent: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90"
+                  disabled={uploading}
+                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 disabled:opacity-50"
                 >
-                  <Save className="mr-2 h-5 w-5 inline-block" />
-                  {editingItem ? 'Update' : 'Save'}
+                  {uploading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-5 w-5 inline-block" />
+                      {editingItem ? 'Update' : 'Save'}
+                    </>
+                  )}
                 </button>
               </div>
             </form>

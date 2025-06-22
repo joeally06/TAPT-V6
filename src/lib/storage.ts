@@ -1,18 +1,20 @@
 import { sanitizeError } from './errors';
+import { supabase } from './supabase';
 
 // Helper to get the current user's UID securely
-function getCurrentUserId(): string {
-  // TODO: Implement this using your authentication/session logic
-  // For example, from a global auth context or Supabase session
-  throw new Error('getCurrentUserId() not implemented. You must provide a secure way to get the user UID.');
+async function getCurrentUserId(): Promise<string> {
+  const { data: { session }, error } = await supabase.auth.getSession();
+  if (error) throw new Error('Authentication error: ' + error.message);
+  if (!session || !session.user) throw new Error('User not authenticated');
+  return session.user.id;
 }
 
 export async function getSignedUploadUrl(file: File, folder: string, bucket: 'private' | 'public' = 'private', accessToken: string) {
   try {
     // Enforce folder structure for private bucket
     if (bucket === 'private') {
-      // You must implement getCurrentUserId() to return the current user's UID
-      const userId = getCurrentUserId();
+      // Get the current user's UID
+      const userId = await getCurrentUserId();
       if (!userId) throw new Error('User not authenticated');
       if (folder !== userId) {
         throw new Error('Invalid folder: must match your user ID');
