@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Award, MapPin, Globe, Mail } from 'lucide-react';
+import { Award, MapPin, Globe, Mail, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface HallOfFameMember {
   id: string;
@@ -27,6 +27,7 @@ export const HallOfFameMembers: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState<number | 'all'>('all');
+  const [expandedBios, setExpandedBios] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     fetchMembers();
@@ -49,6 +50,13 @@ export const HallOfFameMembers: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const toggleBio = (memberId: string) => {
+    setExpandedBios(prev => ({
+      ...prev,
+      [memberId]: !prev[memberId]
+    }));
   };
 
   const inductionYears = [...new Set(members.map(member => member.induction_year))].sort((a, b) => b - a);
@@ -175,9 +183,30 @@ export const HallOfFameMembers: React.FC = () => {
                       </ul>
                     </div>
 
-                    <div>
-                      <p className="text-gray-600">{member.bio}</p>
-                    </div>
+                    <details 
+                      className="group mt-4" 
+                      open={expandedBios[member.id] || false}
+                      onClick={(e) => {
+                        e.preventDefault(); // Prevent default toggle behavior
+                        toggleBio(member.id);
+                      }}
+                    >
+                      <summary className="flex items-center justify-between cursor-pointer list-none font-medium text-gray-900 mb-2">
+                        <span>Biography</span>
+                        <span className="transition-transform duration-200">
+                          {expandedBios[member.id] ? (
+                            <ChevronUp className="h-5 w-5 text-gray-500" />
+                          ) : (
+                            <ChevronDown className="h-5 w-5 text-gray-500" />
+                          )}
+                        </span>
+                      </summary>
+                      <div className={`mt-2 text-gray-600 overflow-hidden transition-all duration-300 ${
+                        expandedBios[member.id] ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'
+                      }`}>
+                        <p>{member.bio}</p>
+                      </div>
+                    </details>
 
                     <div className="mt-4 pt-4 border-t border-gray-200">
                       <p className="text-sm text-gray-500">
