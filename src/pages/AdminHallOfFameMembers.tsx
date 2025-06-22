@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Award, MapPin, Globe, Mail, Plus, Edit, Trash2, ArrowLeft, Search, ExternalLink } from 'lucide-react';
+import { Award, MapPin, Globe, Mail, Plus, Edit, Trash2, ArrowLeft, Search, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { uploadFile } from '../lib/upload';
 
