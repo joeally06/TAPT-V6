@@ -197,15 +197,11 @@ Deno.serve(async (req) => {
       throw new Error('Exhibitor registration is not currently open');
     }
 
-    const startDate = new Date(settings.start_date);
-    const endDate = new Date(settings.end_date);
+    // Check if registration deadline has passed
+    const registrationEndDate = new Date(settings.registration_end_date);
 
-    if (now < startDate) {
-      throw new Error(`Registration opens on ${startDate.toLocaleDateString()}`);
-    }
-
-    if (now > endDate) {
-      throw new Error(`Registration closed on ${endDate.toLocaleDateString()}`);
+    if (now > registrationEndDate) {
+      throw new Error(`Registration closed on ${registrationEndDate.toLocaleDateString()}`);
     }
 
     // Insert registration
