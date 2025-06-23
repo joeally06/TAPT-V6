@@ -19,6 +19,7 @@ import { AdminArchives } from './pages/AdminArchives';
 import { AdminMemberships } from './pages/AdminMemberships';
 import ConferenceRegistration from './pages/ConferenceRegistration';
 import TechConferenceRegistration from './pages/TechConferenceRegistration';
+import ExhibitorRegistration from './pages/ExhibitorRegistration';
 import { AdminConferenceRegistrations } from './pages/AdminConferenceRegistrations';
 import AdminTechConferenceRegistrations from './pages/AdminTechConferenceRegistrations';
 import { AdminConferenceSettings } from './pages/AdminConferenceSettings';
@@ -78,6 +79,7 @@ function App() {
                       <Route path="/contact" element={<Contact />} />
                       <Route path="/conference-registration" element={<ConferenceRegistration />} />
                       <Route path="/tech-conference-registration" element={<TechConferenceRegistration />} />
+                      <Route path="/exhibitor-registration" element={<ExhibitorRegistration />} />
                       <Route path="/hall-of-fame-nomination" element={<HallOfFameNomination />} />
                       <Route path="/hall-of-fame-members" element={<HallOfFameMembers />} />
                     </Routes>
