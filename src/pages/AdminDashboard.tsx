@@ -12,7 +12,8 @@ import {
   CheckCircle,
   Clock,
   FileText,
-  Store
+  Store,
+  Settings
 } from 'lucide-react';
 
 interface ActivityLog {
