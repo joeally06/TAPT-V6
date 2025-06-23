@@ -11,7 +11,8 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
-  FileText
+  FileText,
+  Store
 } from 'lucide-react';
 
 interface ActivityLog {
@@ -31,6 +32,7 @@ export const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState({
     conferenceRegistrations: 0,
     techConferenceRegistrations: 0,
+    exhibitorRegistrations: 0,
     nominations: 0,
     totalUsers: 0,
     pendingNominations: 0,
@@ -132,6 +134,11 @@ export const AdminDashboard: React.FC = () => {
         icon: <CheckCircle className="h-5 w-5 text-green-500" />,
         message: 'New tech conference registration submitted'
       };
+    } else if (action.includes('exhibitor_registration')) {
+      return {
+        icon: <CheckCircle className="h-5 w-5 text-green-500" />,
+        message: 'New exhibitor registration submitted'
+      };
     } else if (action.includes('nomination')) {
       return {
         icon: <Clock className="h-5 w-5 text-orange-500" />,
@@ -209,6 +216,12 @@ export const AdminDashboard: React.FC = () => {
             value: stats.techConferenceRegistrations,
             icon: Calendar,
             color: 'bg-purple-500'
+          },
+          {
+            title: 'Exhibitor Registrations',
+            value: stats.exhibitorRegistrations,
+            icon: Store,
+            color: 'bg-teal-500'
           },
           {
             title: 'Hall of Fame Nominations',
@@ -303,6 +316,18 @@ export const AdminDashboard: React.FC = () => {
                 path: '/admin/content',
                 icon: FileText,
                 color: 'bg-purple-100 text-purple-600'
+              },
+              {
+                title: 'Exhibitor Settings',
+                path: '/admin/exhibitor-settings',
+                icon: Store,
+                color: 'bg-teal-100 text-teal-600'
+              },
+              {
+                title: 'Site Settings',
+                path: '/admin/site-settings',
+                icon: Settings,
+                color: 'bg-gray-100 text-gray-600'
               }
             ].map((action, index) => (
               <button

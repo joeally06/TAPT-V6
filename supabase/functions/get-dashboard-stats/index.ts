@@ -111,6 +111,15 @@ Deno.serve(async (req) => {
       throw new Error(`Failed to count tech conference registrations: ${techConfError.message}`);
     }
 
+    // Get exhibitor registrations count
+    const { count: exhibitorRegistrations, error: exhibitorError } = await supabaseAdmin
+      .from('exhibitor_registrations')
+      .select('*', { count: 'exact', head: true });
+
+    if (exhibitorError) {
+      throw new Error(`Failed to count exhibitor registrations: ${exhibitorError.message}`);
+    }
+
     // Get hall of fame nominations count
     const { count: nominations, error: nomError } = await supabaseAdmin
       .from('hall_of_fame_nominations')
@@ -174,6 +183,7 @@ Deno.serve(async (req) => {
           totalUsers,
           conferenceRegistrations,
           techConferenceRegistrations,
+          exhibitorRegistrations,
           nominations,
           pendingNominations,
           upcomingEvents

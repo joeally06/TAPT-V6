@@ -22,8 +22,10 @@ import TechConferenceRegistration from './pages/TechConferenceRegistration';
 import ExhibitorRegistration from './pages/ExhibitorRegistration';
 import { AdminConferenceRegistrations } from './pages/AdminConferenceRegistrations';
 import AdminTechConferenceRegistrations from './pages/AdminTechConferenceRegistrations';
+import AdminExhibitorRegistrations from './pages/AdminExhibitorRegistrations';
 import { AdminConferenceSettings } from './pages/AdminConferenceSettings';
 import { AdminTechConferenceSettings } from './pages/AdminTechConferenceSettings';
+import AdminExhibitorSettings from './pages/AdminExhibitorSettings';
 import { AdminHallOfFameSettings } from './pages/AdminHallOfFameSettings';
 import { AdminHallOfFameNominations } from './pages/AdminHallOfFameNominations';
 import { AdminHallOfFameMembers } from './pages/AdminHallOfFameMembers';
@@ -131,6 +133,11 @@ function App() {
               <AdminTechConferenceRegistrations />
             </ProtectedRoute>
           } />
+          <Route path="/admin/exhibitor-registrations" element={
+            <ProtectedRoute requireAdmin>
+              <AdminExhibitorRegistrations />
+            </ProtectedRoute>
+          } />
           <Route path="/admin/conference-settings" element={
             <ProtectedRoute requireAdmin>
               <AdminConferenceSettings />
@@ -139,6 +146,11 @@ function App() {
           <Route path="/admin/tech-conference-settings" element={
             <ProtectedRoute requireAdmin>
               <AdminTechConferenceSettings />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/exhibitor-settings" element={
+            <ProtectedRoute requireAdmin>
+              <AdminExhibitorSettings />
             </ProtectedRoute>
           } />
           <Route path="/admin/hall-of-fame-settings" element={

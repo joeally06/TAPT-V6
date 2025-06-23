@@ -131,6 +131,19 @@ Deno.serve(async (req) => {
         throw upsertError;
       }
 
+      // Log the action
+      try {
+        await supabaseAdmin.from('admin_logs').insert([{
+          user_id: user.id,
+          action: 'update_exhibitor_settings',
+          outcome: 'success',
+          details: { settings_id: body.id, name: body.name }
+        }]);
+      } catch (logError) {
+        // Don't fail the request if logging fails
+        console.error("Error logging action:", logError);
+      }
+
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
@@ -159,33 +172,19 @@ Deno.serve(async (req) => {
           }
         }
 
-        return new Response(JSON.stringify({ success: true }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        });
-      } else if (body.rollover) {
-        // Archive current registrations
-        const { error: archiveError } = await supabaseAdmin.rpc('archive_exhibitor_registrations');
-        
-        if (archiveError) {
-          throw archiveError;
+        // Log the action
+        try {
+          await supabaseAdmin.from('admin_logs').insert([{
+            user_id: user.id,
+            action: 'clear_exhibitor_settings',
+            outcome: 'success',
+            details: { previous_settings_id: currentSettings?.id }
+          }]);
+        } catch (logError) {
+          // Don't fail the request if logging fails
+          console.error("Error logging action:", logError);
         }
-        
-        // Update settings
-        if (body.settings) {
-          const { error: upsertError } = await supabaseAdmin
-            .from('exhibitor_settings')
-            .upsert({
-              ...body.settings,
-              is_active: true,
-              updated_at: new Date().toISOString()
-            });
 
-          if (upsertError) {
-            throw upsertError;
-          }
-        }
-        
         return new Response(JSON.stringify({ success: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,

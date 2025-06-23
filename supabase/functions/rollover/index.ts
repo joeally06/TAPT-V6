@@ -179,6 +179,14 @@ Deno.serve(async (req) => {
           .lte('archived_at', `${settingsYear}-12-31`)
           .limit(1);
         break;
+      case 'exhibitor':
+        existingArchiveQuery = await supabaseAdmin
+          .from('exhibitor_registrations_archive')
+          .select('archived_at')
+          .gte('archived_at', `${settingsYear}-01-01`)
+          .lte('archived_at', `${settingsYear}-12-31`)
+          .limit(1);
+        break;
       case 'hall-of-fame':
         existingArchiveQuery = await supabaseAdmin
           .from('hall_of_fame_nominations_archive')
@@ -373,6 +381,59 @@ Deno.serve(async (req) => {
 
         const { error: insertError } = await supabaseAdmin
           .from('tech_conference_settings')
+          .upsert({ ...settings, is_active: true });
+
+        if (insertError) throw insertError;
+
+        break;
+      }
+
+      case 'exhibitor': {
+        // Get current registrations
+        const { data: registrations, error: regError } = await supabaseAdmin
+          .from('exhibitor_registrations')
+          .select('*');
+
+        if (regError) throw regError;
+
+        if (registrations && registrations.length > 0) {
+          // Generate new archive ID
+          archiveId = crypto.randomUUID();
+
+          // Insert into archive with new IDs
+          const archiveData = registrations.map(reg => ({
+            ...reg,
+            id: crypto.randomUUID(),
+            original_id: reg.id,
+            archived_at: new Date().toISOString(),
+            archive_id: archiveId
+          }));
+
+          const { error: archiveError } = await supabaseAdmin
+            .from('exhibitor_registrations_archive')
+            .insert(archiveData);
+
+          if (archiveError) throw archiveError;
+
+          // Delete all records from the original table
+          const { error: deleteRegistrationsError } = await supabaseAdmin
+            .from('exhibitor_registrations')
+            .delete()
+            .not('id', 'is', null);
+
+          if (deleteRegistrationsError) throw deleteRegistrationsError;
+        }
+
+        // Update settings
+        const { error: updateError } = await supabaseAdmin
+          .from('exhibitor_settings')
+          .update({ is_active: false })
+          .neq('id', settings.id);
+
+        if (updateError) throw updateError;
+
+        const { error: insertError } = await supabaseAdmin
+          .from('exhibitor_settings')
           .upsert({ ...settings, is_active: true });
 
         if (insertError) throw insertError;

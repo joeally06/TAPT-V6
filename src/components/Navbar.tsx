@@ -96,6 +96,8 @@ export const Navbar = () => {
     { name: 'Conference Registrations', path: '/admin/conference-registrations' },
     { name: 'Tech Conference Settings', path: '/admin/tech-conference-settings' },
     { name: 'Tech Conference Registrations', path: '/admin/tech-conference-registrations' },
+    { name: 'Exhibitor Settings', path: '/admin/exhibitor-settings' },
+    { name: 'Exhibitor Registrations', path: '/admin/exhibitor-registrations' },
     { name: 'Hall of Fame Settings', path: '/admin/hall-of-fame-settings' },
     { name: 'Hall of Fame Members', path: '/admin/hall-of-fame-members' },
     { name: 'Hall of Fame Nominations', path: '/admin/hall-of-fame-nominations' }
