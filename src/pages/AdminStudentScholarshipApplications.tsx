@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Download, Search, ChevronDown, ChevronUp, Trash2, Eye, ArrowLeft, FileText } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 interface ScholarshipApplication {
   id: string;
@@ -220,8 +220,8 @@ const AdminStudentScholarshipApplications: React.FC = () => {
       new Date(app.created_at).toLocaleDateString()
     ]);
 
-    // Add the summary table
-    (doc as any).autoTable({
+    // Add the summary table using the imported autoTable function
+    autoTable(doc, {
       head: [columns],
       body: data,
       startY: 40,
