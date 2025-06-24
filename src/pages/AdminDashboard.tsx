@@ -13,7 +13,8 @@ import {
   Clock,
   FileText,
   Store,
-  Settings
+  Settings,
+  GraduationCap
 } from 'lucide-react';
 
 interface ActivityLog {
@@ -34,6 +35,7 @@ export const AdminDashboard: React.FC = () => {
     conferenceRegistrations: 0,
     techConferenceRegistrations: 0,
     exhibitorRegistrations: 0,
+    scholarshipApplications: 0,
     nominations: 0,
     totalUsers: 0,
     pendingNominations: 0,
@@ -140,6 +142,11 @@ export const AdminDashboard: React.FC = () => {
         icon: <CheckCircle className="h-5 w-5 text-green-500" />,
         message: 'New exhibitor registration submitted'
       };
+    } else if (action.includes('scholarship_application')) {
+      return {
+        icon: <CheckCircle className="h-5 w-5 text-green-500" />,
+        message: 'New scholarship application submitted'
+      };
     } else if (action.includes('nomination')) {
       return {
         icon: <Clock className="h-5 w-5 text-orange-500" />,
@@ -223,6 +230,12 @@ export const AdminDashboard: React.FC = () => {
             value: stats.exhibitorRegistrations,
             icon: Store,
             color: 'bg-teal-500'
+          },
+          {
+            title: 'Scholarship Applications',
+            value: stats.scholarshipApplications,
+            icon: GraduationCap,
+            color: 'bg-amber-500'
           },
           {
             title: 'Hall of Fame Nominations',
@@ -323,6 +336,12 @@ export const AdminDashboard: React.FC = () => {
                 path: '/admin/exhibitor-settings',
                 icon: Store,
                 color: 'bg-teal-100 text-teal-600'
+              },
+              {
+                title: 'Scholarship Settings',
+                path: '/admin/student-scholarship-settings',
+                icon: GraduationCap,
+                color: 'bg-amber-100 text-amber-600'
               },
               {
                 title: 'Site Settings',

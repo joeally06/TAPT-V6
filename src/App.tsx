@@ -20,12 +20,15 @@ import { AdminMemberships } from './pages/AdminMemberships';
 import ConferenceRegistration from './pages/ConferenceRegistration';
 import TechConferenceRegistration from './pages/TechConferenceRegistration';
 import ExhibitorRegistration from './pages/ExhibitorRegistration';
+import StudentScholarshipApplication from './pages/StudentScholarshipApplication';
 import { AdminConferenceRegistrations } from './pages/AdminConferenceRegistrations';
 import AdminTechConferenceRegistrations from './pages/AdminTechConferenceRegistrations';
 import AdminExhibitorRegistrations from './pages/AdminExhibitorRegistrations';
+import AdminStudentScholarshipApplications from './pages/AdminStudentScholarshipApplications';
 import { AdminConferenceSettings } from './pages/AdminConferenceSettings';
 import { AdminTechConferenceSettings } from './pages/AdminTechConferenceSettings';
 import AdminExhibitorSettings from './pages/AdminExhibitorSettings';
+import AdminStudentScholarshipSettings from './pages/AdminStudentScholarshipSettings';
 import { AdminHallOfFameSettings } from './pages/AdminHallOfFameSettings';
 import { AdminHallOfFameNominations } from './pages/AdminHallOfFameNominations';
 import { AdminHallOfFameMembers } from './pages/AdminHallOfFameMembers';
@@ -82,6 +85,7 @@ function App() {
                       <Route path="/conference-registration" element={<ConferenceRegistration />} />
                       <Route path="/tech-conference-registration" element={<TechConferenceRegistration />} />
                       <Route path="/exhibitor-registration" element={<ExhibitorRegistration />} />
+                      <Route path="/student-scholarship-application" element={<StudentScholarshipApplication />} />
                       <Route path="/hall-of-fame-nomination" element={<HallOfFameNomination />} />
                       <Route path="/hall-of-fame-members" element={<HallOfFameMembers />} />
                     </Routes>
@@ -138,6 +142,11 @@ function App() {
               <AdminExhibitorRegistrations />
             </ProtectedRoute>
           } />
+          <Route path="/admin/student-scholarship-applications" element={
+            <ProtectedRoute requireAdmin>
+              <AdminStudentScholarshipApplications />
+            </ProtectedRoute>
+          } />
           <Route path="/admin/conference-settings" element={
             <ProtectedRoute requireAdmin>
               <AdminConferenceSettings />
@@ -151,6 +160,11 @@ function App() {
           <Route path="/admin/exhibitor-settings" element={
             <ProtectedRoute requireAdmin>
               <AdminExhibitorSettings />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/student-scholarship-settings" element={
+            <ProtectedRoute requireAdmin>
+              <AdminStudentScholarshipSettings />
             </ProtectedRoute>
           } />
           <Route path="/admin/hall-of-fame-settings" element={

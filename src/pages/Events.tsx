@@ -16,7 +16,7 @@ interface Event {
   category: string;
   link: string | null;
   created_at: string;
-  linked_form_type: 'conference' | 'tech-conference' | 'hall-of-fame' | null;
+  linked_form_type: 'conference' | 'tech-conference' | 'hall-of-fame' | 'student-scholarship' | null;
 }
 
 export const Events: React.FC = () => {
@@ -73,6 +73,8 @@ export const Events: React.FC = () => {
           return '/tech-conference-registration';
         case 'hall-of-fame':
           return '/hall-of-fame-nomination';
+        case 'student-scholarship':
+          return '/student-scholarship-application';
         default:
           return `/events/${event.id}`;
       }
@@ -290,7 +292,7 @@ export const Events: React.FC = () => {
                   </button>
                 </div>
               </div>
-              <div className="md:flex-shrink-0 md:w-1/3 bg-gradient-to-br from-primary to-secondary p-8 text-white flex items-center">
+              <div className="md:flex-shrink-0 md:w-1/3 bg-gradient-to-br from-primary to-accent p-8 text-white flex items-center">
                 <div>
                   <h3 className="text-xl font-bold mb-3">Host Your Own Event</h3>
                   <p className="mb-4">Are you interested in hosting a TAPT workshop or event in your district?</p>

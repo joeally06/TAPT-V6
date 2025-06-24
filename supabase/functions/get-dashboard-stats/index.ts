@@ -120,6 +120,15 @@ Deno.serve(async (req) => {
       throw new Error(`Failed to count exhibitor registrations: ${exhibitorError.message}`);
     }
 
+    // Get student scholarship applications count
+    const { count: scholarshipApplications, error: scholarshipError } = await supabaseAdmin
+      .from('student_scholarship_applications')
+      .select('*', { count: 'exact', head: true });
+
+    if (scholarshipError) {
+      throw new Error(`Failed to count scholarship applications: ${scholarshipError.message}`);
+    }
+
     // Get hall of fame nominations count
     const { count: nominations, error: nomError } = await supabaseAdmin
       .from('hall_of_fame_nominations')
@@ -184,6 +193,7 @@ Deno.serve(async (req) => {
           conferenceRegistrations,
           techConferenceRegistrations,
           exhibitorRegistrations,
+          scholarshipApplications,
           nominations,
           pendingNominations,
           upcomingEvents

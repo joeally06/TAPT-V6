@@ -63,7 +63,8 @@ export const Navbar = () => {
       subItems: [
         { name: 'Conference Registration', path: '/conference-registration' },
         { name: 'Tech Conference Registration', path: '/tech-conference-registration' },
-        { name: 'Exhibitor Registration', path: '/exhibitor-registration' }
+        { name: 'Exhibitor Registration', path: '/exhibitor-registration' },
+        { name: 'Student Scholarship', path: '/student-scholarship-application' }
       ]
     },
     { 
@@ -98,6 +99,8 @@ export const Navbar = () => {
     { name: 'Tech Conference Registrations', path: '/admin/tech-conference-registrations' },
     { name: 'Exhibitor Settings', path: '/admin/exhibitor-settings' },
     { name: 'Exhibitor Registrations', path: '/admin/exhibitor-registrations' },
+    { name: 'Student Scholarship Settings', path: '/admin/student-scholarship-settings' },
+    { name: 'Student Scholarship Applications', path: '/admin/student-scholarship-applications' },
     { name: 'Hall of Fame Settings', path: '/admin/hall-of-fame-settings' },
     { name: 'Hall of Fame Members', path: '/admin/hall-of-fame-members' },
     { name: 'Hall of Fame Nominations', path: '/admin/hall-of-fame-nominations' }

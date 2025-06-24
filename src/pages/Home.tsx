@@ -60,6 +60,8 @@ export const Home: React.FC = () => {
           return '/tech-conference-registration';
         case 'hall-of-fame':
           return '/hall-of-fame-nomination';
+        case 'student-scholarship':
+          return '/student-scholarship-application';
         default:
           return `/events/${event.id}`;
       }

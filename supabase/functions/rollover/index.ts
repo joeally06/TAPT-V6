@@ -195,6 +195,14 @@ Deno.serve(async (req) => {
           .lte('archived_at', `${settingsYear}-12-31`)
           .limit(1);
         break;
+      case 'student-scholarship':
+        existingArchiveQuery = await supabaseAdmin
+          .from('student_scholarship_applications_archive')
+          .select('archived_at')
+          .gte('archived_at', `${settingsYear}-01-01`)
+          .lte('archived_at', `${settingsYear}-12-31`)
+          .limit(1);
+        break;
       default:
         return new Response(
           JSON.stringify({ success: false, error: 'Invalid rollover type' }),
@@ -487,6 +495,59 @@ Deno.serve(async (req) => {
 
         const { error: insertError } = await supabaseAdmin
           .from('hall_of_fame_settings')
+          .upsert({ ...settings, is_active: true });
+
+        if (insertError) throw insertError;
+
+        break;
+      }
+
+      case 'student-scholarship': {
+        // Get current applications
+        const { data: applications, error: appError } = await supabaseAdmin
+          .from('student_scholarship_applications')
+          .select('*');
+
+        if (appError) throw appError;
+
+        if (applications && applications.length > 0) {
+          // Generate new archive ID
+          archiveId = crypto.randomUUID();
+
+          // Insert into archive with new IDs
+          const archiveData = applications.map(app => ({
+            ...app,
+            id: crypto.randomUUID(),
+            original_id: app.id,
+            archived_at: new Date().toISOString(),
+            archive_id: archiveId
+          }));
+
+          const { error: archiveError } = await supabaseAdmin
+            .from('student_scholarship_applications_archive')
+            .insert(archiveData);
+
+          if (archiveError) throw archiveError;
+
+          // Delete all records from the original table
+          const { error: deleteApplicationsError } = await supabaseAdmin
+            .from('student_scholarship_applications')
+            .delete()
+            .not('id', 'is', null);
+
+          if (deleteApplicationsError) throw deleteApplicationsError;
+        }
+
+        // Update settings
+        const { error: updateError } = await supabaseAdmin
+          .from('student_scholarship_settings')
+          .update({ is_active: false })
+          .neq('id', settings.id);
+
+        if (updateError) throw updateError;
+
+        const { error: insertError } = await supabaseAdmin
+          .from('student_scholarship_settings')
           .upsert({ ...settings, is_active: true });
 
         if (insertError) throw insertError;

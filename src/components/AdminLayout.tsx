@@ -16,7 +16,8 @@ import {
   Home,
   Image,
   MessageSquare,
-  Store
+  Store,
+  GraduationCap
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -66,6 +67,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {  const [isSi
         { name: 'Conference', path: '/admin/conference-settings' },
         { name: 'Tech Conference', path: '/admin/tech-conference-settings' },
         { name: 'Exhibitor', path: '/admin/exhibitor-settings' },
+        { name: 'Student Scholarship', path: '/admin/student-scholarship-settings' },
         { name: 'Hall of Fame', path: '/admin/hall-of-fame-settings' }
       ]
     },
@@ -94,7 +96,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {  const [isSi
       submenu: [
         { name: 'Conference', path: '/admin/conference-registrations' },
         { name: 'Tech Conference', path: '/admin/tech-conference-registrations' },
-        { name: 'Exhibitor', path: '/admin/exhibitor-registrations' }
+        { name: 'Exhibitor', path: '/admin/exhibitor-registrations' },
+        { name: 'Student Scholarship', path: '/admin/student-scholarship-applications' }
       ]
     },
     {
