@@ -58,7 +58,7 @@ export const Navbar = () => {
   const navItems = [
     { name: 'Home', path: '/' },
     { 
-      name: 'Events', 
+      name: 'Forms', 
       path: '/events',
       subItems: [
         { name: 'Conference Registration', path: '/conference-registration' },
