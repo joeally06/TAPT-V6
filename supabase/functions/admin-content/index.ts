@@ -158,7 +158,7 @@ Deno.serve(async (req) => {
 
       // Validate linked_form_type if present
       if (body.linked_form_type) {
-        const validFormTypes = ['conference', 'tech-conference', 'hall-of-fame'];
+        const validFormTypes = ['conference', 'tech-conference', 'hall-of-fame', 'student-scholarship', 'exhibitor'];
         if (!validFormTypes.includes(body.linked_form_type)) {
           throw new Error('Invalid linked form type');
         }
