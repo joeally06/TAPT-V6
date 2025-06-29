@@ -61,12 +61,13 @@ Deno.serve(async (req) => {
       return new RegExp(`^${pattern}$`).test(origin);
     }
     return allowed === origin;
-  }) ? origin : '*';
+  }) ? origin : '';
   
   const corsHeaders = {
     'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Credentials': 'true',
     ...securityHeaders
   };
 

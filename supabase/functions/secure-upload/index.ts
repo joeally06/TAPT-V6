@@ -16,13 +16,6 @@ const securityHeaders = {
   'Content-Security-Policy': "default-src 'none'"
 };
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  ...securityHeaders
-};
-
 interface UploadRequest {
   fileName: string;
   contentType: string;
@@ -94,7 +87,13 @@ Deno.serve(async (req) => {
     return allowed === origin;
   }) ? origin : '';
   
-  corsHeaders['Access-Control-Allow-Origin'] = allowOrigin;
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Credentials': 'true',
+    ...securityHeaders
+  };
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });

@@ -4,7 +4,10 @@ const allowedOrigins = [
   'https://tapt.org',
   'https://admin.tapt.org',
   'http://localhost:5173',
-  'https://localhost:5173'
+  'https://localhost:5173',
+  // Add WebContainer domains
+  'https://*.webcontainer-api.io',
+  'http://*.webcontainer-api.io'
 ];
 
 const securityHeaders = {
@@ -50,10 +53,20 @@ Deno.serve(async (req) => {
   console.log("Submit membership function called");
   
   const origin = req.headers.get('Origin') || '';
+  // Check if origin matches any allowed pattern (including wildcards)
+  const allowOrigin = allowedOrigins.some(allowed => {
+    if (allowed.includes('*')) {
+      const pattern = allowed.replace(/\./g, '\\.').replace(/\*/g, '.*');
+      return new RegExp(`^${pattern}$`).test(origin);
+    }
+    return allowed === origin;
+  }) ? origin : '';
+  
   const corsHeaders = {
-    'Access-Control-Allow-Origin': allowedOrigins.includes(origin) ? origin : '*',
+    'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Credentials': 'true',
     ...securityHeaders
   };
 
