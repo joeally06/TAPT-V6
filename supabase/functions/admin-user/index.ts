@@ -4,7 +4,10 @@ const allowedOrigins = [
   'https://tapt.org',
   'https://admin.tapt.org',
   'http://localhost:5173',
-  'https://localhost:5173'
+  'https://localhost:5173',
+  // Add WebContainer domains
+  'https://*.webcontainer-api.io',
+  'http://*.webcontainer-api.io'
 ];
 
 const securityHeaders = {
@@ -13,59 +16,44 @@ const securityHeaders = {
   'Content-Security-Policy': "default-src 'none'"
 };
 
-const corsHeaders = {
-  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  ...securityHeaders
-};
-
-interface CreateUserPayload {
-  email: string;
-  password: string;
-  role: 'user' | 'admin';
-}
-
-interface DeleteUserPayload {
-  userId: string;
-}
-
-// Helper to log admin actions
-type AdminLogEntry = {
-  action: string;
-  user_id: string;
-  outcome: 'success' | 'failure';
-  error?: string;
-  details?: any;
-};
-async function logAdminAction(supabaseAdmin: any, entry: AdminLogEntry) {
-  try {
-    await supabaseAdmin.from('admin_logs').insert([
-      {
-        action: entry.action,
-        user_id: entry.user_id,
-        outcome: entry.outcome,
-        error: entry.error || null,
-        details: entry.details ? JSON.stringify(entry.details) : null,
-        timestamp: new Date().toISOString(),
-      },
-    ]);
-    // TODO: Integrate alerting/monitoring for repeated failures
-  } catch (e) {
-    // Logging failure should not block main flow
-    console.error("Failed to log admin action:", e);
+// Utility to sanitize error messages
+const sanitizeError = (error: any): string => {
+  const errorMap: Record<string, string> = {
+    'auth/invalid-email': 'Please enter a valid email address.',
+    'auth/wrong-password': 'Invalid login credentials.',
+    '23505': 'A record with this information already exists.',
+    '22P02': 'Invalid input format.',
+    '23503': 'Related record not found.',
+    '23514': 'Input does not meet requirements.',
+  };
+  
+  if (error && typeof error === 'object') {
+    if (error.code && errorMap[error.code]) return errorMap[error.code];
+    if (error.message && errorMap[error.message]) return errorMap[error.message];
   }
-}
+  
+  return error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.';
+};
 
 Deno.serve(async (req) => {
   console.log("Admin user function called");
   
-  let user: any = undefined;
-  let supabaseAdmin: any = undefined;
-
   const origin = req.headers.get('Origin') || '';
+  // Check if origin matches any allowed pattern (including wildcards)
+  const allowOrigin = allowedOrigins.some(allowed => {
+    if (allowed.includes('*')) {
+      const pattern = allowed.replace(/\./g, '\\.').replace(/\*/g, '.*');
+      return new RegExp(`^${pattern}$`).test(origin);
+    }
+    return allowed === origin;
+  }) ? origin : '';
+  
   const responseCorsHeaders = {
-    ...corsHeaders,
-    'Access-Control-Allow-Origin': allowedOrigins.includes(origin) ? origin : '*'
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Credentials': 'true',
+    ...securityHeaders
   };
 
   // Handle CORS preflight requests
@@ -93,8 +81,8 @@ Deno.serve(async (req) => {
       throw new Error('Server configuration error: Missing required environment variables');
     }
 
-    // Create authenticated Supabase client using service role key
-    supabaseAdmin = createClient(
+    // Create Supabase client with service role key
+    const supabaseAdmin = createClient(
       supabaseUrl,
       supabaseServiceKey,
       {
@@ -112,9 +100,8 @@ Deno.serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
-    user = authUser;
-
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    
     if (authError || !user) {
       throw new Error('Unauthorized');
     }
@@ -160,11 +147,15 @@ Deno.serve(async (req) => {
         created_at: authUser.created_at
       }));
 
-      await logAdminAction(supabaseAdmin, {
-        action: 'list_users',
-        user_id: user.id,
-        outcome: 'success',
-      });
+      try {
+        await supabaseAdmin.from('admin_logs').insert([{
+          user_id: user.id,
+          action: 'list_users',
+          outcome: 'success',
+        }]);
+      } catch (logError) {
+        console.error("Error logging action:", logError);
+      }
 
       console.log(`Found ${users.length} users`);
       return new Response(
@@ -183,18 +174,12 @@ Deno.serve(async (req) => {
       console.log("Creating new user");
       
       // Create new user
-      let payload: CreateUserPayload;
-      try {
-        payload = await req.json();
-        console.log("Received payload:", JSON.stringify({
-          email: payload.email,
-          role: payload.role
-          // Omitting password for security
-        }));
-      } catch (error) {
-        console.error("Error parsing request JSON:", error);
-        throw new Error('Invalid request format: Unable to parse JSON');
-      }
+      const payload = await req.json();
+      console.log("Received payload:", JSON.stringify({
+        email: payload.email,
+        role: payload.role
+        // Omitting password for security
+      }));
 
       // Check if user already exists in auth
       const { data: existingUsers } = await supabaseAdmin
@@ -240,12 +225,16 @@ Deno.serve(async (req) => {
         }
       }
 
-      await logAdminAction(supabaseAdmin, {
-        action: 'create_user',
-        user_id: user.id,
-        outcome: 'success',
-        details: { created_user: newUser.user.id, email: payload.email, role: payload.role }
-      });
+      try {
+        await supabaseAdmin.from('admin_logs').insert([{
+          user_id: user.id,
+          action: 'create_user',
+          outcome: 'success',
+          details: { created_user: newUser.user.id, email: payload.email, role: payload.role }
+        }]);
+      } catch (logError) {
+        console.error("Error logging action:", logError);
+      }
 
       console.log("User created successfully");
       return new Response(
@@ -268,14 +257,8 @@ Deno.serve(async (req) => {
       console.log("Deleting user");
       
       // Delete user
-      let payload: DeleteUserPayload;
-      try {
-        payload = await req.json();
-        console.log("Received payload:", JSON.stringify(payload));
-      } catch (error) {
-        console.error("Error parsing request JSON:", error);
-        throw new Error('Invalid request format: Unable to parse JSON');
-      }
+      const payload = await req.json();
+      console.log("Received payload:", JSON.stringify(payload));
 
       // First, verify the user exists in auth
       const { data: authUser, error: authUserError } = await supabaseAdmin.auth.admin.getUserById(
@@ -351,12 +334,16 @@ Deno.serve(async (req) => {
         throw new Error(`Failed to delete user from auth: ${deleteAuthError.message}`);
       }
 
-      await logAdminAction(supabaseAdmin, {
-        action: 'delete_user',
-        user_id: user.id,
-        outcome: 'success',
-        details: { deleted_user: payload.userId }
-      });
+      try {
+        await supabaseAdmin.from('admin_logs').insert([{
+          user_id: user.id,
+          action: 'delete_user',
+          outcome: 'success',
+          details: { deleted_user: payload.userId }
+        }]);
+      } catch (logError) {
+        console.error("Error logging action:", logError);
+      }
 
       console.log("User deleted successfully");
       return new Response(
@@ -375,25 +362,11 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error("Error in admin-user function:", error);
-
-    // Try to log the failed action if user and supabaseAdmin are available
-    try {
-      if (supabaseAdmin && user && user.id) {
-        await logAdminAction(supabaseAdmin, {
-          action: req.method === 'GET' ? 'list_users' : req.method === 'POST' ? 'create_user' : req.method === 'DELETE' ? 'delete_user' : 'unknown',
-          user_id: user.id,
-          outcome: 'failure',
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-    } catch (logError) {
-      console.error("Failed to log admin action:", logError);
-    }
-
+    
     return new Response(
       JSON.stringify({
         success: false,
-        error: error instanceof Error ? error.message : 'An unexpected error occurred',
+        error: sanitizeError(error),
       }),
       { 
         status: 400,

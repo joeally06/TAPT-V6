@@ -155,6 +155,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // If user is null after timeout, force redirect to login page
       if (!state.user) {
         console.log('AuthContext: No user after timeout - redirecting to login page');
+        setState(prev => ({ 
+          ...prev, 
+          loading: false,
+          error: new Error('Authentication timeout')
+        }));
         window.location.href = '/admin/login';
       } else {
         // Just reset loading state if we have a user
@@ -167,7 +172,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, 10000); // 10 second timeout
 
     return () => clearTimeout(timeoutId);
-  }, [state.loading, state.user]);
+  }, [state.loading]); // Only depend on loading state, not user
 
   return <AuthContext.Provider value={state}>{children}</AuthContext.Provider>;
 };
