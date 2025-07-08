@@ -16,7 +16,7 @@ export const AdminArchives: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [archiveType, setArchiveType] = useState<'conference' | 'tech-conference' | 'hall-of-fame'>('conference');
+  const [archiveType, setArchiveType] = useState<'conference' | 'tech-conference' | 'hall-of-fame' | 'exhibitor' | 'student-scholarship'>('conference');
   const [archives, setArchives] = useState<Record<string, ArchiveItem[]>>({});
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -43,7 +43,9 @@ export const AdminArchives: React.FC = () => {
       const tables = {
         conference: 'conference_registrations_archive',
         'tech-conference': 'tech_conference_registrations_archive',
-        'hall-of-fame': 'hall_of_fame_nominations_archive'
+        'hall-of-fame': 'hall_of_fame_nominations_archive',
+        'exhibitor': 'exhibitor_registrations_archive',
+        'student-scholarship': 'student_scholarship_applications_archive'
       };
 
       const archiveData: Record<string, ArchiveItem[]> = {};
@@ -95,16 +97,81 @@ export const AdminArchives: React.FC = () => {
   const convertToCSV = (items: ArchiveItem[]) => {
     if (items.length === 0) return '';
     
-    const headers = Object.keys(items[0])
-      .filter(key => !['id', 'archive_id'].includes(key))
-      .join(',');
+    // Define headers based on archive type
+    let headers: string;
+    
+    switch (archiveType) {
+      case 'conference':
+      case 'tech-conference':
+        headers = ['School District', 'Name', 'Email', 'Phone', 'Total Attendees', 'Total Amount', 'Archived Date'].join(',');
+        break;
+      case 'hall-of-fame':
+        headers = ['Nominee', 'District', 'Region', 'Years of Service', 'Status', 'Archived Date'].join(',');
+        break;
+      case 'exhibitor':
+        headers = ['Business Name', 'Contact Name', 'Email', 'Phone', 'City', 'State', 'Archived Date'].join(',');
+        break;
+      case 'student-scholarship':
+        headers = ['Name', 'Email', 'High School', 'School District', 'Status', 'Archived Date'].join(',');
+        break;
+      default:
+        headers = Object.keys(items[0])
+          .filter(key => !['id', 'archive_id'].includes(key))
+          .join(',');
+    }
       
-    const rows = items.map(item => 
-      Object.entries(item)
-        .filter(([key]) => !['id', 'archive_id'].includes(key))
-        .map(([_, value]) => `"${value}"`)
-        .join(',')
-    );
+    // Map rows based on archive type
+    const rows = items.map(item => {
+      switch (archiveType) {
+        case 'conference':
+        case 'tech-conference':
+          return [
+            `"${item.school_district || ''}"`,
+            `"${item.first_name || ''} ${item.last_name || ''}"`,
+            `"${item.email || ''}"`,
+            `"${item.phone || ''}"`,
+            `"${item.total_attendees || 0}"`,
+            `"${item.total_amount || 0}"`,
+            `"${new Date(item.archived_at).toLocaleDateString() || ''}"`,
+          ].join(',');
+        case 'hall-of-fame':
+          return [
+            `"${item.nominee_first_name || ''} ${item.nominee_last_name || ''}"`,
+            `"${item.district || ''}"`,
+            `"${item.region || ''}"`,
+            `"${item.years_of_service || ''}"`,
+            `"${item.status || ''}"`,
+            `"${new Date(item.archived_at).toLocaleDateString() || ''}"`,
+          ].join(',');
+        case 'exhibitor':
+          return [
+            `"${item.business_name || ''}"`,
+            `"${item.first_name || ''} ${item.last_name || ''}"`,
+            `"${item.email || ''}"`,
+            `"${item.phone || ''}"`,
+            `"${item.city || ''}"`,
+            `"${item.state || ''}"`,
+            `"${new Date(item.archived_at).toLocaleDateString() || ''}"`,
+          ].join(',');
+        case 'student-scholarship':
+          // Handle the JSONB structure for full_name
+          const fullName = item.full_name ? 
+            `${item.full_name.first || ''} ${item.full_name.last || ''}` : '';
+          return [
+            `"${fullName}"`,
+            `"${item.email || ''}"`,
+            `"${item.high_school || ''}"`,
+            `"${item.school_district || ''}"`,
+            `"${item.application_status || ''}"`,
+            `"${new Date(item.archived_at).toLocaleDateString() || ''}"`,
+          ].join(',');
+        default:
+          return Object.entries(item)
+            .filter(([key]) => !['id', 'archive_id'].includes(key))
+            .map(([_, value]) => `"${value}"`)
+            .join(',');
+      }
+    });
     
     return [headers, ...rows].join('\n');
   };
@@ -117,6 +184,10 @@ export const AdminArchives: React.FC = () => {
         return 'Tech Conference Registrations';
       case 'hall-of-fame':
         return 'Hall of Fame Nominations';
+      case 'exhibitor':
+        return 'Exhibitor Registrations';
+      case 'student-scholarship':
+        return 'Student Scholarship Applications';
       default:
         return '';
     }
@@ -154,7 +225,9 @@ export const AdminArchives: React.FC = () => {
             {[
               { id: 'conference', label: 'Conference' },
               { id: 'tech-conference', label: 'Tech Conference' },
-              { id: 'hall-of-fame', label: 'Hall of Fame' }
+              { id: 'hall-of-fame', label: 'Hall of Fame' },
+              { id: 'exhibitor', label: 'Exhibitor' },
+              { id: 'student-scholarship', label: 'Student Scholarship' }
             ].map((type) => (
               <button
                 key={type.id}
@@ -206,9 +279,23 @@ export const AdminArchives: React.FC = () => {
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Archive Date
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Items
-                    </th>
+                    {archiveType === 'conference' || archiveType === 'tech-conference' ? (
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        School Districts
+                      </th>
+                    ) : archiveType === 'hall-of-fame' ? (
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Nominations
+                      </th>
+                    ) : archiveType === 'exhibitor' ? (
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Businesses
+                      </th>
+                    ) : (
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Applications
+                      </th>
+                    )}
                     <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
                     </th>
