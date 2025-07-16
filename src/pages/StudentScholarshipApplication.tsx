@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Mail, Phone, MapPin, Calendar, User, Book, Award, FileText, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { handleError } from '../lib/errors';
+import { SecureForm } from '../components/forms/SecureForm';
 
 interface ScholarshipSettings {
   id: string;
@@ -133,36 +134,21 @@ const StudentScholarshipApplication: React.FC = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const handleSecureSubmit = async (turnstileToken: string) => {
     if (!scholarshipSettings?.is_active) {
-      setFormStatus({
-        success: false,
-        message: 'Scholarship application is not currently available.'
-      });
-      return;
+      throw new Error('Scholarship application is not currently available.');
     }
 
     if (isApplicationClosed) {
-      setFormStatus({
-        success: false,
-        message: 'Application deadline has passed.'
-      });
-      return;
+      throw new Error('Application deadline has passed.');
     }
 
     // Validate essay word count
     if (wordCounts.essay < 300 || wordCounts.essay > 500) {
-      setFormStatus({
-        success: false,
-        message: 'Your essay must be between 300-500 words.'
-      });
-      return;
+      throw new Error('Your essay must be between 300-500 words.');
     }
 
     setIsSubmitting(true);
-    setFormStatus({});
 
     try {
       // Get the Supabase URL from environment variables
@@ -204,7 +190,8 @@ const StudentScholarshipApplication: React.FC = () => {
         },
         mobilePhone: formData.mobilePhone,
         email: formData.email,
-        signature: formData.signature
+        signature: formData.signature,
+        turnstileToken
       };
 
       // Make the request to the Edge Function
@@ -228,6 +215,7 @@ const StudentScholarshipApplication: React.FC = () => {
         throw new Error(result.error || 'Failed to submit application');
       }
 
+      // ✅ Only show success message via formStatus
       setFormStatus({
         success: true,
         message: 'Application submitted successfully! You will receive a confirmation email shortly.'
@@ -266,10 +254,9 @@ const StudentScholarshipApplication: React.FC = () => {
     } catch (error: any) {
       console.error('Error submitting application:', error);
       const { message } = handleError(error);
-      setFormStatus({
-        success: false,
-        message: `Error submitting application: ${message}`
-      });
+      
+      // ✅ Re-throw the error so SecureForm can display it
+      throw new Error(`Error submitting application: ${message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -384,7 +371,7 @@ const StudentScholarshipApplication: React.FC = () => {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="bg-white shadow-lg rounded-lg p-8">
+            <SecureForm onSubmit={handleSecureSubmit} className="bg-white shadow-lg rounded-lg p-8">
               {/* Personal Information */}
               <div className="mb-8">
                 <h2 className="text-xl font-semibold text-secondary mb-6">I. Personal Data</h2>
@@ -1078,7 +1065,7 @@ const StudentScholarshipApplication: React.FC = () => {
                   )}
                 </button>
               </div>
-            </form>
+            </SecureForm>
           </div>
         </section>
       )}

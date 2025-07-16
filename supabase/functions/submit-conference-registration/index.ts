@@ -2,6 +2,9 @@ import { createClient } from "npm:@supabase/supabase-js@2.39.3";
 
 const allowedOrigins = [
   'https://tapt.org',
+  'https://www.tapt.org',
+  'https://tntapt.com',
+  'https://www.tntapt.com',
   'https://admin.tapt.org',
   'http://localhost:5173',
   'https://localhost:5173',
@@ -88,11 +91,38 @@ Deno.serve(async (req) => {
     if (!body.totalAttendees || typeof body.totalAttendees !== 'number' || body.totalAttendees < 1 || body.totalAttendees > 20) {
       errors.push('Total attendees must be between 1 and 20.');
     }
+    if (!body.turnstileToken || typeof body.turnstileToken !== 'string') {
+      errors.push('Security verification is required.');
+    }
     if (errors.length > 0) {
       return new Response(
         JSON.stringify({ success: false, error: errors.join(' ') }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Verify Turnstile token
+    const turnstileSecret = Deno.env.get('TURNSTILE_SECRET_KEY');
+    if (!turnstileSecret) {
+      throw new Error('Server configuration error: Missing Turnstile configuration');
+    }
+
+    const turnstileResponse = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        secret: turnstileSecret,
+        response: body.turnstileToken,
+        remoteip: req.headers.get('CF-Connecting-IP') || req.headers.get('X-Forwarded-For') || ''
+      })
+    });
+
+    const turnstileResult = await turnstileResponse.json();
+    if (!turnstileResult.success) {
+      console.error('Turnstile verification failed:', turnstileResult);
+      throw new Error('Security verification failed. Please try again.');
     }
 
     // Rate limiting: max 3 submissions per hour per email

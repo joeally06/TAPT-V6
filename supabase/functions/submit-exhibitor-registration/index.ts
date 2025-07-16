@@ -2,6 +2,9 @@ import { createClient } from "npm:@supabase/supabase-js@2.39.3";
 
 const allowedOrigins = [
   'https://tapt.org',
+  'https://www.tapt.org',
+  'https://tntapt.com',
+  'https://www.tntapt.com',
   'https://admin.tapt.org',
   'http://localhost:5173',
   'https://localhost:5173',
@@ -50,6 +53,7 @@ interface ExhibitorRegistration {
   boothRequirements?: string;
   productsDescription?: string;
   additionalComments?: string;
+  turnstileToken: string;
 }
 
 Deno.serve(async (req) => {
@@ -133,13 +137,38 @@ Deno.serve(async (req) => {
       'state',
       'zipCode',
       'email',
-      'phone'
+      'phone',
+      'turnstileToken'
     ];
 
     for (const field of requiredFields) {
       if (!payload[field as keyof ExhibitorRegistration]) {
         throw new Error(`Missing required field: ${field}`);
       }
+    }
+
+    // Verify Turnstile token
+    const turnstileSecret = Deno.env.get('TURNSTILE_SECRET_KEY');
+    if (!turnstileSecret) {
+      throw new Error('Server configuration error: Missing Turnstile configuration');
+    }
+
+    const turnstileResponse = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        secret: turnstileSecret,
+        response: payload.turnstileToken,
+        remoteip: req.headers.get('CF-Connecting-IP') || req.headers.get('X-Forwarded-For') || ''
+      })
+    });
+
+    const turnstileResult = await turnstileResponse.json();
+    if (!turnstileResult.success) {
+      console.error('Turnstile verification failed:', turnstileResult);
+      throw new Error('Security verification failed. Please try again.');
     }
 
     // Validate email format

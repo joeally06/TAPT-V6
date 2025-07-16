@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Mail, Phone, MapPin, Building, User, AlertCircle, Briefcase, FileText } from 'lucide-react';
 import { handleError } from '../lib/errors';
+import { SecureForm } from '../components/forms/SecureForm';
 
 interface ExhibitorSettings {
   id: string;
@@ -100,27 +101,16 @@ const ExhibitorRegistration: React.FC = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const handleSecureSubmit = async (turnstileToken: string) => {
     if (!exhibitorSettings?.is_active) {
-      setFormStatus({
-        success: false,
-        message: 'Registration is not currently available.'
-      });
-      return;
+      throw new Error('Registration is not currently available.');
     }
 
     if (isRegistrationClosed) {
-      setFormStatus({
-        success: false,
-        message: 'Registration is closed. The deadline has passed.'
-      });
-      return;
+      throw new Error('Registration is closed. The deadline has passed.');
     }
 
     setIsSubmitting(true);
-    setFormStatus({});
 
     try {
       // Get the Supabase URL from environment variables
@@ -144,7 +134,8 @@ const ExhibitorRegistration: React.FC = () => {
         mobilePhone: formData.mobilePhone || undefined,
         boothRequirements: formData.boothRequirements || undefined,
         productsDescription: formData.productsDescription || undefined,
-        additionalComments: formData.additionalComments || undefined
+        additionalComments: formData.additionalComments || undefined,
+        turnstileToken
       };
 
       // Make the request to the Edge Function
@@ -168,6 +159,7 @@ const ExhibitorRegistration: React.FC = () => {
         throw new Error(result.error || 'Failed to submit registration');
       }
 
+      // ✅ Only show success message via formStatus
       setFormStatus({
         success: true,
         message: 'Registration submitted successfully! Please mail your payment as instructed.'
@@ -193,10 +185,9 @@ const ExhibitorRegistration: React.FC = () => {
     } catch (error: any) {
       console.error('Error submitting registration:', error);
       const { message } = handleError(error);
-      setFormStatus({
-        success: false,
-        message: `Error submitting registration: ${message}`
-      });
+      
+      // ✅ Re-throw the error so SecureForm can display it
+      throw new Error(`Error submitting registration: ${message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -333,7 +324,7 @@ const ExhibitorRegistration: React.FC = () => {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="bg-white shadow-lg rounded-lg p-8">
+            <SecureForm onSubmit={handleSecureSubmit} className="bg-white shadow-lg rounded-lg p-8">
               {/* Business Information */}
               <div className="mb-8">
                 <h2 className="text-xl font-semibold text-secondary mb-6">Business Information</h2>
@@ -672,7 +663,7 @@ const ExhibitorRegistration: React.FC = () => {
                   )}
                 </button>
               </div>
-            </form>
+            </SecureForm>
           </div>
         </section>
       )}

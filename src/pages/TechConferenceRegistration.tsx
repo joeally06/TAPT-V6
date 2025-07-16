@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Mail, Phone, MapPin, DollarSign, Building, User, Users, Calendar, AlertCircle, X } from 'lucide-react';
+import { SecureForm } from '../components/forms/SecureForm';
 
 interface Attendee {
   firstName: string;
@@ -147,27 +148,16 @@ const TechConferenceRegistration: React.FC = () => {
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const handleSecureSubmit = async (turnstileToken: string) => {
     if (!conferenceSettings?.is_active) {
-      setFormStatus({
-        success: false,
-        message: 'Registration is not currently available.'
-      });
-      return;
+      throw new Error('Registration is not currently available.');
     }
 
     if (isRegistrationClosed) {
-      setFormStatus({
-        success: false,
-        message: 'Registration is closed. The deadline has passed.'
-      });
-      return;
+      throw new Error('Registration is closed. The deadline has passed.');
     }
 
     setIsSubmitting(true);
-    setFormStatus({});
 
     try {
       // Get the Supabase URL from environment variables
@@ -189,7 +179,8 @@ const TechConferenceRegistration: React.FC = () => {
         phone: formData.phone,
         totalAttendees: formData.totalAttendees,
         totalAmount,
-        additionalAttendees: formData.additionalAttendees
+        additionalAttendees: formData.additionalAttendees,
+        turnstileToken
       };
 
       // Make the request to the Edge Function
@@ -213,6 +204,7 @@ const TechConferenceRegistration: React.FC = () => {
         throw new Error(result.error || 'Failed to submit registration');
       }
 
+      // ✅ Only show success message via formStatus
       setFormStatus({
         success: true,
         message: 'Registration submitted successfully! Please mail your payment as instructed.'
@@ -234,10 +226,9 @@ const TechConferenceRegistration: React.FC = () => {
       });
     } catch (error: any) {
       console.error('Error submitting registration:', error);
-      setFormStatus({
-        success: false,
-        message: `Error submitting registration: ${error.message}`
-      });
+      
+      // ✅ Re-throw the error so SecureForm can display it
+      throw new Error(`Error submitting registration: ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -419,8 +410,8 @@ const TechConferenceRegistration: React.FC = () => {
                 <div className="flex">
                   <div className="flex-shrink-0">
                     {formStatus.success ? (
-                      <svg className="h-5 w-5 text-green-400\" viewBox="0 0 20 20\" fill="currentColor">
-                        <path fillRule="evenodd\" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z\" clipRule="evenodd" />
+                      <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
                     ) : (
                       <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -437,7 +428,7 @@ const TechConferenceRegistration: React.FC = () => {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="bg-white shadow-lg rounded-lg p-8">
+            <SecureForm onSubmit={handleSecureSubmit} className="bg-white shadow-lg rounded-lg p-8">
               {/* Organization Information */}
               <div className="mb-8">
                 <h2 className="text-xl font-semibold text-secondary mb-6">Organization Information</h2>
@@ -729,7 +720,7 @@ const TechConferenceRegistration: React.FC = () => {
                   )}
                 </button>
               </div>
-            </form>
+            </SecureForm>
           </div>
         </section>
       )}

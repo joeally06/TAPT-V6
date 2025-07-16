@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { User, Mail, Phone, Building, Clock, Award, AlertCircle, X } from 'lucide-react';
+import { SecureForm } from '../components/forms/SecureForm';
 
 interface HallOfFameSettings {
   id: string;
@@ -112,27 +113,16 @@ export const HallOfFameNomination: React.FC = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const handleSecureSubmit = async (turnstileToken: string) => {
     if (!settings?.is_active) {
-      setFormStatus({
-        success: false,
-        message: 'Nominations are currently closed.'
-      });
-      return;
+      throw new Error('Nominations are currently closed.');
     }
 
     if (!isNominationPeriodOpen) {
-      setFormStatus({
-        success: false,
-        message: 'The nomination period is not currently open.'
-      });
-      return;
+      throw new Error('The nomination period is not currently open.');
     }
 
     setIsSubmitting(true);
-    setFormStatus({});
 
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -159,7 +149,8 @@ export const HallOfFameNomination: React.FC = () => {
             supervisor_last_name: formData.supervisorLastName,
             supervisor_email: formData.supervisorEmail,
             nominee_city: formData.nomineeCity,
-            region: formData.region
+            region: formData.region,
+            turnstileToken
           }),
         }
       );
@@ -170,6 +161,7 @@ export const HallOfFameNomination: React.FC = () => {
         throw new Error(result.error || 'Failed to submit nomination');
       }
 
+      // ✅ Only show success message via formStatus
       setFormStatus({
         success: true,
         message: 'Nomination submitted successfully!'
@@ -192,10 +184,9 @@ export const HallOfFameNomination: React.FC = () => {
       });
     } catch (error: any) {
       console.error('Error submitting nomination:', error);
-      setFormStatus({
-        success: false,
-        message: error.message || 'Failed to submit nomination. Please try again.'
-      });
+      
+      // ✅ Re-throw the error so SecureForm can display it
+      throw new Error(error.message || 'Failed to submit nomination. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -289,7 +280,7 @@ export const HallOfFameNomination: React.FC = () => {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="bg-white shadow-lg rounded-lg p-8">
+          <SecureForm onSubmit={handleSecureSubmit} className="bg-white shadow-lg rounded-lg p-8">
             {/* Nominee Information */}
             <div className="mb-8">
               <h2 className="text-2xl font-bold text-secondary mb-6">Nominee Information</h2>
@@ -575,7 +566,7 @@ export const HallOfFameNomination: React.FC = () => {
                 )}
               </button>
             </div>
-          </form>
+          </SecureForm>
         </div>
       </section>
     </div>

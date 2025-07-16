@@ -2,6 +2,9 @@ import { createClient } from "npm:@supabase/supabase-js@2.39.3";
 
 const allowedOrigins = [
   'https://tapt.org',
+  'https://www.tapt.org',
+  'https://tntapt.com',
+  'https://www.tntapt.com',
   'https://admin.tapt.org',
   'http://localhost:5173',
   'https://localhost:5173',
@@ -41,7 +44,42 @@ interface ContactMessage {
   phone?: string;
   district?: string;
   message: string;
+  verified?: boolean; // Add verification flag
+  turnstileToken?: string; // Add turnstile token
 }
+
+// Function to verify Turnstile token
+const verifyTurnstileToken = async (token: string, userIP?: string): Promise<boolean> => {
+  try {
+    const secretKey = Deno.env.get('TURNSTILE_SECRET_KEY');
+    if (!secretKey) {
+      console.error('Turnstile secret key not configured');
+      return false;
+    }
+
+    const formData = new FormData();
+    formData.append('secret', secretKey);
+    formData.append('response', token);
+    if (userIP) {
+      formData.append('remoteip', userIP);
+    }
+
+    const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const result = await response.json();
+    console.log('🔒 Turnstile verification result:', result.success ? 'SUCCESS' : 'FAILED', {
+      errorCodes: result['error-codes']
+    });
+    
+    return result.success === true;
+  } catch (error) {
+    console.error('❌ Turnstile verification error:', error);
+    return false;
+  }
+};
 
 Deno.serve(async (req) => {
   const origin = req.headers.get('Origin') || '';
@@ -105,6 +143,7 @@ Deno.serve(async (req) => {
       console.log("Received payload:", JSON.stringify({
         name: payload.name,
         email: payload.email,
+        verified: payload.verified,
         // Omit message for privacy in logs
       }));
     } catch (error) {
@@ -115,6 +154,24 @@ Deno.serve(async (req) => {
     // Validate required fields
     if (!payload.name || !payload.email || !payload.message) {
       throw new Error('Name, email, and message are required fields');
+    }
+
+    // Verify Turnstile token if provided
+    if (payload.turnstileToken) {
+      const clientIP = req.headers.get('cf-connecting-ip') || 
+                       req.headers.get('x-forwarded-for') || 
+                       req.headers.get('x-real-ip') || 
+                       undefined;
+      
+      const isVerified = await verifyTurnstileToken(payload.turnstileToken, clientIP);
+      if (!isVerified) {
+        throw new Error('Security verification failed. Please try again.');
+      }
+      
+      console.log('✅ Turnstile verification passed for contact message submission');
+    } else if (payload.verified === true) {
+      // If marked as verified but no token provided, reject
+      throw new Error('Security verification required');
     }
 
     // Validate email format

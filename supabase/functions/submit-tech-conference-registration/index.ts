@@ -2,6 +2,9 @@ import { createClient } from "npm:@supabase/supabase-js@2.39.3";
 
 const allowedOrigins = [
   'https://tapt.org',
+  'https://www.tapt.org',
+  'https://tntapt.com',
+  'https://www.tntapt.com',
   'https://admin.tapt.org',
   'http://localhost:5173',
   'https://localhost:5173',
@@ -119,31 +122,40 @@ Deno.serve(async (req) => {
       );
     }
 
-    // CAPTCHA verification
-    const captchaToken = body.captchaToken;
-    if (!captchaToken) {
+    // Turnstile verification
+    const turnstileToken = body.turnstileToken;
+    if (!turnstileToken) {
       return new Response(
-        JSON.stringify({ success: false, error: 'CAPTCHA verification failed. Please try again.' }),
+        JSON.stringify({ success: false, error: 'Security verification is required.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    // Use globalThis.Deno for Deno.env.get in Edge Functions
-    const recaptchaSecret = (typeof Deno !== 'undefined' ? Deno.env.get('RECAPTCHA_SECRET_KEY') : undefined) || (typeof globalThis !== 'undefined' && globalThis.Deno ? globalThis.Deno.env.get('RECAPTCHA_SECRET_KEY') : undefined);
-    if (!recaptchaSecret) {
+
+    const turnstileSecret = Deno.env.get('TURNSTILE_SECRET_KEY');
+    if (!turnstileSecret) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Server misconfiguration: CAPTCHA secret missing.' }),
+        JSON.stringify({ success: false, error: 'Server configuration error: Missing Turnstile configuration' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    const captchaVerifyRes = await fetch('https://www.google.com/recaptcha/api/siteverify', {
+
+    const turnstileResponse = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: `secret=${encodeURIComponent(recaptchaSecret)}&response=${encodeURIComponent(captchaToken)}`
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        secret: turnstileSecret,
+        response: turnstileToken,
+        remoteip: req.headers.get('CF-Connecting-IP') || req.headers.get('X-Forwarded-For') || ''
+      })
     });
-    const captchaVerifyData = await captchaVerifyRes.json();
-    if (!captchaVerifyData.success) {
+
+    const turnstileResult = await turnstileResponse.json();
+    if (!turnstileResult.success) {
+      console.error('Turnstile verification failed:', turnstileResult);
       return new Response(
-        JSON.stringify({ success: false, error: 'CAPTCHA verification failed. Please try again.' }),
+        JSON.stringify({ success: false, error: 'Security verification failed. Please try again.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
