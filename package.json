@@ -32,8 +32,9 @@
     "check:all": "npm run type-check && npm run lint && npm run format:check && npm run build"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.50.5",
+    "@supabase/supabase-js": "^2.54.0",
     "date-fns": "^3.6.0",
+    "dotenv": "^17.2.1",
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.1",
     "jspdf-autotable": "^5.0.2",
