@@ -1021,9 +1021,7 @@ const StudentScholarshipApplication: React.FC = () => {
                 
                 <div className="bg-gray-50 p-4 rounded-md mb-6">
                   <p className="text-sm text-gray-700">
-                    By signing below, you are certifying that all information is correct and that you are the person completing this application. 
-                    When you press the submit button, you will receive an email confirmation that your application was received. 
-                    Please print for your records and retain as verification of your application.
+                    By signing below, you are certifying that all information is correct and that you are the person completing this application.
                   </p>
                 </div>
 

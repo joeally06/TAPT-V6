@@ -138,7 +138,7 @@ Deno.serve(async (req) => {
       }
 
       // Validate content type
-      const validTypes = ['event', 'announcement', 'resource', 'news'];
+      const validTypes = ['event', 'announcement', 'resource', 'news', 'links', 'resources-page'];
       if (!validTypes.includes(body.type)) {
         throw new Error('Invalid content type');
       }

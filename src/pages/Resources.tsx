@@ -1,11 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Search, Download, FileText, Book, FileCheck, Folder } from 'lucide-react';
+import { Search, Download, FileText, Book, FileCheck, Folder, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { 
-  RESOURCE_CATEGORIES, 
-  type ResourceCategory,
-} from '../lib/config';
 import { FixedSizeList } from 'react-window';
 
 interface Resource {
@@ -19,6 +15,29 @@ interface Resource {
   created_at: string;
   updated_at: string;
 }
+
+// Add new interface for link content
+interface LinkContent {
+  id: string;
+  title: string;
+  description: string;
+  link: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Extended resource categories to include Links
+const EXTENDED_RESOURCE_CATEGORIES = [
+  { id: 'all', name: 'All Resources' },
+  { id: 'manuals', name: 'Manuals & Guides' },
+  { id: 'forms', name: 'Forms & Documents' },
+  { id: 'laws', name: 'Laws & Regulations' },
+  { id: 'training', name: 'Training Materials' },
+  { id: 'safety', name: 'Safety Resources' },
+  { id: 'links', name: 'External Links' }
+] as const;
+
+type ExtendedResourceCategory = typeof EXTENDED_RESOURCE_CATEGORIES[number]['id'];
 
 const PAGE_SIZE = 12;
 
@@ -43,6 +62,8 @@ const getCategoryIcon = (category: string) => {
         return <Folder className="h-6 w-6" />;
       case 'safety':
         return <FileText className="h-6 w-6" />;
+      case 'links':
+        return <ExternalLink className="h-6 w-6" />;
       default:
         console.warn('Unknown category for icon:', category);
         return <FileText className="h-6 w-6" />;
@@ -79,20 +100,100 @@ const ResourceCard: React.FC<{ resource: Resource; onDownload: (resource: Resour
   </div>
 );
 
+const LinkCard: React.FC<{ 
+  linkContent: LinkContent; 
+  onVisit: (linkContent: LinkContent) => void; 
+  style?: React.CSSProperties 
+}> = ({ linkContent, onVisit, style }) => (
+  <div style={style} className="py-6 flex flex-col md:flex-row md:items-center">
+    <div className="flex-shrink-0 mr-4 mb-4 md:mb-0 bg-blue-100 p-4 rounded-md">
+      <ExternalLink className="h-6 w-6 text-blue-600" />
+    </div>
+    <div className="flex-grow">
+      <h3 className="text-lg font-semibold text-secondary">{linkContent.title}</h3>
+      <p className="text-gray-600 mb-2">{linkContent.description}</p>
+      <div className="flex flex-wrap items-center text-sm text-gray-500 gap-x-4">
+        <span>Updated: {new Date(linkContent.updated_at).toLocaleDateString()}</span>
+        <span className="text-blue-600 truncate max-w-xs" title={linkContent.link}>
+          {linkContent.link.length > 50 ? `${linkContent.link.substring(0, 50)}...` : linkContent.link}
+        </span>
+      </div>
+    </div>
+    <div className="mt-4 md:mt-0 flex-shrink-0">
+      <button
+        onClick={() => onVisit(linkContent)}
+        className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+      >
+        <ExternalLink className="mr-2 h-4 w-4" />
+        Visit Link
+      </button>
+    </div>
+  </div>
+);
+
 export const Resources: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [activeCategory, setActiveCategory] = useState<ResourceCategory>('all');
+  const [activeCategory, setActiveCategory] = useState<ExtendedResourceCategory>('all');
   const [resources, setResources] = useState<Resource[]>([]);
+  const [linkContent, setLinkContent] = useState<LinkContent[]>([]); // New state
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    fetchResources();
+    if (activeCategory === 'links') {
+      fetchLinkContent();
+    } else {
+      fetchResources();
+    }
     // eslint-disable-next-line
   }, [page, activeCategory, searchQuery]);
+
+  // New function to fetch link content
+  const fetchLinkContent = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const from = (page - 1) * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+      
+      let query = supabase
+        .from('content')
+        .select('*', { count: 'exact' })
+        .eq('type', 'links')
+        .eq('status', 'published')
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      if (searchQuery) {
+        query = query.or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
+      }
+
+      const { data, error, count } = await query;
+      
+      if (error) throw error;
+
+      // Transform content data to match LinkContent interface
+      const transformedData: LinkContent[] = (data || []).map(item => ({
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        link: item.link,
+        created_at: item.created_at,
+        updated_at: item.updated_at
+      }));
+
+      setLinkContent(transformedData);
+      setTotalCount(count || 0);
+    } catch (err) {
+      console.error('Error fetching link content:', err);
+      setError('Failed to load external links');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchResources = async () => {
     try {
@@ -108,7 +209,7 @@ export const Resources: React.FC = () => {
       if (searchQuery) {
         query = query.textSearch('title', searchQuery);
       }
-      if (activeCategory !== 'all') {
+      if (activeCategory !== 'all' && activeCategory !== 'links') {
         query = query.eq('category', activeCategory);
       }
       console.log('Fetching resources with query:', { from, to, searchQuery, activeCategory });
@@ -144,6 +245,11 @@ export const Resources: React.FC = () => {
     }
   };
 
+  const handleVisit = (linkContent: LinkContent) => {
+    // Open link in new tab
+    window.open(linkContent.link, '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <div className="pt-16">
       {/* Hero Section */}
@@ -176,7 +282,7 @@ export const Resources: React.FC = () => {
                 </div>
                 {/* Category Tabs (Desktop) */}
                 <div className="hidden md:flex space-x-2">
-                  {RESOURCE_CATEGORIES.map((category) => (
+                  {EXTENDED_RESOURCE_CATEGORIES.map((category) => (
                     <button
                       key={category.id}
                       onClick={() => { setActiveCategory(category.id); setPage(1); }}
@@ -195,9 +301,9 @@ export const Resources: React.FC = () => {
                   <select
                     className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary focus:border-primary rounded-md"
                     value={activeCategory}
-                    onChange={(e) => { setActiveCategory(e.target.value as ResourceCategory); setPage(1); }}
+                    onChange={(e) => { setActiveCategory(e.target.value as ExtendedResourceCategory); setPage(1); }}
                   >
-                    {RESOURCE_CATEGORIES.map((category) => (
+                    {EXTENDED_RESOURCE_CATEGORIES.map((category) => (
                       <option key={category.id} value={category.id}>
                         {category.name}
                       </option>
@@ -219,32 +325,52 @@ export const Resources: React.FC = () => {
               ) : (
                 <>
                   <div className="text-sm text-gray-600 mb-4">
-                    {resources.length === 0 ? 'No resources found' : `Showing ${(page - 1) * PAGE_SIZE + 1}-${(page - 1) * PAGE_SIZE + resources.length} of ${totalCount} resources`}
+                    {activeCategory === 'links' ? (
+                      linkContent.length === 0 ? 'No external links found' : 
+                      `Showing ${(page - 1) * PAGE_SIZE + 1}-${(page - 1) * PAGE_SIZE + linkContent.length} of ${totalCount} external links`
+                    ) : (
+                      resources.length === 0 ? 'No resources found' : 
+                      `Showing ${(page - 1) * PAGE_SIZE + 1}-${(page - 1) * PAGE_SIZE + resources.length} of ${totalCount} resources`
+                    )}
                   </div>
-                  {resources.length > 0 && resources.length > 8 ? (
-                    <FixedSizeList
-                      height={Math.min(8, resources.length) * 120}
-                      width="100%"
-                      itemCount={resources.length}
-                      itemSize={120}
-                      className="divide-y divide-gray-200"
-                    >
-                      {({ index, style }) => (
-                        <ResourceCard
-                          resource={resources[index]}
-                          onDownload={handleDownload}
-                          style={style}
-                        />
-                      )}
-                    </FixedSizeList>
-                  ) : (
+                  
+                  {activeCategory === 'links' ? (
+                    // Render link content
                     <div className="divide-y divide-gray-200">
-                      {resources.map((resource) => (
-                        <ResourceCard key={resource.id} resource={resource} onDownload={handleDownload} />
+                      {linkContent.map((link) => (
+                        <LinkCard key={link.id} linkContent={link} onVisit={handleVisit} />
                       ))}
                     </div>
+                  ) : (
+                    // Render file resources
+                    <>
+                      {resources.length > 0 && resources.length > 8 ? (
+                        <FixedSizeList
+                          height={Math.min(8, resources.length) * 120}
+                          width="100%"
+                          itemCount={resources.length}
+                          itemSize={120}
+                          className="divide-y divide-gray-200"
+                        >
+                          {({ index, style }) => (
+                            <ResourceCard
+                              resource={resources[index]}
+                              onDownload={handleDownload}
+                              style={style}
+                            />
+                          )}
+                        </FixedSizeList>
+                      ) : (
+                        <div className="divide-y divide-gray-200">
+                          {resources.map((resource) => (
+                            <ResourceCard key={resource.id} resource={resource} onDownload={handleDownload} />
+                          ))}
+                        </div>
+                      )}
+                    </>
                   )}
-                  {/* Pagination Controls */}
+                  
+                  {/* Pagination Controls - show for both types */}
                   <div className="flex justify-between items-center mt-6">
                     <button
                       onClick={() => setPage((p) => Math.max(1, p - 1))}

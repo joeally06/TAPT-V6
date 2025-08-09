@@ -9,12 +9,10 @@ import {
   Calendar,
   FileText,
   Bell,
-  Image,
   Save,
   X,
-  Upload,
-  Star,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Folder
 } from 'lucide-react';
 import { NEWS_CATEGORIES } from '../lib/types/news';
 import { useAuth } from '../context/AuthContext';
@@ -25,7 +23,7 @@ interface ContentItem {
   id: string;
   title: string;
   description: string;
-  type: 'event' | 'announcement' | 'resource' | 'news';
+  type: 'event' | 'announcement' | 'resource' | 'news' | 'links' | 'resources-page';
   status: 'draft' | 'published';
   featured: boolean;
   image_url: string | null;
@@ -183,7 +181,7 @@ export const AdminContent: React.FC = () => {
         const fileUrl = getPublicUrl('public', filePath);
 
         // Insert resource record into database
-        const { data: resourceData, error: resourceError } = await supabase
+        const { error: resourceError } = await supabase
           .from('resources')
           .insert([{
             title: formData.title,
@@ -353,7 +351,9 @@ export const AdminContent: React.FC = () => {
     { id: 'event', label: 'Events', icon: Calendar },
     { id: 'announcement', label: 'Announcements', icon: Bell },
     { id: 'resource', label: 'Resources', icon: FileText },
-    { id: 'news', label: 'News', icon: FileText }
+    { id: 'news', label: 'News', icon: FileText },
+    { id: 'links', label: 'Links', icon: LinkIcon },
+    { id: 'resources-page', label: 'Resources Page', icon: Folder }
   ] as const;
 
   const formatFileSize = (bytes: number): string => {
@@ -428,7 +428,8 @@ export const AdminContent: React.FC = () => {
                 featured: false,
                 is_featured: false,
                 category: selectedType === 'news' ? NEWS_CATEGORIES[1].id : null,
-                linked_form_type: null
+                linked_form_type: null,
+                link: selectedType === 'links' ? '' : null
               });
               setShowForm(!showForm);
             }}
@@ -539,6 +540,53 @@ export const AdminContent: React.FC = () => {
                           </option>
                         ))}
                       </select>
+                    </div>
+                  )}
+
+                  {/* Links category - requires URL */}
+                  {selectedType === 'links' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Link URL *
+                      </label>
+                      <div className="mt-1 relative rounded-md shadow-sm">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <LinkIcon className="h-5 w-5 text-gray-400" />
+                        </div>
+                        <input
+                          type="url"
+                          value={formData.link || ''}
+                          onChange={(e) => setFormData({ ...formData, link: e.target.value })}
+                          required
+                          className="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+                          placeholder="https://example.com"
+                        />
+                      </div>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Enter the full URL where this link should direct users
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Resources Page category - informational */}
+                  {selectedType === 'resources-page' && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                      <div className="flex">
+                        <div className="flex-shrink-0">
+                          <FileText className="h-5 w-5 text-blue-400" />
+                        </div>
+                        <div className="ml-3">
+                          <h3 className="text-sm font-medium text-blue-800">
+                            Resources Page Content
+                          </h3>
+                          <div className="mt-2 text-sm text-blue-700">
+                            <p>
+                              This content will appear on the Resources page. Use this to create featured resources, 
+                              announcements about new resources, or general information about the resources section.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -778,6 +826,11 @@ export const AdminContent: React.FC = () => {
                         Form Link
                       </th>
                     )}
+                    {selectedType === 'links' && (
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        URL
+                      </th>
+                    )}
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
@@ -831,6 +884,25 @@ export const AdminContent: React.FC = () => {
                               </span>
                             ) : (
                               <span className="text-gray-400">None</span>
+                            )}
+                          </div>
+                        </td>
+                      )}
+                      {selectedType === 'links' && (
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-500">
+                            {item.link ? (
+                              <a
+                                href={item.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-800 underline max-w-xs truncate block"
+                                title={item.link}
+                              >
+                                {item.link.length > 50 ? `${item.link.substring(0, 50)}...` : item.link}
+                              </a>
+                            ) : (
+                              <span className="text-gray-400">No URL</span>
                             )}
                           </div>
                         </td>
