@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Mail, Phone, MapPin, DollarSign, Building, User, Users, Calendar, AlertCircle, X } from 'lucide-react';
-import { handleError } from '../lib/errors';
+import { Mail, Phone, MapPin, DollarSign, Building, User, Users, Calendar, AlertCircle } from 'lucide-react';
+import { SecureForm } from '../components/forms/SecureForm';
 
 interface Attendee {
   firstName: string;
@@ -38,7 +38,7 @@ const ConferenceRegistration: React.FC = () => {
     additionalAttendees: [] as Attendee[]
   });
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [formStatus, setFormStatus] = useState<{
     success?: boolean;
     message?: string;
@@ -46,7 +46,6 @@ const ConferenceRegistration: React.FC = () => {
 
   const [conferenceSettings, setConferenceSettings] = useState<ConferenceSettings | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isRegistrationClosed, setIsRegistrationClosed] = useState(false);
 
   useEffect(() => {
@@ -64,12 +63,10 @@ const ConferenceRegistration: React.FC = () => {
 
       if (error) {
         console.error('Error fetching conference settings:', error);
-        setError('Failed to load conference settings. Please try again later.');
         return;
       }
 
       if (!data) {
-        setError('No active conference registration is available at this time.');
         setIsRegistrationClosed(true);
         return;
       }
@@ -83,15 +80,12 @@ const ConferenceRegistration: React.FC = () => {
         
         if (now > endDate) {
           setIsRegistrationClosed(true);
-          setError(`Registration closed on ${endDate.toLocaleDateString()}`);
         } else {
           setIsRegistrationClosed(false);
-          setError(null);
         }
       }
     } catch (error) {
       console.error('Error:', error);
-      setError('An unexpected error occurred. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -146,36 +140,21 @@ const ConferenceRegistration: React.FC = () => {
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const handleSecureSubmit = async (turnstileToken: string) => {
     if (!conferenceSettings?.is_active) {
-      setFormStatus({
-        success: false,
-        message: 'Registration is not currently available.'
-      });
-      return;
+      throw new Error('Registration is not currently available.');
     }
 
     if (isRegistrationClosed) {
-      setFormStatus({
-        success: false,
-        message: 'Registration is closed. The deadline has passed.'
-      });
-      return;
+      throw new Error('Registration is closed. The deadline has passed.');
     }
 
-    setIsSubmitting(true);
-    setFormStatus({});
-
     try {
-      // Get the Supabase URL from environment variables
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       if (!supabaseUrl) {
-        throw new Error('SUPABASE_URL environment variable is not defined');
+        throw new Error('Configuration error. Please contact support.');
       }
 
-      // Prepare the request payload
       const payload = {
         schoolDistrict: formData.schoolDistrict,
         firstName: formData.firstName,
@@ -189,10 +168,10 @@ const ConferenceRegistration: React.FC = () => {
         totalAttendees: formData.totalAttendees,
         totalAmount,
         conferenceId: conferenceSettings?.id,
-        additionalAttendees: formData.additionalAttendees
+        additionalAttendees: formData.additionalAttendees,
+        turnstileToken
       };
 
-      // Make the request to the Edge Function
       const response = await fetch(`${supabaseUrl}/functions/v1/submit-conference-registration`, {
         method: 'POST',
         headers: {
@@ -202,17 +181,22 @@ const ConferenceRegistration: React.FC = () => {
         body: JSON.stringify(payload)
       });
 
-      // Check if the request was successful
+      let result;
+      try {
+        result = await response.json();
+      } catch (e) {
+        throw new Error('Server communication error. Please try again.');
+      }
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to submit registration');
+        throw new Error(result?.error || `Server error (${response.status}). Please try again.`);
       }
 
-      const result = await response.json();
       if (!result.success) {
-        throw new Error(result.error || 'Failed to submit registration');
+        throw new Error(result.error || 'Registration failed. Please try again.');
       }
 
+      // Success
       setFormStatus({
         success: true,
         message: 'Registration submitted successfully! Please mail your payment as instructed.'
@@ -232,15 +216,21 @@ const ConferenceRegistration: React.FC = () => {
         totalAttendees: 1,
         additionalAttendees: []
       });
+
     } catch (error: any) {
-      console.error('Error submitting registration:', error);
-      const { message } = handleError(error);
-      setFormStatus({
-        success: false,
-        message: `Error submitting registration: ${message}`
-      });
-    } finally {
-      setIsSubmitting(false);
+      console.error('Registration error:', error);
+      
+      // Handle specific error types
+      if (error.message?.includes('rate limit') || error.message?.includes('too many')) {
+        throw new Error('Too many requests. Please wait a moment and try again.');
+      }
+      
+      if (error.message?.includes('network') || error.message?.includes('fetch')) {
+        throw new Error('Network error. Please check your connection and try again.');
+      }
+      
+      // Re-throw with the original error message or a generic one
+      throw new Error(error.message || 'An unexpected error occurred. Please try again.');
     }
   };
 
@@ -362,39 +352,29 @@ const ConferenceRegistration: React.FC = () => {
                 Thank you for your interest in the TAPT Conference. Registration is currently closed. 
                 Please check back later for future events.
               </p>
-              {error && (
-                <p className="mt-4 text-red-600">{error}</p>
-              )}
             </div>
           </div>
         </section>
       ) : (
         <section className="py-16">
           <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-            {formStatus.message && (
-              <div className={`mb-8 p-4 rounded-md ${formStatus.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+            {/* ✅ Only show success messages - SecureForm handles errors */}
+            {formStatus.success && formStatus.message && (
+              <div className="mb-8 p-4 rounded-md bg-green-50 border border-green-200">
                 <div className="flex">
                   <div className="flex-shrink-0">
-                    {formStatus.success ? (
-                      <svg className="h-5 w-5 text-green-400\" viewBox="0 0 20 20\" fill="currentColor">
-                        <path fillRule="evenodd\" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z\" clipRule="evenodd" />
-                      </svg>
-                    ) : (
-                      <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                      </svg>
-                    )}
+                    <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
                   </div>
                   <div className="ml-3">
-                    <p className={`text-sm ${formStatus.success ? 'text-green-800' : 'text-red-800'}`}>
-                      {formStatus.message}
-                    </p>
+                    <p className="text-sm text-green-800">{formStatus.message}</p>
                   </div>
                 </div>
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="bg-white shadow-lg rounded-lg p-8">
+            <SecureForm onSubmit={handleSecureSubmit} className="bg-white shadow-lg rounded-lg p-8">
               {/* Organization Information */}
               <div className="mb-8">
                 <h2 className="text-xl font-semibold text-secondary mb-6">Organization Information</h2>
@@ -663,30 +643,8 @@ const ConferenceRegistration: React.FC = () => {
                 </div>
               )}
 
-              {/* Submit Button */}
-              <div>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full inline-flex justify-center py-3 px-6 border border-transparent shadow-sm text-base font-medium rounded-md text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white\" xmlns="http://www.w3.org/2000/svg\" fill="none\" viewBox="0 0 24 24">
-                        <circle className="opacity-25\" cx="12\" cy="12\" r="10\" stroke="currentColor\" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <DollarSign className="mr-2 h-5 w-5" />
-                      Submit Registration
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
+
+            </SecureForm>
           </div>
         </section>
       )}

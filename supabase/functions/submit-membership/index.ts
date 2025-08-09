@@ -2,6 +2,9 @@ import { createClient } from "npm:@supabase/supabase-js@2.39.3";
 
 const allowedOrigins = [
   'https://tapt.org',
+  'https://www.tapt.org',
+  'https://tntapt.com',
+  'https://www.tntapt.com',
   'https://admin.tapt.org',
   'http://localhost:5173',
   'https://localhost:5173',

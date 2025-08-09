@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Mail, Phone, MapPin, Building, User, AlertCircle, Briefcase, FileText } from 'lucide-react';
-import { handleError } from '../lib/errors';
+import { SecureForm } from '../components/forms/SecureForm';
 
 interface ExhibitorSettings {
   id: string;
@@ -35,7 +35,7 @@ const ExhibitorRegistration: React.FC = () => {
     additionalComments: ''
   });
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [formStatus, setFormStatus] = useState<{
     success?: boolean;
     message?: string;
@@ -43,7 +43,7 @@ const ExhibitorRegistration: React.FC = () => {
 
   const [exhibitorSettings, setExhibitorSettings] = useState<ExhibitorSettings | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
   const [isRegistrationClosed, setIsRegistrationClosed] = useState(false);
 
   useEffect(() => {
@@ -62,12 +62,10 @@ const ExhibitorRegistration: React.FC = () => {
 
       if (error) {
         console.error('Error fetching exhibitor settings:', error);
-        setError('Failed to load exhibitor settings. Please try again later.');
         return;
       }
 
       if (!data) {
-        setError('No active exhibitor registration is available at this time.');
         setIsRegistrationClosed(true);
         return;
       }
@@ -81,15 +79,12 @@ const ExhibitorRegistration: React.FC = () => {
         
         if (now > endDate) {
           setIsRegistrationClosed(true);
-          setError(`Registration closed on ${endDate.toLocaleDateString()}`);
         } else {
           setIsRegistrationClosed(false);
-          setError(null);
         }
       }
     } catch (error) {
       console.error('Error:', error);
-      setError('An unexpected error occurred. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -100,33 +95,20 @@ const ExhibitorRegistration: React.FC = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const handleSecureSubmit = async (turnstileToken: string) => {
     if (!exhibitorSettings?.is_active) {
-      setFormStatus({
-        success: false,
-        message: 'Registration is not currently available.'
-      });
-      return;
+      throw new Error('Registration is not currently available.');
     }
 
     if (isRegistrationClosed) {
-      setFormStatus({
-        success: false,
-        message: 'Registration is closed. The deadline has passed.'
-      });
-      return;
+      throw new Error('Registration is closed. The deadline has passed.');
     }
-
-    setIsSubmitting(true);
-    setFormStatus({});
 
     try {
       // Get the Supabase URL from environment variables
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       if (!supabaseUrl) {
-        throw new Error('VITE_SUPABASE_URL is not defined');
+        throw new Error('Configuration error. Please contact support.');
       }
 
       // Prepare the request payload
@@ -144,7 +126,8 @@ const ExhibitorRegistration: React.FC = () => {
         mobilePhone: formData.mobilePhone || undefined,
         boothRequirements: formData.boothRequirements || undefined,
         productsDescription: formData.productsDescription || undefined,
-        additionalComments: formData.additionalComments || undefined
+        additionalComments: formData.additionalComments || undefined,
+        turnstileToken
       };
 
       // Make the request to the Edge Function
@@ -158,16 +141,25 @@ const ExhibitorRegistration: React.FC = () => {
       });
 
       // Check if the request was successful
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to submit registration');
+      let result;
+      try {
+        result = await response.json();
+      } catch (e) {
+        throw new Error('Server communication error. Please try again.');
       }
 
-      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result?.error || `Server error (${response.status}). Please try again.`);
+      }
+
+      if (!result.success) {
+        throw new Error(result.error || 'Registration failed. Please try again.');
+      }
       if (!result.success) {
         throw new Error(result.error || 'Failed to submit registration');
       }
 
+      // ✅ Only show success message via formStatus
       setFormStatus({
         success: true,
         message: 'Registration submitted successfully! Please mail your payment as instructed.'
@@ -191,14 +183,19 @@ const ExhibitorRegistration: React.FC = () => {
         additionalComments: ''
       });
     } catch (error: any) {
-      console.error('Error submitting registration:', error);
-      const { message } = handleError(error);
-      setFormStatus({
-        success: false,
-        message: `Error submitting registration: ${message}`
-      });
-    } finally {
-      setIsSubmitting(false);
+      console.error('Registration error:', error);
+      
+      // Handle specific error types
+      if (error.message?.includes('rate limit') || error.message?.includes('too many')) {
+        throw new Error('Too many requests. Please wait a moment and try again.');
+      }
+      
+      if (error.message?.includes('network') || error.message?.includes('fetch')) {
+        throw new Error('Network error. Please check your connection and try again.');
+      }
+      
+      // Re-throw with the original error message or a generic one
+      throw new Error(error.message || 'An unexpected error occurred. Please try again.');
     }
   };
 
@@ -333,7 +330,7 @@ const ExhibitorRegistration: React.FC = () => {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="bg-white shadow-lg rounded-lg p-8">
+            <SecureForm onSubmit={handleSecureSubmit} className="bg-white shadow-lg rounded-lg p-8">
               {/* Business Information */}
               <div className="mb-8">
                 <h2 className="text-xl font-semibold text-secondary mb-6">Business Information</h2>
@@ -652,27 +649,7 @@ const ExhibitorRegistration: React.FC = () => {
                 </div>
               </div>
 
-              {/* Submit Button */}
-              <div>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full inline-flex justify-center py-3 px-6 border border-transparent shadow-sm text-base font-medium rounded-md text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Processing...
-                    </>
-                  ) : (
-                    'Submit Registration'
-                  )}
-                </button>
-              </div>
-            </form>
+            </SecureForm>
           </div>
         </section>
       )}

@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, Phone, MapPin, Send, AlertCircle, Clock } from 'lucide-react';
+import { Mail, Phone, MapPin, AlertCircle, Clock } from 'lucide-react';
 import { getSiteSetting } from '../lib/siteSettings';
 import { supabase } from '../lib/supabase';
+import { SecureForm } from '../components/forms/SecureForm';
 
 export const Contact: React.FC = () => {
   const [contactEmail, setContactEmail] = useState<string>('contact@tapt.org');
@@ -10,11 +11,6 @@ export const Contact: React.FC = () => {
   const [businessHoursDays, setBusinessHoursDays] = useState<string>('Monday – Friday');
   const [businessHoursTime, setBusinessHoursTime] = useState<string>('8:00 AM – 4:30 PM CST');
   const [formState, setFormState] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    district: '',
-    message: '',
     submitted: false,
     error: false,
     loading: false
@@ -44,14 +40,11 @@ export const Contact: React.FC = () => {
     fetchSettings();
   }, []);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormState(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormState(prev => ({ ...prev, loading: true, error: false }));
+  // Secure form submission handler
+  const handleSecureSubmit = async (formData: any, isVerified: boolean, turnstileToken?: string) => {
+    if (!isVerified) {
+      throw new Error('Security verification required');
+    }
 
     try {
       // Get the Supabase URL from environment variables
@@ -62,11 +55,13 @@ export const Contact: React.FC = () => {
 
       // Prepare the request payload
       const payload = {
-        name: formState.name,
-        email: formState.email,
-        phone: formState.phone || undefined,
-        district: formState.district || undefined,
-        message: formState.message
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone || undefined,
+        district: formData.district || undefined,
+        message: formData.message,
+        verified: isVerified, // Include verification status
+        turnstileToken: turnstileToken // Include the Turnstile token for backend verification
       };
 
       // Make the request to the Edge Function
@@ -90,25 +85,19 @@ export const Contact: React.FC = () => {
         throw new Error(result.error || 'Failed to submit message');
       }
 
-      setFormState(prev => ({
-        ...prev,
+      setFormState({
         submitted: true,
         error: false,
-        loading: false,
-        name: '',
-        email: '',
-        phone: '',
-        district: '',
-        message: ''
-      }));
+        loading: false
+      });
     } catch (error: any) {
       console.error('Error submitting message:', error);
-      setFormState(prev => ({
-        ...prev,
+      setFormState({
         error: true,
         loading: false,
         submitted: false
-      }));
+      });
+      throw error; // Re-throw so SecureForm can handle it
     }
   };
 
@@ -213,11 +202,6 @@ export const Contact: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setFormState({
-                            name: '',
-                            email: '',
-                            phone: '',
-                            district: '',
-                            message: '',
                             submitted: false,
                             error: false,
                             loading: false
@@ -231,7 +215,11 @@ export const Contact: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <SecureForm 
+                  onSubmit={handleSecureSubmit}
+                  className="space-y-6"
+                  requireTurnstile={true}
+                >
                   {formState.error && (
                     <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-md">
                       <div className="flex">
@@ -253,8 +241,6 @@ export const Contact: React.FC = () => {
                       type="text"
                       id="name"
                       name="name"
-                      value={formState.name}
-                      onChange={handleChange}
                       required
                       className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
                     />
@@ -267,8 +253,6 @@ export const Contact: React.FC = () => {
                       type="email"
                       id="email"
                       name="email"
-                      value={formState.email}
-                      onChange={handleChange}
                       required
                       className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
                     />
@@ -281,8 +265,6 @@ export const Contact: React.FC = () => {
                       type="tel"
                       id="phone"
                       name="phone"
-                      value={formState.phone}
-                      onChange={handleChange}
                       className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
                     />
                   </div>
@@ -294,8 +276,6 @@ export const Contact: React.FC = () => {
                       type="text"
                       id="district"
                       name="district"
-                      value={formState.district}
-                      onChange={handleChange}
                       className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
                     />
                   </div>
@@ -306,38 +286,12 @@ export const Contact: React.FC = () => {
                     <textarea
                       id="message"
                       name="message"
-                      value={formState.message}
-                      onChange={handleChange}
                       required
                       rows={4}
                       className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
                     ></textarea>
                   </div>
-
-                  {/* Submit Button */}
-                  <div>
-                    <button
-                      type="submit"
-                      disabled={formState.loading}
-                      className="w-full inline-flex justify-center items-center px-6 py-3 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-70"
-                    >
-                      {formState.loading ? (
-                        <>
-                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          Processing...
-                        </>
-                      ) : (
-                        <>
-                          <Send className="mr-2 h-5 w-5" />
-                          Send Message
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
+                </SecureForm>
               )}
             </div>
           </div>

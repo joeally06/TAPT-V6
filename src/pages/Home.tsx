@@ -82,23 +82,32 @@ export const Home: React.FC = () => {
   };
 
   return (
-    <div className="pt-16">
-      {/* Hero Section */}
-      <section className="relative bg-gradient-to-r from-secondary to-primary text-white">
-        <div className="absolute inset-0 bg-cover bg-center mix-blend-overlay opacity-20" style={{ backgroundImage: `url('${heroImageUrl}')` }}></div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28 lg:py-32 relative z-10">
-          <div className="md:max-w-2xl lg:max-w-3xl">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight mb-6 slide-in-left">
+    <div className="pt-16 overflow-x-hidden">
+      {/* Hero Section - Fixed Mobile Layout */}
+      <section className="relative bg-gradient-to-r from-secondary to-primary text-white min-h-[60vh] sm:min-h-[70vh]">
+        <div 
+          className="absolute inset-0 bg-cover bg-center mix-blend-overlay opacity-20" 
+          style={{ backgroundImage: `url('${heroImageUrl}')` }}
+        ></div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 md:py-20 lg:py-28 relative z-10">
+          <div className="max-w-full sm:max-w-2xl lg:max-w-3xl">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight mb-4 sm:mb-6 slide-in-left break-words">
               Student Safety is Our Priority
             </h1>
-            <p className="text-lg md:text-xl text-gray-100 mb-8 slide-in-left" style={{ animationDelay: '0.1s' }}>
+            <p className="text-base sm:text-lg md:text-xl text-gray-100 mb-6 sm:mb-8 slide-in-left break-words" style={{ animationDelay: '0.1s' }}>
               Education is Our Destination! {siteTagline}
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 slide-in-left" style={{ animationDelay: '0.2s' }}>
-              <Link to="/about" className="bg-white text-primary hover:bg-gray-100 px-6 py-3 rounded-md font-medium inline-flex items-center transition-all">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 slide-in-left" style={{ animationDelay: '0.2s' }}>
+              <Link 
+                to="/about" 
+                className="bg-white text-primary hover:bg-gray-100 px-4 sm:px-6 py-2 sm:py-3 rounded-md font-medium inline-flex items-center justify-center transition-all text-sm sm:text-base"
+              >
                 Learn More <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
-              <Link to="/members" className="bg-transparent text-white border border-white hover:bg-white/10 px-6 py-3 rounded-md font-medium transition-all">
+              <Link 
+                to="/members" 
+                className="bg-transparent text-white border border-white hover:bg-white/10 px-4 sm:px-6 py-2 sm:py-3 rounded-md font-medium transition-all text-sm sm:text-base text-center"
+              >
                 Become a Member
               </Link>
             </div>
@@ -106,19 +115,22 @@ export const Home: React.FC = () => {
         </div>
       </section>
 
-      {/* Announcement Banner */}
+      {/* Announcement Banner - Fixed Mobile Layout */}
       <div className="bg-accent/10 border-y border-accent/20">
         <div className="max-w-7xl mx-auto py-3 px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between flex-wrap">
-            <div className="flex-1 flex items-center">
-              <AlertCircle className="flex-shrink-0 h-5 w-5 text-accent" />
-              <p className="ml-3 font-medium text-secondary truncate">
+          <div className="flex items-start sm:items-center justify-between flex-col sm:flex-row gap-3">
+            <div className="flex-1 flex items-start sm:items-center w-full">
+              <AlertCircle className="flex-shrink-0 h-5 w-5 text-accent mt-0.5 sm:mt-0" />
+              <p className="ml-3 font-medium text-secondary text-sm sm:text-base leading-relaxed">
                 <span className="hidden md:inline">Important: </span>
                 The site is currently under construction. Check back soon for more features and content!
               </p>
             </div>
-            <div className="order-3 mt-2 w-full sm:mt-0 sm:w-auto">
-              <Link to="/contact" className="flex items-center justify-center px-4 py-2 border border-transparent rounded-md text-sm font-medium text-accent bg-white/50 hover:bg-white">
+            <div className="w-full sm:w-auto">
+              <Link 
+                to="/contact" 
+                className="flex items-center justify-center px-4 py-2 border border-transparent rounded-md text-sm font-medium text-accent bg-white/50 hover:bg-white w-full sm:w-auto"
+              >
                 Contact Us
               </Link>
             </div>
@@ -126,42 +138,42 @@ export const Home: React.FC = () => {
         </div>
       </div>
 
-      {/* Featured Events */}
+      {/* Featured Events - Fixed Mobile Layout */}
       {featuredEvents.length > 0 && (
-        <section className="py-12 bg-gradient-to-b from-gray-100 to-white">
+        <section className="py-8 sm:py-12 bg-gradient-to-b from-gray-100 to-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-secondary mb-2">Featured Events</h2>
-              <div className="w-20 h-1 bg-primary mx-auto"></div>
+            <div className="text-center mb-6 sm:mb-8">
+              <h2 className="text-2xl sm:text-3xl font-bold text-secondary mb-2">Featured Events</h2>
+              <div className="w-16 sm:w-20 h-1 bg-primary mx-auto"></div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
               {featuredEvents.map((event) => (
                 <div key={event.id} className="bg-white rounded-lg shadow-lg overflow-hidden">
                   {event.image_url && (
                     <img
-                      className="w-full h-48 object-cover"
+                      className="w-full h-36 sm:h-48 object-cover"
                       src={event.image_url}
                       alt={event.title}
                     />
                   )}
-                  <div className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="px-3 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
+                  <div className="p-4 sm:p-6">
+                    <div className="flex items-center justify-between mb-3 sm:mb-4 flex-wrap gap-2">
+                      <span className="px-2 sm:px-3 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
                         Featured Event
                       </span>
-                      <span className="text-sm text-gray-500">
+                      <span className="text-xs sm:text-sm text-gray-500">
                         {new Date(event.date).toLocaleDateString()}
                       </span>
                     </div>
-                    <h3 className="text-xl font-bold text-secondary mb-2">{event.title}</h3>
-                    <p className="text-gray-600 mb-4">{event.description}</p>
+                    <h3 className="text-lg sm:text-xl font-bold text-secondary mb-2 break-words">{event.title}</h3>
+                    <p className="text-gray-600 mb-3 sm:mb-4 text-sm sm:text-base break-words">{event.description}</p>
                     {isExternalLink(event) ? (
                       <a
                         href={event.link!}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center text-primary hover:text-primary/80 font-medium"
+                        className="inline-flex items-center text-primary hover:text-primary/80 font-medium text-sm sm:text-base"
                       >
                         Learn More
                         <ArrowRight className="ml-2 h-4 w-4" />
@@ -169,7 +181,7 @@ export const Home: React.FC = () => {
                     ) : (
                       <Link
                         to={getEventLink(event)}
-                        className="inline-flex items-center text-primary hover:text-primary/80 font-medium"
+                        className="inline-flex items-center text-primary hover:text-primary/80 font-medium text-sm sm:text-base"
                       >
                         {event.linked_form_type ? 'Register Now' : 'Learn More'}
                         <ArrowRight className="ml-2 h-4 w-4" />
@@ -183,39 +195,39 @@ export const Home: React.FC = () => {
         </section>
       )}
 
-      {/* Quick Links Section */}
-      <section className="py-12 bg-gray-50">
+      {/* Quick Links Section - Fixed Mobile Layout */}
+      <section className="py-8 sm:py-12 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow border-t-4 border-primary">
-              <div className="flex items-center mb-4">
-                <Calendar className="h-8 w-8 text-primary" />
-                <h3 className="text-xl font-semibold ml-3">Upcoming Events</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+            <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 hover:shadow-lg transition-shadow border-t-4 border-primary">
+              <div className="flex items-center mb-3 sm:mb-4">
+                <Calendar className="h-6 sm:h-8 w-6 sm:w-8 text-primary flex-shrink-0" />
+                <h3 className="text-lg sm:text-xl font-semibold ml-3">Upcoming Events</h3>
               </div>
-              <p className="text-gray-600 mb-4">Stay informed about conferences, workshops, and training opportunities.</p>
-              <Link to="/events" className="text-primary font-medium inline-flex items-center hover:underline">
+              <p className="text-gray-600 mb-3 sm:mb-4 text-sm sm:text-base">Stay informed about conferences, workshops, and training opportunities.</p>
+              <Link to="/events" className="text-primary font-medium inline-flex items-center hover:underline text-sm sm:text-base">
                 View Calendar <ArrowRight className="ml-1 h-4 w-4" />
               </Link>
             </div>
             
-            <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow border-t-4 border-primary">
-              <div className="flex items-center mb-4">
-                <BookOpen className="h-8 w-8 text-primary" />
-                <h3 className="text-xl font-semibold ml-3">Resources</h3>
+            <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 hover:shadow-lg transition-shadow border-t-4 border-primary">
+              <div className="flex items-center mb-3 sm:mb-4">
+                <BookOpen className="h-6 sm:h-8 w-6 sm:w-8 text-primary flex-shrink-0" />
+                <h3 className="text-lg sm:text-xl font-semibold ml-3">Resources</h3>
               </div>
-              <p className="text-gray-600 mb-4">Access guidelines, training materials, and important documentation.</p>
-              <Link to="/resources" className="text-primary font-medium inline-flex items-center hover:underline">
+              <p className="text-gray-600 mb-3 sm:mb-4 text-sm sm:text-base">Access guidelines, training materials, and important documentation.</p>
+              <Link to="/resources" className="text-primary font-medium inline-flex items-center hover:underline text-sm sm:text-base">
                 Browse Resources <ArrowRight className="ml-1 h-4 w-4" />
               </Link>
             </div>
             
-            <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow border-t-4 border-primary">
-              <div className="flex items-center mb-4">
-                <Users className="h-8 w-8 text-primary" />
-                <h3 className="text-xl font-semibold ml-3">Membership</h3>
+            <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 hover:shadow-lg transition-shadow border-t-4 border-primary">
+              <div className="flex items-center mb-3 sm:mb-4">
+                <Users className="h-6 sm:h-8 w-6 sm:w-8 text-primary flex-shrink-0" />
+                <h3 className="text-lg sm:text-xl font-semibold ml-3">Membership</h3>
               </div>
-              <p className="text-gray-600 mb-4">Join TAPT to connect with professionals and access exclusive benefits.</p>
-              <Link to="/members" className="text-primary font-medium inline-flex items-center hover:underline">
+              <p className="text-gray-600 mb-3 sm:mb-4 text-sm sm:text-base">Join TAPT to connect with professionals and access exclusive benefits.</p>
+              <Link to="/members" className="text-primary font-medium inline-flex items-center hover:underline text-sm sm:text-base">
                 Join Today <ArrowRight className="ml-1 h-4 w-4" />
               </Link>
             </div>
@@ -223,16 +235,22 @@ export const Home: React.FC = () => {
         </div>
       </section>
 
-      {/* Call to Action */}
-      <section className="bg-gradient-to-r from-primary to-accent py-16 text-white">
+      {/* Call to Action - Fixed Mobile Layout */}
+      <section className="bg-gradient-to-r from-primary to-accent py-12 sm:py-16 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-bold text-white mb-6">Ready to connect with transportation professionals?</h2>
-          <p className="text-xl mb-8 max-w-3xl mx-auto">Join the Tennessee Association of Pupil Transportation today to access exclusive resources, networking opportunities, and professional development.</p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/members" className="bg-white text-primary hover:bg-gray-100 px-8 py-3 rounded-md font-medium transition-colors">
+          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4 sm:mb-6 break-words">Ready to connect with transportation professionals?</h2>
+          <p className="text-base sm:text-lg lg:text-xl mb-6 sm:mb-8 max-w-3xl mx-auto break-words">Join the Tennessee Association of Pupil Transportation today to access exclusive resources, networking opportunities, and professional development.</p>
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center max-w-md sm:max-w-none mx-auto">
+            <Link 
+              to="/members" 
+              className="bg-white text-primary hover:bg-gray-100 px-6 sm:px-8 py-2 sm:py-3 rounded-md font-medium transition-colors text-sm sm:text-base"
+            >
               Join TAPT
             </Link>
-            <Link to="/contact" className="bg-transparent border border-white hover:bg-white/10 text-white px-8 py-3 rounded-md font-medium transition-colors">
+            <Link 
+              to="/contact" 
+              className="bg-transparent border border-white hover:bg-white/10 text-white px-6 sm:px-8 py-2 sm:py-3 rounded-md font-medium transition-colors text-sm sm:text-base"
+            >
               Contact Us
             </Link>
           </div>

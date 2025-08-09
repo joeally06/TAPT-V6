@@ -2,6 +2,9 @@ import { createClient } from "npm:@supabase/supabase-js@2.39.3";
 
 const allowedOrigins = [
   'https://tapt.org',
+  'https://www.tapt.org',
+  'https://tntapt.com',
+  'https://www.tntapt.com',
   'https://admin.tapt.org',
   'http://localhost:5173',
   'https://localhost:5173',
@@ -47,6 +50,7 @@ interface NominationPayload {
   supervisor_email: string;
   nominee_city: string;
   region: string;
+  turnstileToken: string;
 }
 
 Deno.serve(async (req) => {
@@ -94,6 +98,33 @@ Deno.serve(async (req) => {
     // Get request body
     const payload: NominationPayload = await req.json();
 
+    // Verify Turnstile token
+    if (!payload.turnstileToken) {
+      throw new Error('Security verification required');
+    }
+
+    try {
+      const turnstileResponse = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          secret: Deno.env.get('TURNSTILE_SECRET_KEY'),
+          response: payload.turnstileToken,
+        }),
+      });
+
+      const turnstileResult = await turnstileResponse.json();
+      
+      if (!turnstileResult.success) {
+        throw new Error('Security verification failed');
+      }
+    } catch (error) {
+      console.error('Turnstile verification error:', error);
+      throw new Error('Security verification failed');
+    }
+
     // Validate required fields
     const requiredFields = [
       'nominee_first_name',
@@ -105,7 +136,8 @@ Deno.serve(async (req) => {
       'supervisor_last_name',
       'supervisor_email',
       'nominee_city',
-      'region'
+      'region',
+      'turnstileToken'
     ];
 
     for (const field of requiredFields) {
