@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Mail, Phone, MapPin, Calendar, User, Book, Award, FileText, Clock, CheckCircle, AlertCircle } from 'lucide-react';
-import { handleError } from '../lib/errors';
+import { Mail, Phone, MapPin, User, Book, Award, CheckCircle, AlertCircle } from 'lucide-react';
 import { SecureForm } from '../components/forms/SecureForm';
 
 interface ScholarshipSettings {
@@ -47,7 +46,7 @@ const StudentScholarshipApplication: React.FC = () => {
     signature: ''
   });
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [formStatus, setFormStatus] = useState<{
     success?: boolean;
     message?: string;
@@ -148,13 +147,11 @@ const StudentScholarshipApplication: React.FC = () => {
       throw new Error('Your essay must be between 300-500 words.');
     }
 
-    setIsSubmitting(true);
-
     try {
       // Get the Supabase URL from environment variables
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       if (!supabaseUrl) {
-        throw new Error('VITE_SUPABASE_URL is not defined');
+        throw new Error('Configuration error. Please contact support.');
       }
 
       // Format birthdate
@@ -205,14 +202,19 @@ const StudentScholarshipApplication: React.FC = () => {
       });
 
       // Check if the request was successful
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to submit application');
+      let result;
+      try {
+        result = await response.json();
+      } catch (e) {
+        throw new Error('Server communication error. Please try again.');
       }
 
-      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result?.error || `Server error (${response.status}). Please try again.`);
+      }
+
       if (!result.success) {
-        throw new Error(result.error || 'Failed to submit application');
+        throw new Error(result.error || 'Application failed. Please try again.');
       }
 
       // ✅ Only show success message via formStatus
@@ -252,13 +254,19 @@ const StudentScholarshipApplication: React.FC = () => {
         signature: ''
       });
     } catch (error: any) {
-      console.error('Error submitting application:', error);
-      const { message } = handleError(error);
+      console.error('Application error:', error);
       
-      // ✅ Re-throw the error so SecureForm can display it
-      throw new Error(`Error submitting application: ${message}`);
-    } finally {
-      setIsSubmitting(false);
+      // Handle specific error types
+      if (error.message?.includes('rate limit') || error.message?.includes('too many')) {
+        throw new Error('Too many requests. Please wait a moment and try again.');
+      }
+      
+      if (error.message?.includes('network') || error.message?.includes('fetch')) {
+        throw new Error('Network error. Please check your connection and try again.');
+      }
+      
+      // Re-throw with the original error message or a generic one
+      throw new Error(error.message || 'An unexpected error occurred. Please try again.');
     }
   };
 
@@ -1045,26 +1053,6 @@ const StudentScholarshipApplication: React.FC = () => {
                 </div>
               </div>
 
-              {/* Submit Button */}
-              <div>
-                <button
-                  type="submit"
-                  disabled={isSubmitting || wordCounts.essay < 300 || wordCounts.essay > 500}
-                  className="w-full inline-flex justify-center py-3 px-6 border border-transparent shadow-sm text-base font-medium rounded-md text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Processing...
-                    </>
-                  ) : (
-                    'Submit Application'
-                  )}
-                </button>
-              </div>
             </SecureForm>
           </div>
         </section>

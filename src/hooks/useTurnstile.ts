@@ -44,6 +44,10 @@ export const useTurnstile = (
     // Security validation
     validateDomainSecurity();
 
+    // Log current domain for debugging
+    console.log('🔒 Current domain:', window.location.hostname);
+    console.log('🔒 Is valid domain:', isValidDomain());
+
     // Prevent loading on invalid domains in production
     if (import.meta.env.PROD && !isValidDomain()) {
       setError('Domain not authorized for Turnstile');
@@ -82,10 +86,15 @@ export const useTurnstile = (
     if (isLoaded && containerRef.current && window.turnstile && !error) {
       try {
         const siteKey = getTurnstileSiteKey();
+        console.log('🔒 Initializing Turnstile with site key:', siteKey);
         
         const id = window.turnstile.render(containerRef.current, {
           sitekey: siteKey,
-          callback: onVerify,
+          callback: (token: string) => {
+            console.log('🔒 Turnstile callback triggered with token:', token ? 'Token received' : 'Empty token');
+            console.log('🔒 Callback token length:', token?.length || 0);
+            onVerify(token);
+          },
           'error-callback': () => {
             const errorMsg = 'Turnstile verification failed';
             setError(errorMsg);

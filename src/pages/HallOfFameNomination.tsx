@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { User, Mail, Phone, Building, Clock, Award, AlertCircle, X } from 'lucide-react';
+import { User, Mail, Phone, Building, Clock, Award } from 'lucide-react';
 import { SecureForm } from '../components/forms/SecureForm';
 
 interface HallOfFameSettings {
@@ -30,7 +30,7 @@ export const HallOfFameNomination: React.FC = () => {
     region: ''
   });
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [formStatus, setFormStatus] = useState<{
     success?: boolean;
     message?: string;
@@ -122,12 +122,10 @@ export const HallOfFameNomination: React.FC = () => {
       throw new Error('The nomination period is not currently open.');
     }
 
-    setIsSubmitting(true);
-
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       if (!supabaseUrl) {
-        throw new Error('VITE_SUPABASE_URL is not defined');
+        throw new Error('Configuration error. Please contact support.');
       }
 
       const response = await fetch(
@@ -155,10 +153,15 @@ export const HallOfFameNomination: React.FC = () => {
         }
       );
 
-      const result = await response.json();
+      let result;
+      try {
+        result = await response.json();
+      } catch (e) {
+        throw new Error('Server communication error. Please try again.');
+      }
 
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to submit nomination');
+        throw new Error(result?.error || `Server error (${response.status}). Please try again.`);
       }
 
       // ✅ Only show success message via formStatus
@@ -183,12 +186,19 @@ export const HallOfFameNomination: React.FC = () => {
         region: ''
       });
     } catch (error: any) {
-      console.error('Error submitting nomination:', error);
+      console.error('Nomination error:', error);
       
-      // ✅ Re-throw the error so SecureForm can display it
-      throw new Error(error.message || 'Failed to submit nomination. Please try again.');
-    } finally {
-      setIsSubmitting(false);
+      // Handle specific error types
+      if (error.message?.includes('rate limit') || error.message?.includes('too many')) {
+        throw new Error('Too many requests. Please wait a moment and try again.');
+      }
+      
+      if (error.message?.includes('network') || error.message?.includes('fetch')) {
+        throw new Error('Network error. Please check your connection and try again.');
+      }
+      
+      // Re-throw with the original error message or a generic one
+      throw new Error(error.message || 'An unexpected error occurred. Please try again.');
     }
   };
 
@@ -543,29 +553,6 @@ export const HallOfFameNomination: React.FC = () => {
               </div>
             </div>
 
-            {/* Submit Button */}
-            <div className="mt-8">
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full inline-flex justify-center py-3 px-6 border border-transparent shadow-sm text-base font-medium rounded-md text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
-              >
-                {isSubmitting ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <Award className="mr-2 h-5 w-5" />
-                    Submit Nomination
-                  </>
-                )}
-              </button>
-            </div>
           </SecureForm>
         </div>
       </section>

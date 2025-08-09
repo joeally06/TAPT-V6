@@ -24,6 +24,8 @@ export const SecureForm: React.FC<SecureFormProps> = ({
   const [isVerified, setIsVerified] = useState(false);
 
   const handleTurnstileVerify = useCallback((token: string) => {
+    console.log('🔒 SecureForm: Turnstile token received:', token ? 'Token present' : 'Empty token');
+    console.log('🔒 SecureForm: Token length:', token?.length || 0);
     setTurnstileToken(token);
     setTurnstileError(null);
     setIsVerified(false); // Will verify on submit
@@ -47,9 +49,13 @@ export const SecureForm: React.FC<SecureFormProps> = ({
     }
 
     if (requireTurnstile && !turnstileToken) {
+      console.log('🔒 SecureForm: No turnstile token available for submission');
       setTurnstileError('Please complete the security verification');
       return;
     }
+
+    console.log('🔒 SecureForm: About to submit with token:', turnstileToken ? 'Token present' : 'Empty token');
+    console.log('🔒 SecureForm: Token length at submission:', turnstileToken?.length || 0);
 
     setIsSubmitting(true);
     setTurnstileError(null);
