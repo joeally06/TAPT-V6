@@ -1,4 +1,12 @@
 import { createClient } from "npm:@supabase/supabase-js@2.39.3";
+import { 
+  getRequestId, 
+  createSuccessResponse, 
+  createErrorResponse,
+  logWithRequestId,
+  logErrorWithRequestId,
+  createEdgeRequestContext
+} from "../_shared/requestId.ts";
 
 const allowedOrigins = [
   'https://tapt.org',
@@ -82,6 +90,16 @@ const verifyTurnstileToken = async (token: string, userIP?: string): Promise<boo
 };
 
 Deno.serve(async (req) => {
+  // Extract or generate request ID
+  const requestId = getRequestId(req);
+  const requestContext = createEdgeRequestContext(req, requestId);
+  
+  logWithRequestId(requestId, 'Incoming request', {
+    method: requestContext.method,
+    url: requestContext.url,
+    ip: requestContext.ip
+  });
+  
   const origin = req.headers.get('Origin') || '';
   // Check if origin matches any allowed pattern (including wildcards)
   const allowOrigin = allowedOrigins.some(allowed => {
@@ -95,8 +113,9 @@ Deno.serve(async (req) => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Request-ID',
     'Access-Control-Allow-Credentials': 'true',
+    'X-Request-ID': requestId,
     ...securityHeaders
   };
 
@@ -109,7 +128,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log("Processing contact message submission");
+    logWithRequestId(requestId, "Processing contact message submission");
     
     // Verify request method
     if (req.method !== 'POST') {
@@ -237,43 +256,33 @@ Deno.serve(async (req) => {
         user_id: null, // No user for public submissions
         action: 'submit_contact_message',
         outcome: 'success',
-        details: { message_id: data.id }
+        details: { 
+          message_id: data.id,
+          request_id: requestId
+        }
       }]);
     } catch (logError) {
       // Don't fail the request if logging fails
-      console.error("Error logging action:", logError);
+      logErrorWithRequestId(requestId, "Error logging action", logError);
     }
 
-    return new Response(
-      JSON.stringify({ 
-        success: true,
-        data: {
-          id: data.id,
-          created_at: data.created_at
-        }
-      }),
-      { 
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
-      }
+    logWithRequestId(requestId, "Contact message submitted successfully", { id: data.id });
+
+    return createSuccessResponse(
+      {
+        id: data.id,
+        created_at: data.created_at
+      },
+      requestId,
+      200
     );
 
   } catch (error) {
-    console.error("Error in submit-contact-message function:", error);
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: sanitizeError(error),
-      }),
-      { 
-        status: 400,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
-      }
+    logErrorWithRequestId(requestId, "Error in submit-contact-message function", error);
+    return createErrorResponse(
+      sanitizeError(error),
+      requestId,
+      400
     );
   }
 });
