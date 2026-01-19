@@ -178,7 +178,7 @@ Deno.serve(async (req) => {
       phone: { type: 'phone', required: false },
       district: { type: 'string', required: false, maxLength: 100 },
       message: { type: 'string', required: true, maxLength: 5000 },
-      turnstileToken: { type: 'string', required: false }
+      turnstileToken: { type: 'token', required: false, maxLength: 2000 }
     };
 
     // Sanitize payload

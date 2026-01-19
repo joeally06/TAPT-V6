@@ -165,8 +165,29 @@ export function sanitizeState(state: string): string {
 /**
  * Schema-based object sanitization
  */
+/**
+ * Sanitize a token (like Turnstile token) - only validate, don't modify
+ */
+export function sanitizeToken(input: string, maxLength: number = 2000): string {
+  if (typeof input !== 'string') {
+    throw new Error('Token must be a string');
+  }
+  
+  const trimmed = input.trim();
+  
+  if (trimmed.length === 0) {
+    throw new Error('Token cannot be empty');
+  }
+  
+  if (trimmed.length > maxLength) {
+    throw new Error(`Token exceeds maximum length of ${maxLength}`);
+  }
+  
+  return trimmed;
+}
+
 export interface SanitizationRule {
-  type: 'string' | 'email' | 'phone' | 'zip' | 'url' | 'number' | 'boolean' | 'array' | 'state';
+  type: 'string' | 'email' | 'phone' | 'zip' | 'url' | 'number' | 'boolean' | 'array' | 'state' | 'token';
   required?: boolean;
   maxLength?: number;
   min?: number;
@@ -222,6 +243,9 @@ export function sanitizeObject<T extends Record<string, any>>(
           break;
         case 'array':
           sanitized[key] = sanitizeArray(value, rules.arrayMaxLength);
+          break;
+        case 'token':
+          sanitized[key] = sanitizeToken(value, rules.maxLength);
           break;
         default:
           throw new Error(`Unknown type: ${rules.type}`);

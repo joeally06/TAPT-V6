@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
       poNumber: { type: 'string', required: false, maxLength: 100 },
       paypalTransactionId: { type: 'string', required: false, maxLength: 100 },
       paypalPayerEmail: { type: 'email', required: false },
-      turnstileToken: { type: 'string', required: true }
+      turnstileToken: { type: 'token', required: true, maxLength: 2000 }
     };
 
     // Sanitize main registration data

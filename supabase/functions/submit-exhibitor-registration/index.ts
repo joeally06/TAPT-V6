@@ -154,7 +154,7 @@ Deno.serve(async (req) => {
       poNumber: { type: 'string', required: false, maxLength: 100 },
       paypalTransactionId: { type: 'string', required: false, maxLength: 100 },
       paypalPayerEmail: { type: 'email', required: false },
-      turnstileToken: { type: 'string', required: true }
+      turnstileToken: { type: 'token', required: true, maxLength: 2000 }
     };
 
     // Sanitize payload
@@ -194,7 +194,9 @@ Deno.serve(async (req) => {
     console.log('🔒 Verifying Turnstile token:', {
       tokenLength: sanitizedData.turnstileToken?.length,
       tokenPreview: sanitizedData.turnstileToken?.substring(0, 20) + '...',
-      origin: origin
+      origin: origin,
+      secretKeyLength: turnstileSecret?.length,
+      secretKeyPrefix: turnstileSecret?.substring(0, 10) + '...'
     });
 
     // Build Turnstile verification params
@@ -204,6 +206,8 @@ Deno.serve(async (req) => {
       secret: turnstileSecret,
       response: sanitizedData.turnstileToken || '',
     });
+
+    console.log('🔒 Turnstile request body:', turnstileParams.toString().replace(turnstileSecret, '[REDACTED]'));
 
     const turnstileResponse = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
       method: 'POST',
