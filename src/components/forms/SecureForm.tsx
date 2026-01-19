@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useImperativeHandle, forwardRef, useRef } from 'react';
 import { Turnstile } from '../ui/Turnstile';
 import { getTurnstileSiteKey } from '../../config/turnstile';
 import { checkRateLimit, recordAttempt } from '../../utils/turnstileVerification';
@@ -11,17 +11,39 @@ interface SecureFormProps {
   disabled?: boolean;
 }
 
-export const SecureForm: React.FC<SecureFormProps> = ({
+export interface SecureFormHandle {
+  resetTurnstile: () => void;
+}
+
+export const SecureForm = forwardRef<SecureFormHandle, SecureFormProps>(({
   children,
   onSubmit,
   className = "",
   requireTurnstile = true,
   disabled = false
-}) => {
+}, ref) => {
   const [turnstileToken, setTurnstileToken] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [turnstileError, setTurnstileError] = useState<string | null>(null);
   const [isVerified, setIsVerified] = useState(false);
+  const turnstileResetRef = useRef<(() => void) | null>(null);
+
+  // Expose reset method to parent
+  useImperativeHandle(ref, () => ({
+    resetTurnstile: () => {
+      console.log('🔒 SecureForm: Resetting Turnstile widget');
+      if (turnstileResetRef.current) {
+        turnstileResetRef.current();
+        setTurnstileToken('');
+        setIsVerified(false);
+        setTurnstileError(null);
+      }
+    }
+  }));
+
+  const handleTurnstileReset = useCallback((resetFn: () => void) => {
+    turnstileResetRef.current = resetFn;
+  }, []);
 
   const handleTurnstileVerify = useCallback((token: string) => {
     console.log('🔒 SecureForm: Turnstile token received:', token ? 'Token present' : 'Empty token');
@@ -107,6 +129,7 @@ export const SecureForm: React.FC<SecureFormProps> = ({
             siteKey={getTurnstileSiteKey()}
             onVerify={handleTurnstileVerify}
             onError={handleTurnstileError}
+            onResetReady={handleTurnstileReset}
             className="mb-4"
           />
           
@@ -149,4 +172,4 @@ export const SecureForm: React.FC<SecureFormProps> = ({
       </button>
     </form>
   );
-};
+});

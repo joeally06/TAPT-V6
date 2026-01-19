@@ -1,4 +1,8 @@
 import { createClient } from "npm:@supabase/supabase-js@2.39.3";
+import { sendEmail } from '../_shared/email.ts';
+import { generateConferenceConfirmationEmail, generateConferenceAdminNotification } from '../_shared/emailTemplates.ts';
+import type { ConferenceRegistrationData } from '../_shared/emailTemplates.ts';
+import { sanitizeObject, sanitizeArray, type SanitizationRule } from '../_shared/sanitize.ts';
 
 const allowedOrigins = [
   'https://tapt.org',
@@ -79,58 +83,80 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
 
-    // Enhanced validation
-    let errors: string[] = [];
-    if (!body.firstName || typeof body.firstName !== 'string') {
-      errors.push('First name is required');
-    }
-    if (!body.lastName || typeof body.lastName !== 'string') {
-      errors.push('Last name is required');
-    }
-    if (!body.email || typeof body.email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) {
-      errors.push('Valid email is required');
-    }
-    if (!body.schoolDistrict || typeof body.schoolDistrict !== 'string') {
-      errors.push('School district is required');
-    }
-    if (!body.streetAddress || typeof body.streetAddress !== 'string') {
-      errors.push('Street address is required');
-    }
-    if (!body.city || typeof body.city !== 'string') {
-      errors.push('City is required');
-    }
-    if (!body.state || typeof body.state !== 'string') {
-      errors.push('State is required');
-    }
-    if (!body.zipCode || typeof body.zipCode !== 'string') {
-      errors.push('ZIP code is required');
-    }
-    if (!body.phone || typeof body.phone !== 'string') {
-      errors.push('Phone number is required');
-    }
-    if (!body.totalAttendees || typeof body.totalAttendees !== 'number' || body.totalAttendees < 1) {
-      errors.push('Total attendees must be at least 1');
-    }
-    
-    if (errors.length > 0) {
-      return new Response(
-        JSON.stringify({ success: false, error: errors.join(', ') }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
+    // Define sanitization schema
+    const mainRegistrationSchema: Record<string, SanitizationRule> = {
+      firstName: { type: 'string', required: true, maxLength: 100 },
+      lastName: { type: 'string', required: true, maxLength: 100 },
+      email: { type: 'email', required: true },
+      phone: { type: 'phone', required: true },
+      schoolDistrict: { type: 'string', required: true, maxLength: 100 },
+      streetAddress: { type: 'string', required: true, maxLength: 200 },
+      city: { type: 'string', required: true, maxLength: 100 },
+      state: { type: 'state', required: true },
+      zipCode: { type: 'zip', required: true },
+      totalAttendees: { type: 'number', required: true, min: 1, max: 20 },
+      totalAmount: { type: 'number', required: true, min: 0 },
+      conferenceId: { type: 'number', required: true },
+      paymentMethod: { type: 'string', required: true },
+      paymentStatus: { type: 'string', required: false, maxLength: 50 },
+      poNumber: { type: 'string', required: false, maxLength: 100 },
+      paypalTransactionId: { type: 'string', required: false, maxLength: 100 },
+      paypalPayerEmail: { type: 'email', required: false },
+      turnstileToken: { type: 'string', required: true }
+    };
 
-    // Turnstile verification
-    const turnstileToken = body.turnstileToken;
-    if (!turnstileToken) {
+    // Sanitize main registration data
+    let sanitizedData;
+    try {
+      sanitizedData = sanitizeObject(body, mainRegistrationSchema);
+    } catch (error) {
+      console.error('❌ Validation error:', error);
       return new Response(
-        JSON.stringify({ success: false, error: 'Security verification is required.' }),
+        JSON.stringify({ success: false, error: error instanceof Error ? error.message : 'Validation failed' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    // Additional validation for payment method
+    if (!['po', 'paypal'].includes(sanitizedData.paymentMethod || '')) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid payment method. Must be "po" or "paypal".' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate PO number if payment method is PO
+    if (sanitizedData.paymentMethod === 'po' && (!sanitizedData.poNumber || !sanitizedData.poNumber.trim())) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Purchase order number is required for PO payments.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Sanitize additional attendees
+    const attendeeSchema: Record<string, SanitizationRule> = {
+      firstName: { type: 'string', required: true, maxLength: 100 },
+      lastName: { type: 'string', required: true, maxLength: 100 },
+      email: { type: 'email', required: true }
+    };
+
+    let sanitizedAttendees: any[] = [];
+    if (body.additionalAttendees && Array.isArray(body.additionalAttendees)) {
+      try {
+        sanitizeArray(body.additionalAttendees, 20);
+        sanitizedAttendees = body.additionalAttendees.map((attendee: any) => 
+          sanitizeObject(attendee, attendeeSchema)
+        );
+      } catch (error) {
+        console.error('❌ Attendee validation error:', error);
+        return new Response(
+          JSON.stringify({ success: false, error: `Invalid attendee data: ${error instanceof Error ? error.message : 'validation failed'}` }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Turnstile verification
     const turnstileSecret = Deno.env.get('TURNSTILE_SECRET_KEY');
     if (!turnstileSecret) {
       return new Response(
@@ -146,7 +172,7 @@ Deno.serve(async (req) => {
       },
       body: new URLSearchParams({
         secret: turnstileSecret,
-        response: turnstileToken,
+        response: sanitizedData.turnstileToken || '',
         remoteip: req.headers.get('CF-Connecting-IP') || req.headers.get('X-Forwarded-For') || ''
       })
     });
@@ -161,7 +187,7 @@ Deno.serve(async (req) => {
     }
     
     // Rate limiting: max 3 submissions per hour per email
-    const rateLimitKey = `tech_conference_registration_${body.email}`;
+    const rateLimitKey = `tech_conference_registration_${sanitizedData.email}`;
     const { data: rateLimit } = await supabaseAdmin
       .from('rate_limits')
       .select('count, last_attempt')
@@ -195,21 +221,28 @@ Deno.serve(async (req) => {
         });
     }
 
-    // Insert main registration
+    // Insert main registration with sanitized data
     const { data: registration, error: regError } = await supabaseAdmin
       .from('tech_conference_registrations')
       .insert([{
-        school_district: body.schoolDistrict,
-        first_name: body.firstName,
-        last_name: body.lastName,
-        street_address: body.streetAddress,
-        city: body.city,
-        state: body.state,
-        zip_code: body.zipCode,
-        email: body.email,
-        phone: body.phone,
-        total_attendees: body.totalAttendees,
-        total_amount: body.totalAmount
+        school_district: sanitizedData.schoolDistrict,
+        first_name: sanitizedData.firstName,
+        last_name: sanitizedData.lastName,
+        street_address: sanitizedData.streetAddress,
+        city: sanitizedData.city,
+        state: sanitizedData.state,
+        zip_code: sanitizedData.zipCode,
+        email: sanitizedData.email,
+        phone: sanitizedData.phone,
+        total_attendees: sanitizedData.totalAttendees,
+        total_amount: sanitizedData.totalAmount,
+        // Payment fields
+        payment_method: sanitizedData.paymentMethod,
+        payment_status: sanitizedData.paymentStatus || 'pending',
+        po_number: sanitizedData.poNumber || null,
+        paypal_transaction_id: sanitizedData.paypalTransactionId || null,
+        paypal_payer_email: sanitizedData.paypalPayerEmail || null,
+        payment_completed_at: sanitizedData.paymentStatus === 'completed' ? new Date().toISOString() : null
       }])
       .select()
       .single();
@@ -217,8 +250,8 @@ Deno.serve(async (req) => {
     if (regError) throw regError;
 
     // Insert additional attendees if any
-    if (body.additionalAttendees && body.additionalAttendees.length > 0) {
-      const attendeesToInsert = body.additionalAttendees.map((attendee: any) => ({
+    if (sanitizedAttendees.length > 0) {
+      const attendeesToInsert = sanitizedAttendees.map((attendee: any) => ({
         registration_id: registration.id,
         first_name: attendee.firstName,
         last_name: attendee.lastName,
@@ -231,6 +264,70 @@ Deno.serve(async (req) => {
 
       if (attendeesError) throw attendeesError;
     }
+
+    // Get tech conference details for email
+    const { data: conferenceDetails } = await supabaseAdmin
+      .from('tech_conference_settings')
+      .select('name, start_date, end_date, location, venue, payment_instructions')
+      .limit(1)
+      .single();
+
+    // Prepare email data with sanitized values
+    const emailData: ConferenceRegistrationData = {
+      firstName: sanitizedData.firstName || '',
+      lastName: sanitizedData.lastName || '',
+      email: sanitizedData.email || '',
+      schoolDistrict: sanitizedData.schoolDistrict || '',
+      phone: sanitizedData.phone || '',
+      streetAddress: sanitizedData.streetAddress || '',
+      city: sanitizedData.city || '',
+      state: sanitizedData.state || '',
+      zipCode: sanitizedData.zipCode || '',
+      totalAttendees: sanitizedData.totalAttendees || 0,
+      totalAmount: sanitizedData.totalAmount || 0,
+      conferenceName: conferenceDetails?.name || 'TAPT Tech Conference',
+      conferenceDate: conferenceDetails 
+        ? `${new Date(conferenceDetails.start_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - ${new Date(conferenceDetails.end_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}` 
+        : 'TBD',
+      conferenceLocation: conferenceDetails 
+        ? `${conferenceDetails.venue}, ${conferenceDetails.location}` 
+        : 'TBD',
+      paymentInstructions: conferenceDetails?.payment_instructions || 'Payment instructions will be sent separately.',
+      additionalAttendees: sanitizedAttendees || [],
+      // Payment fields
+      paymentMethod: sanitizedData.paymentMethod || '',
+      paymentStatus: sanitizedData.paymentStatus || 'pending',
+      poNumber: sanitizedData.poNumber,
+      paypalTransactionId: sanitizedData.paypalTransactionId,
+    };
+
+    // Send confirmation email to user
+    console.log('📧 Sending confirmation email to user...');
+    const userEmailResult = await sendEmail({
+      to: sanitizedData.email || '',
+      subject: `Registration Confirmation - ${emailData.conferenceName}`,
+      html: generateConferenceConfirmationEmail(emailData)
+    });
+
+    if (!userEmailResult.success) {
+      console.error('⚠️ Failed to send user confirmation email:', userEmailResult.error);
+      // Don't fail the registration if email fails, just log it
+    }
+
+    // Send notification to admin(s)
+    const adminEmail = Deno.env.get('ADMIN_NOTIFICATION_EMAIL') || 'info@tapt.org';
+    console.log('📧 Sending admin notification email...');
+    const adminEmailResult = await sendEmail({
+      to: adminEmail,
+      subject: `New Tech Conference Registration: ${sanitizedData.schoolDistrict} - ${emailData.conferenceName}`,
+      html: generateConferenceAdminNotification(emailData)
+    });
+
+    if (!adminEmailResult.success) {
+      console.error('⚠️ Failed to send admin notification email:', adminEmailResult.error);
+    }
+
+    console.log('✅ Tech conference registration complete with email notifications sent');
 
     return new Response(
       JSON.stringify({ success: true, registrationId: registration.id }),

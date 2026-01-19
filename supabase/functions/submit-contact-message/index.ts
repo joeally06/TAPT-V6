@@ -7,6 +7,7 @@ import {
   logErrorWithRequestId,
   createEdgeRequestContext
 } from "../_shared/requestId.ts";
+import { sanitizeObject, type SanitizationRule } from '../_shared/sanitize.ts';
 
 const allowedOrigins = [
   'https://tapt.org',
@@ -156,7 +157,7 @@ Deno.serve(async (req) => {
     );
 
     // Parse request body
-    let payload: ContactMessage;
+    let payload: any;
     try {
       payload = await req.json();
       console.log("Received payload:", JSON.stringify({
@@ -170,19 +171,38 @@ Deno.serve(async (req) => {
       throw new Error('Invalid request format: Unable to parse JSON');
     }
 
-    // Validate required fields
-    if (!payload.name || !payload.email || !payload.message) {
-      throw new Error('Name, email, and message are required fields');
+    // Define sanitization schema
+    const contactMessageSchema: Record<string, SanitizationRule> = {
+      name: { type: 'string', required: true, maxLength: 100 },
+      email: { type: 'email', required: true },
+      phone: { type: 'phone', required: false },
+      district: { type: 'string', required: false, maxLength: 100 },
+      message: { type: 'string', required: true, maxLength: 5000 },
+      turnstileToken: { type: 'string', required: false }
+    };
+
+    // Sanitize payload
+    let sanitizedData;
+    try {
+      sanitizedData = sanitizeObject(payload, contactMessageSchema);
+    } catch (error) {
+      console.error('❌ Validation error:', error);
+      return createErrorResponse(
+        error instanceof Error ? error.message : 'Validation failed',
+        400,
+        corsHeaders,
+        requestId
+      );
     }
 
     // Verify Turnstile token if provided
-    if (payload.turnstileToken) {
+    if (sanitizedData.turnstileToken) {
       const clientIP = req.headers.get('cf-connecting-ip') || 
                        req.headers.get('x-forwarded-for') || 
                        req.headers.get('x-real-ip') || 
                        undefined;
       
-      const isVerified = await verifyTurnstileToken(payload.turnstileToken, clientIP);
+      const isVerified = await verifyTurnstileToken(sanitizedData.turnstileToken, clientIP);
       if (!isVerified) {
         throw new Error('Security verification failed. Please try again.');
       }
@@ -193,14 +213,8 @@ Deno.serve(async (req) => {
       throw new Error('Security verification required');
     }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(payload.email)) {
-      throw new Error('Invalid email format');
-    }
-
     // Check for rate limiting
-    const rateLimitKey = `contact_message_${payload.email}`;
+    const rateLimitKey = `contact_message_${sanitizedData.email}`;
     const { data: rateLimit } = await supabaseAdmin
       .from('rate_limits')
       .select('count, last_attempt')
@@ -234,15 +248,15 @@ Deno.serve(async (req) => {
         });
     }
 
-    // Insert message
+    // Insert message with sanitized data
     const { data, error } = await supabaseAdmin
       .from('contact_messages')
       .insert([{
-        name: payload.name,
-        email: payload.email,
-        phone: payload.phone || null,
-        district: payload.district || null,
-        message: payload.message,
+        name: sanitizedData.name,
+        email: sanitizedData.email,
+        phone: sanitizedData.phone || null,
+        district: sanitizedData.district || null,
+        message: sanitizedData.message,
         read_status: false
       }])
       .select()

@@ -144,6 +144,19 @@ export const AdminConferenceSettings: React.FC = () => {
     setError(null);
     setSuccess(null);
     try {
+      // Validate dates on client-side before submitting
+      const startDate = new Date(settings.start_date);
+      const endDate = new Date(settings.end_date);
+      const regEndDate = new Date(settings.registration_end_date);
+
+      if (endDate <= startDate) {
+        throw new Error('Conference end date must be after conference start date');
+      }
+
+      if (regEndDate > startDate) {
+        throw new Error('Registration end date must be before or on the conference start date');
+      }
+
       // If no ID exists or ID is empty, fetch a new UUID from the server
       if (!settings.id || settings.id.trim() === '') {
         const uuid = await fetchUUID();

@@ -98,11 +98,11 @@ Deno.serve(async (req) => {
       const regEndDate = new Date(body.registration_end_date);
 
       if (endDate <= startDate) {
-        throw new Error('End date must be after start date');
+        throw new Error('Conference end date must be after conference start date');
       }
 
       if (regEndDate > startDate) {
-        throw new Error('Registration end date must be before or on start date');
+        throw new Error('Registration end date must be before or on the conference start date');
       }
 
       // Update tech conference settings

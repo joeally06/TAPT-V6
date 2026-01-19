@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useTurnstile } from '../../hooks/useTurnstile';
 
 interface TurnstileProps {
   siteKey: string;
   onVerify: (token: string) => void;
   onError?: (error: string) => void;
+  onResetReady?: (resetFn: () => void) => void;
   className?: string;
 }
 
@@ -12,9 +13,17 @@ export const Turnstile: React.FC<TurnstileProps> = ({
   siteKey, 
   onVerify, 
   onError,
+  onResetReady,
   className = "" 
 }) => {
-  const { containerRef, isLoaded, error } = useTurnstile(onVerify, onError);
+  const { containerRef, reset, isLoaded, error } = useTurnstile(onVerify, onError);
+
+  // Expose reset function to parent
+  useEffect(() => {
+    if (onResetReady && reset) {
+      onResetReady(reset);
+    }
+  }, [reset, onResetReady]);
 
   return (
     <div className={`turnstile-container ${className}`}>

@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Mail, Phone, MapPin, DollarSign, Building, User, Users, Calendar, AlertCircle, X } from 'lucide-react';
 import { SecureForm } from '../components/forms/SecureForm';
+import { PaymentMethodSelector } from '../components/forms/PaymentMethodSelector';
+import { PayPalButton } from '../components/forms/PayPalButton';
+import { PayPalOrderDetails } from '../config/paypal';
 
 interface Attendee {
   firstName: string;
@@ -38,6 +41,10 @@ const TechConferenceRegistration: React.FC = () => {
     additionalAttendees: [] as Attendee[]
   });
 
+  // Payment state
+  const [paymentMethod, setPaymentMethod] = useState<'po' | 'paypal' | null>(null);
+  const [poNumber, setPoNumber] = useState('');
+  const [paypalDetails, setPaypalDetails] = useState<PayPalOrderDetails | null>(null);
 
   const [formStatus, setFormStatus] = useState<{
     success?: boolean;
@@ -153,23 +160,30 @@ const TechConferenceRegistration: React.FC = () => {
       throw new Error('Registration is closed. The deadline has passed.');
     }
 
+    if (!turnstileToken) {
+      throw new Error('Security verification is required.');
+    }
+
+    // Validate payment method
+    if (!paymentMethod) {
+      throw new Error('Please select a payment method.');
+    }
+
+    if (paymentMethod === 'po' && !poNumber.trim()) {
+      throw new Error('Please enter a purchase order number.');
+    }
+
+    if (paymentMethod === 'paypal' && !paypalDetails) {
+      throw new Error('Please complete PayPal payment before submitting.');
+    }
+
     try {
-      // Debug: Log the turnstile token
-      console.log('🔒 Turnstile token received:', turnstileToken ? 'Token present' : 'No token');
-      console.log('🔒 Token length:', turnstileToken?.length || 0);
       
-      // Ensure we have a valid turnstile token
-      if (!turnstileToken) {
-        throw new Error('Security verification failed. Please try again.');
-      }
-      
-      // Get the Supabase URL from environment variables
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       if (!supabaseUrl) {
-        throw new Error('SUPABASE_URL environment variable is not defined');
+        throw new Error('Configuration error. Please contact support.');
       }
 
-      // Prepare the request payload
       const payload = {
         schoolDistrict: formData.schoolDistrict,
         firstName: formData.firstName,
@@ -182,18 +196,17 @@ const TechConferenceRegistration: React.FC = () => {
         phone: formData.phone,
         totalAttendees: formData.totalAttendees,
         totalAmount,
-        conferenceId: conferenceSettings?.id, // ✅ Added missing conferenceId
+        conferenceId: conferenceSettings?.id,
         additionalAttendees: formData.additionalAttendees,
-        turnstileToken
+        turnstileToken,
+        // Payment fields
+        paymentMethod,
+        poNumber: paymentMethod === 'po' ? poNumber : null,
+        paypalTransactionId: paymentMethod === 'paypal' ? paypalDetails?.id : null,
+        paypalPayerEmail: paymentMethod === 'paypal' ? paypalDetails?.payer?.email_address : null,
+        paymentStatus: paymentMethod === 'paypal' ? 'completed' : 'pending'
       };
 
-      // Debug: Log payload (without sensitive data)
-      console.log('📤 Sending payload:', {
-        ...payload,
-        turnstileToken: payload.turnstileToken ? 'Token present' : 'No token'
-      });
-
-      // Make the request to the Edge Function
       const response = await fetch(`${supabaseUrl}/functions/v1/submit-tech-conference-registration`, {
         method: 'POST',
         headers: {
@@ -223,10 +236,14 @@ const TechConferenceRegistration: React.FC = () => {
         throw new Error(result.error || 'Registration failed. Please try again.');
       }
 
-      // ✅ Only show success message via formStatus
+      // Success
+      const successMessage = paymentMethod === 'paypal' 
+        ? 'Registration and payment completed successfully! You will receive a confirmation email shortly.'
+        : 'Registration submitted successfully! An invoice will be sent to your email.';
+      
       setFormStatus({
         success: true,
-        message: 'Registration submitted successfully! Please mail your payment as instructed.'
+        message: successMessage
       });
       
       // Reset form
@@ -243,6 +260,12 @@ const TechConferenceRegistration: React.FC = () => {
         totalAttendees: 1,
         additionalAttendees: []
       });
+      
+      // Reset payment state
+      setPaymentMethod(null);
+      setPoNumber('');
+      setPaypalDetails(null);
+
     } catch (error: any) {
       console.error('Registration error:', error);
       
@@ -255,9 +278,33 @@ const TechConferenceRegistration: React.FC = () => {
         throw new Error('Network error. Please check your connection and try again.');
       }
       
-      // Re-throw with the original error message or a generic one
-      throw new Error(error.message || 'An unexpected error occurred. Please try again.');
+      throw error;
     }
+  };
+
+  const handlePayPalSuccess = (details: PayPalOrderDetails) => {
+    console.log('✅ PayPal payment successful:', details);
+    setPaypalDetails(details);
+    setFormStatus({
+      success: true,
+      message: 'Payment completed! Please fill out the form above and click Register to complete your registration.'
+    });
+  };
+
+  const handlePayPalError = (error: any) => {
+    console.error('❌ PayPal payment failed:', error);
+    setFormStatus({
+      success: false,
+      message: 'PayPal payment failed. Please try again or use a different payment method.'
+    });
+  };
+
+  const handlePayPalCancel = () => {
+    console.log('⚠️ PayPal payment cancelled');
+    setFormStatus({
+      success: false,
+      message: 'Payment cancelled. You can try again or select a different payment method.'
+    });
   };
 
   if (loading) {
@@ -715,6 +762,30 @@ const TechConferenceRegistration: React.FC = () => {
                   ))}
                 </div>
               )}
+
+              {/* Payment Method Selection */}
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold text-secondary mb-6">Payment Method</h2>
+                <PaymentMethodSelector
+                  paymentMethod={paymentMethod}
+                  onPaymentMethodChange={setPaymentMethod}
+                  poNumber={poNumber}
+                  onPoNumberChange={setPoNumber}
+                  totalAmount={totalAmount}
+                />
+                
+                {paymentMethod === 'paypal' && (
+                  <div className="mt-6">
+                    <PayPalButton
+                      amount={totalAmount}
+                      description={`Tech Conference Registration - ${formData.totalAttendees} attendee(s)`}
+                      onSuccess={handlePayPalSuccess}
+                      onError={handlePayPalError}
+                      onCancel={handlePayPalCancel}
+                    />
+                  </div>
+                )}
+              </div>
 
             </SecureForm>
           </div>

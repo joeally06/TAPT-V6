@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Mail, Phone, MapPin, Building, User, AlertCircle, Briefcase, FileText } from 'lucide-react';
-import { SecureForm } from '../components/forms/SecureForm';
+import { SecureForm, SecureFormHandle } from '../components/forms/SecureForm';
+import { PaymentMethodSelector } from '../components/forms/PaymentMethodSelector';
+import { PayPalButton } from '../components/forms/PayPalButton';
+import { PayPalOrderDetails } from '../config/paypal';
 
 interface ExhibitorSettings {
   id: string;
@@ -18,6 +21,8 @@ interface ExhibitorSettings {
 }
 
 const ExhibitorRegistration: React.FC = () => {
+  const formRef = useRef<SecureFormHandle>(null);
+  
   const [formData, setFormData] = useState({
     businessName: '',
     firstName: '',
@@ -35,6 +40,10 @@ const ExhibitorRegistration: React.FC = () => {
     additionalComments: ''
   });
 
+  // Payment state
+  const [paymentMethod, setPaymentMethod] = useState<'po' | 'paypal' | null>(null);
+  const [poNumber, setPoNumber] = useState('');
+  const [paypalDetails, setPaypalDetails] = useState<PayPalOrderDetails | null>(null);
 
   const [formStatus, setFormStatus] = useState<{
     success?: boolean;
@@ -95,7 +104,7 @@ const ExhibitorRegistration: React.FC = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSecureSubmit = async (turnstileToken: string) => {
+  const handleSecureSubmit = async (data: any, isVerified: boolean, turnstileToken?: string) => {
     if (!exhibitorSettings?.is_active) {
       throw new Error('Registration is not currently available.');
     }
@@ -104,14 +113,29 @@ const ExhibitorRegistration: React.FC = () => {
       throw new Error('Registration is closed. The deadline has passed.');
     }
 
+    if (!turnstileToken) {
+      throw new Error('Security verification is required.');
+    }
+
+    // Validate payment method
+    if (!paymentMethod) {
+      throw new Error('Please select a payment method.');
+    }
+
+    if (paymentMethod === 'po' && !poNumber.trim()) {
+      throw new Error('Please enter a purchase order number.');
+    }
+
+    if (paymentMethod === 'paypal' && !paypalDetails) {
+      throw new Error('Please complete PayPal payment before submitting.');
+    }
+
     try {
-      // Get the Supabase URL from environment variables
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       if (!supabaseUrl) {
         throw new Error('Configuration error. Please contact support.');
       }
 
-      // Prepare the request payload
       const payload = {
         businessName: formData.businessName,
         firstName: formData.firstName,
@@ -127,10 +151,16 @@ const ExhibitorRegistration: React.FC = () => {
         boothRequirements: formData.boothRequirements || undefined,
         productsDescription: formData.productsDescription || undefined,
         additionalComments: formData.additionalComments || undefined,
-        turnstileToken
+        exhibitorFee: exhibitorSettings?.fee || 0,
+        turnstileToken,
+        // Payment fields
+        paymentMethod,
+        poNumber: paymentMethod === 'po' ? poNumber : null,
+        paypalTransactionId: paymentMethod === 'paypal' ? paypalDetails?.id : null,
+        paypalPayerEmail: paymentMethod === 'paypal' ? paypalDetails?.payer?.email_address : null,
+        paymentStatus: paymentMethod === 'paypal' ? 'completed' : 'pending'
       };
 
-      // Make the request to the Edge Function
       const response = await fetch(`${supabaseUrl}/functions/v1/submit-exhibitor-registration`, {
         method: 'POST',
         headers: {
@@ -155,14 +185,15 @@ const ExhibitorRegistration: React.FC = () => {
       if (!result.success) {
         throw new Error(result.error || 'Registration failed. Please try again.');
       }
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to submit registration');
-      }
 
-      // ✅ Only show success message via formStatus
+      // Success
+      const successMessage = paymentMethod === 'paypal' 
+        ? 'Registration and payment completed successfully! You will receive a confirmation email shortly.'
+        : 'Registration submitted successfully! An invoice will be sent to your email.';
+      
       setFormStatus({
         success: true,
-        message: 'Registration submitted successfully! Please mail your payment as instructed.'
+        message: successMessage
       });
       
       // Reset form
@@ -182,10 +213,15 @@ const ExhibitorRegistration: React.FC = () => {
         productsDescription: '',
         additionalComments: ''
       });
+      
+      // Reset payment state
+      setPaymentMethod(null);
+      setPoNumber('');
+      setPaypalDetails(null);
+
     } catch (error: any) {
       console.error('Registration error:', error);
       
-      // Handle specific error types
       if (error.message?.includes('rate limit') || error.message?.includes('too many')) {
         throw new Error('Too many requests. Please wait a moment and try again.');
       }
@@ -194,9 +230,48 @@ const ExhibitorRegistration: React.FC = () => {
         throw new Error('Network error. Please check your connection and try again.');
       }
       
-      // Re-throw with the original error message or a generic one
-      throw new Error(error.message || 'An unexpected error occurred. Please try again.');
+      throw error;
     }
+  };
+
+  const handlePayPalSuccess = (details: PayPalOrderDetails) => {
+    console.log('✅ PayPal payment successful:', details);
+    setPaypalDetails(details);
+    
+    // Reset Turnstile to get a fresh token for final submission
+    console.log('🔒 Resetting Turnstile after PayPal success');
+    if (formRef.current) {
+      formRef.current.resetTurnstile();
+      
+      // Show message after Turnstile reset
+      setTimeout(() => {
+        setFormStatus({
+          success: true,
+          message: '✅ Payment completed! The security verification below has been reset. Please complete it again, then review your information and click "Register" to finalize your registration.'
+        });
+      }, 100);
+    } else {
+      setFormStatus({
+        success: true,
+        message: '✅ Payment completed! Please review your information above and click "Register" below to complete your registration.'
+      });
+    }
+  };
+
+  const handlePayPalError = (error: any) => {
+    console.error('❌ PayPal payment failed:', error);
+    setFormStatus({
+      success: false,
+      message: 'PayPal payment failed. Please try again or use a different payment method.'
+    });
+  };
+
+  const handlePayPalCancel = () => {
+    console.log('⚠️ PayPal payment cancelled');
+    setFormStatus({
+      success: false,
+      message: 'Payment cancelled. You can try again or select a different payment method.'
+    });
   };
 
   if (loading) {
@@ -330,7 +405,7 @@ const ExhibitorRegistration: React.FC = () => {
               </div>
             )}
 
-            <SecureForm onSubmit={handleSecureSubmit} className="bg-white shadow-lg rounded-lg p-8">
+            <SecureForm ref={formRef} onSubmit={handleSecureSubmit} className="bg-white shadow-lg rounded-lg p-8">
               {/* Business Information */}
               <div className="mb-8">
                 <h2 className="text-xl font-semibold text-secondary mb-6">Business Information</h2>
@@ -647,6 +722,30 @@ const ExhibitorRegistration: React.FC = () => {
                     />
                   </div>
                 </div>
+              </div>
+
+              {/* Payment Method Selection */}
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold text-secondary mb-6">Payment Method</h2>
+                <PaymentMethodSelector
+                  selectedMethod={paymentMethod}
+                  onMethodChange={setPaymentMethod}
+                  poNumber={poNumber}
+                  onPoNumberChange={setPoNumber}
+                  amount={exhibitorSettings?.fee || 0}
+                />
+                
+                {paymentMethod === 'paypal' && (
+                  <div className="mt-6">
+                    <PayPalButton
+                      amount={exhibitorSettings?.fee || 0}
+                      description={`Exhibitor Registration - ${formData.businessName || 'Booth'}`}
+                      onSuccess={handlePayPalSuccess}
+                      onError={handlePayPalError}
+                      onCancel={handlePayPalCancel}
+                    />
+                  </div>
+                )}
               </div>
 
             </SecureForm>
