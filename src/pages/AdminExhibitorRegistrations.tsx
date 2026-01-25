@@ -23,6 +23,13 @@ interface ExhibitorRegistration {
   created_at: string;
   updated_at: string;
   user_id: string | null;
+  // Payment fields
+  payment_method: string | null;
+  payment_status: string | null;
+  po_number: string | null;
+  paypal_transaction_id: string | null;
+  paypal_payer_email: string | null;
+  payment_completed_at: string | null;
 }
 
 const PAGE_SIZE = 20;
@@ -198,7 +205,13 @@ const AdminExhibitorRegistrations: React.FC = () => {
       'Booth Requirements',
       'Products Description',
       'Additional Comments',
-      'Registration Date'
+      'Registration Date',
+      'Payment Method',
+      'Payment Status',
+      'PO Number',
+      'PayPal Transaction ID',
+      'PayPal Payer Email',
+      'Payment Completed At'
     ];
 
     const csvData = registrations.map(reg => {
@@ -215,7 +228,13 @@ const AdminExhibitorRegistrations: React.FC = () => {
         reg.booth_requirements || '',
         reg.products_description || '',
         reg.additional_comments || '',
-        new Date(reg.created_at).toLocaleDateString()
+        new Date(reg.created_at).toLocaleDateString(),
+        reg.payment_method || '',
+        reg.payment_status || '',
+        reg.po_number || '',
+        reg.paypal_transaction_id || '',
+        reg.paypal_payer_email || '',
+        reg.payment_completed_at ? new Date(reg.payment_completed_at).toLocaleString() : ''
       ];
     });
 

@@ -186,8 +186,27 @@ export function sanitizeToken(input: string, maxLength: number = 2000): string {
   return trimmed;
 }
 
+/**
+ * Sanitize and validate UUID
+ */
+export function sanitizeUuid(input: string): string {
+  if (typeof input !== 'string') {
+    throw new Error('UUID must be a string');
+  }
+  
+  const trimmed = input.trim().toLowerCase();
+  
+  // Validate UUID format (standard UUID v4 format)
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+  if (!uuidRegex.test(trimmed)) {
+    throw new Error('Invalid UUID format');
+  }
+  
+  return trimmed;
+}
+
 export interface SanitizationRule {
-  type: 'string' | 'email' | 'phone' | 'zip' | 'url' | 'number' | 'boolean' | 'array' | 'state' | 'token';
+  type: 'string' | 'email' | 'phone' | 'zip' | 'url' | 'number' | 'boolean' | 'array' | 'state' | 'token' | 'uuid';
   required?: boolean;
   maxLength?: number;
   min?: number;
@@ -246,6 +265,9 @@ export function sanitizeObject<T extends Record<string, any>>(
           break;
         case 'token':
           sanitized[key] = sanitizeToken(value, rules.maxLength);
+          break;
+        case 'uuid':
+          sanitized[key] = sanitizeUuid(value);
           break;
         default:
           throw new Error(`Unknown type: ${rules.type}`);

@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
       zipCode: { type: 'zip', required: true },
       totalAttendees: { type: 'number', required: true, min: 1, max: 20 },
       totalAmount: { type: 'number', required: true, min: 0 },
-      conferenceId: { type: 'number', required: true },
+      conferenceId: { type: 'uuid', required: true },
       paymentMethod: { type: 'string', required: true },
       paymentStatus: { type: 'string', required: false, maxLength: 50 },
       poNumber: { type: 'string', required: false, maxLength: 100 },
@@ -268,7 +268,6 @@ Deno.serve(async (req) => {
       conferenceDate: conferenceDetails 
         ? `${new Date(conferenceDetails.start_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - ${new Date(conferenceDetails.end_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}` 
         : 'TBD',
-      // Payment fields
       paymentMethod: sanitizedData.paymentMethod || '',
       paymentStatus: sanitizedData.paymentStatus || 'pending',
       poNumber: sanitizedData.poNumber,
@@ -290,7 +289,6 @@ Deno.serve(async (req) => {
 
     if (!userEmailResult.success) {
       console.error('⚠️ Failed to send user confirmation email:', userEmailResult.error);
-      // Don't fail the registration if email fails, just log it
     }
 
     // Send notification to admin(s)

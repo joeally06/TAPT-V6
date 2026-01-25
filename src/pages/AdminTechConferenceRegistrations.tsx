@@ -23,6 +23,13 @@ interface TechConferenceRegistration {
   total_amount: number;
   created_at: string;
   attendees?: TechConferenceAttendee[];
+  // Payment fields
+  payment_method: string | null;
+  payment_status: string | null;
+  po_number: string | null;
+  paypal_transaction_id: string | null;
+  paypal_payer_email: string | null;
+  payment_completed_at: string | null;
 }
 
 const PAGE_SIZE = 20;
@@ -127,7 +134,13 @@ const AdminTechConferenceRegistrations: React.FC = () => {
       'Phone',
       'Total Attendees',
       'Total Amount',
-      'Additional Attendees'
+      'Additional Attendees',
+      'Payment Method',
+      'Payment Status',
+      'PO Number',
+      'PayPal Transaction ID',
+      'PayPal Payer Email',
+      'Payment Completed At'
     ];
 
     const csvData = registrations.map(reg => {
@@ -143,7 +156,13 @@ const AdminTechConferenceRegistrations: React.FC = () => {
         reg.phone,
         reg.total_attendees,
         `$${reg.total_amount.toFixed(2)}`,
-        additionalAttendees
+        additionalAttendees,
+        reg.payment_method || '',
+        reg.payment_status || '',
+        reg.po_number || '',
+        reg.paypal_transaction_id || '',
+        reg.paypal_payer_email || '',
+        reg.payment_completed_at ? new Date(reg.payment_completed_at).toLocaleString() : ''
       ];
     });
 

@@ -51,7 +51,65 @@ const AdminConferenceRegistrations: React.FC = () => {
   };
 
   const exportToCSV = () => {
-    // Implementation details...
+    if (!registrations.length) return;
+
+    const headers = [
+      'Registration Date',
+      'First Name',
+      'Last Name',
+      'Email',
+      'Phone',
+      'School District',
+      'Job Title',
+      'Total Attendees',
+      'Total Amount',
+      'Payment Method',
+      'Payment Status',
+      'PO Number',
+      'PayPal Transaction ID',
+      'PayPal Payer Email',
+      'Payment Completed At',
+      'Additional Attendees'
+    ];
+
+    const csvData = registrations.map((reg: any) => {
+      const additionalAttendees = reg.attendees
+        ? reg.attendees.map((a: any) => `${a.first_name} ${a.last_name} (${a.email})`).join('; ')
+        : '';
+
+      return [
+        new Date(reg.created_at).toLocaleDateString(),
+        reg.first_name || '',
+        reg.last_name || '',
+        reg.email || '',
+        reg.phone || '',
+        reg.school_district || '',
+        reg.job_title || '',
+        reg.total_attendees || 0,
+        `$${(reg.total_amount || 0).toFixed(2)}`,
+        reg.payment_method || '',
+        reg.payment_status || '',
+        reg.po_number || '',
+        reg.paypal_transaction_id || '',
+        reg.paypal_payer_email || '',
+        reg.payment_completed_at ? new Date(reg.payment_completed_at).toLocaleString() : '',
+        additionalAttendees
+      ];
+    });
+
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `conference-registrations-${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   useEffect(() => {
