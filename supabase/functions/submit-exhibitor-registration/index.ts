@@ -3,6 +3,7 @@ import { sendEmail } from '../_shared/email.ts';
 import { generateExhibitorConfirmationEmail, generateExhibitorAdminNotification } from '../_shared/emailTemplates.ts';
 import type { ExhibitorRegistrationData } from '../_shared/emailTemplates.ts';
 import { sanitizeObject, type SanitizationRule } from '../_shared/sanitize.ts';
+import { fetchSettings, formatRemittanceAddressPlain } from '../_shared/settings.ts';
 
 const allowedOrigins = [
   'https://tapt.org',
@@ -333,6 +334,10 @@ Deno.serve(async (req) => {
 
     if (error) throw error;
 
+    // Fetch site settings for remittance address
+    console.log('⚙️ Fetching site settings...');
+    const siteSettings = await fetchSettings(supabaseAdmin);
+
     // Prepare email data with sanitized values
     const emailData: ExhibitorRegistrationData = {
       companyName: sanitizedData.businessName || '',
@@ -353,11 +358,13 @@ Deno.serve(async (req) => {
       conferenceLocation: settings?.location || 'TBD',
       paymentInstructions: settings?.payment_instructions || 'Payment instructions will be sent separately.',
       exhibitorOptions: sanitizedData.productsDescription ? [sanitizedData.productsDescription] : [],
-      // Payment fields
       paymentMethod: sanitizedData.paymentMethod || '',
       paymentStatus: sanitizedData.paymentStatus || 'pending',
       poNumber: sanitizedData.poNumber,
       paypalTransactionId: sanitizedData.paypalTransactionId,
+      remittanceAddress: formatRemittanceAddressPlain(siteSettings),
+      contactEmail: siteSettings.payment_contact_email,
+      contactPhone: siteSettings.payment_contact_phone
     };
 
     // Send confirmation email to exhibitor

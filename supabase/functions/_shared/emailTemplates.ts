@@ -22,6 +22,9 @@ export interface ConferenceRegistrationData {
   paymentStatus?: string;
   poNumber?: string;
   paypalTransactionId?: string;
+  remittanceAddress?: string;
+  contactEmail?: string;
+  contactPhone?: string;
   additionalAttendees?: Array<{
     firstName: string;
     lastName: string;
@@ -49,6 +52,9 @@ export interface ExhibitorRegistrationData {
   paymentStatus?: string;
   poNumber?: string;
   paypalTransactionId?: string;
+  remittanceAddress?: string;
+  contactEmail?: string;
+  contactPhone?: string;
   exhibitorOptions?: string[];
 }
 
@@ -241,7 +247,13 @@ export function generateConferenceConfirmationEmail(data: ConferenceRegistration
           ${data.paymentMethod === 'po' ? `
             <div class="payment-box">
               <h3>📄 Invoice Information</h3>
-              <p style="margin: 0;">An invoice for $${data.totalAmount.toFixed(2)} will be sent to ${data.email} within 2 business days. Please reference PO# ${data.poNumber || 'N/A'} when making payment.</p>
+              <p style="margin: 0;">Once your payment has been received, a receipt will be sent to ${data.email}. Please reference PO# ${data.poNumber || 'N/A'} when making payment.</p>
+              ${data.remittanceAddress ? `
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #f59e0b;">
+                  <p style="margin: 0 0 8px 0; font-weight: 600;">Send Payment To:</p>
+                  <div style="white-space: pre-line; line-height: 1.5;">${data.remittanceAddress}</div>
+                </div>
+              ` : ''}
             </div>
           ` : data.paymentMethod === 'paypal' ? `
             <div class="payment-box" style="background: #d1fae5; border-left: 4px solid #10b981;">
@@ -255,7 +267,7 @@ export function generateConferenceConfirmationEmail(data: ConferenceRegistration
             </div>
           `}
           
-          <p style="margin-top: 30px;">If you have any questions about your registration, please contact us at <a href="mailto:info@tapt.org" style="color: #1e3a8a;">info@tapt.org</a>.</p>
+          <p style="margin-top: 30px;">If you have any questions about your registration, please contact us at <a href="mailto:${data.contactEmail || 'info@tapt.org'}" style="color: #1e3a8a;">${data.contactEmail || 'info@tapt.org'}</a>${data.contactPhone ? ` or call ${data.contactPhone}` : ''}.</p>
           
           <p>We look forward to seeing you at the conference!</p>
           
@@ -614,7 +626,13 @@ export function generateExhibitorConfirmationEmail(data: ExhibitorRegistrationDa
           ${data.paymentMethod === 'po' ? `
             <div class="payment-box">
               <h3>📄 Invoice Information</h3>
-              <p style="margin: 0;">An invoice for $${data.totalAmount.toFixed(2)} will be sent to ${data.email} within 2 business days. Please reference PO# ${data.poNumber || 'N/A'} when making payment.</p>
+              <p style="margin: 0;">Once your payment has been received, a receipt will be sent to ${data.email}. Please reference PO# ${data.poNumber || 'N/A'} when making payment.</p>
+              ${data.remittanceAddress ? `
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #f59e0b;">
+                  <p style="margin: 0 0 8px 0; font-weight: 600;">Send Payment To:</p>
+                  <div style="white-space: pre-line; line-height: 1.5;">${data.remittanceAddress}</div>
+                </div>
+              ` : ''}
             </div>
           ` : data.paymentMethod === 'paypal' ? `
             <div class="payment-box" style="background: #d1fae5; border-left: 4px solid #10b981;">
@@ -628,7 +646,7 @@ export function generateExhibitorConfirmationEmail(data: ExhibitorRegistrationDa
             </div>
           `}
           
-          <p style="margin-top: 30px;">If you have any questions about your exhibitor registration, please contact us at <a href="mailto:info@tapt.org" style="color: #1e3a8a;">info@tapt.org</a>.</p>
+          <p style="margin-top: 30px;">If you have any questions about your exhibitor registration, please contact us at <a href="mailto:${data.contactEmail || 'info@tapt.org'}" style="color: #1e3a8a;">${data.contactEmail || 'info@tapt.org'}</a>${data.contactPhone ? ` or call ${data.contactPhone}` : ''}.</p>
           
           <p>We look forward to having you as an exhibitor!</p>
           
@@ -805,3 +823,267 @@ export function generateExhibitorAdminNotification(data: ExhibitorRegistrationDa
     </html>
   `;
 }
+
+/**
+ * Payment Receipt Email Data Interface
+ */
+export interface PaymentReceiptData {
+  registrationType: 'conference' | 'tech_conference' | 'exhibitor';
+  firstName: string;
+  lastName: string;
+  email: string;
+  schoolDistrict?: string;
+  businessName?: string;
+  poNumber: string;
+  totalAmount: number;
+  paymentCompletedAt: string;
+  conferenceName?: string;
+  conferenceDate?: string;
+  // Dynamic settings
+  remittanceAddress?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  organizationName?: string;
+  footerMessage?: string;
+}
+
+/**
+ * Generate HTML email for payment receipt/confirmation
+ */
+export function generatePaymentReceiptEmail(data: PaymentReceiptData): string {
+  const registrationTypeLabel = data.registrationType === 'conference' 
+    ? 'Annual Conference Registration'
+    : data.registrationType === 'tech_conference'
+    ? 'Tech Conference Registration'
+    : 'Exhibitor Registration';
+
+  const organizationName = data.schoolDistrict || data.businessName || 'N/A';
+  const paymentDate = new Date(data.paymentCompletedAt).toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
+  // Use provided settings or fallback to defaults
+  const contactEmail = data.contactEmail || 'info@tapt.org';
+  const contactPhone = data.contactPhone || '(615) 555-0100';
+  const orgName = data.organizationName || 'Tennessee Association of Pupil Transportation';
+  const footerMsg = data.footerMessage || 'This is an automated receipt email. Please keep it for your records.';
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { 
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+          line-height: 1.6; 
+          color: #333; 
+          margin: 0;
+          padding: 0;
+          background-color: #f3f4f6;
+        }
+        .container { 
+          max-width: 600px; 
+          margin: 20px auto; 
+          background: white;
+          border-radius: 8px;
+          overflow: hidden;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header { 
+          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+          color: white; 
+          padding: 40px 20px; 
+          text-align: center; 
+        }
+        .header h1 {
+          margin: 0 0 10px 0;
+          font-size: 28px;
+        }
+        .header .checkmark {
+          font-size: 60px;
+          margin-bottom: 10px;
+        }
+        .content { 
+          padding: 30px 20px; 
+        }
+        .receipt-box {
+          background: #f9fafb;
+          border: 2px solid #10b981;
+          border-radius: 8px;
+          padding: 20px;
+          margin: 20px 0;
+        }
+        .receipt-box h2 {
+          margin: 0 0 20px 0;
+          color: #065f46;
+          font-size: 20px;
+        }
+        .info-row { 
+          padding: 12px 0; 
+          border-bottom: 1px solid #e5e7eb;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .info-row:last-child {
+          border-bottom: none;
+        }
+        .label { 
+          font-weight: 600; 
+          color: #4b5563;
+          min-width: 140px;
+        }
+        .value {
+          color: #111827;
+          text-align: right;
+        }
+        .amount-row {
+          background: #ecfdf5;
+          margin: 20px -20px -20px -20px;
+          padding: 20px;
+          border-top: 2px solid #10b981;
+        }
+        .total-amount { 
+          font-size: 32px;
+          font-weight: bold; 
+          color: #059669;
+        }
+        .paid-stamp {
+          background: #10b981;
+          color: white;
+          padding: 8px 20px;
+          border-radius: 20px;
+          font-weight: bold;
+          font-size: 14px;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+        }
+        .footer { 
+          background: #f9fafb; 
+          padding: 20px; 
+          text-align: center; 
+          font-size: 12px; 
+          color: #6b7280; 
+          border-top: 1px solid #e5e7eb;
+        }
+        .button {
+          display: inline-block;
+          background: #1e3a8a;
+          color: white;
+          padding: 12px 30px;
+          text-decoration: none;
+          border-radius: 6px;
+          font-weight: 600;
+          margin: 20px 0;
+        }
+        .info-box {
+          background: #eff6ff;
+          border-left: 4px solid #3b82f6;
+          padding: 15px;
+          margin: 20px 0;
+          border-radius: 4px;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <div class="checkmark">✓</div>
+          <h1>Payment Received!</h1>
+          <p style="margin: 0; font-size: 16px; opacity: 0.95;">Your purchase order payment has been processed</p>
+        </div>
+        
+        <div class="content">
+          <p>Dear ${data.firstName} ${data.lastName},</p>
+          
+          <p>We are pleased to confirm that we have received and processed your purchase order payment for your <strong>${registrationTypeLabel}</strong>.</p>
+          
+          <div class="receipt-box">
+            <h2>📄 Payment Receipt</h2>
+            
+            <div class="info-row">
+              <span class="label">Receipt Date:</span>
+              <span class="value">${paymentDate}</span>
+            </div>
+            
+            <div class="info-row">
+              <span class="label">Registration Type:</span>
+              <span class="value">${registrationTypeLabel}</span>
+            </div>
+            
+            <div class="info-row">
+              <span class="label">Name:</span>
+              <span class="value">${data.firstName} ${data.lastName}</span>
+            </div>
+            
+            <div class="info-row">
+              <span class="label">Organization:</span>
+              <span class="value">${organizationName}</span>
+            </div>
+            
+            <div class="info-row">
+              <span class="label">PO Number:</span>
+              <span class="value"><strong>${data.poNumber}</strong></span>
+            </div>
+            
+            <div class="info-row">
+              <span class="label">Payment Method:</span>
+              <span class="value">Purchase Order</span>
+            </div>
+            
+            <div class="info-row">
+              <span class="label">Payment Status:</span>
+              <span class="value"><span class="paid-stamp">✓ Paid</span></span>
+            </div>
+            
+            <div class="amount-row">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span class="label" style="font-size: 18px;">Amount Paid:</span>
+                <span class="total-amount">$${data.totalAmount.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+          
+          ${data.conferenceName ? `
+            <div class="info-box">
+              <h3 style="margin: 0 0 10px 0; color: #1e40af;">Event Details</h3>
+              <p style="margin: 5px 0;"><strong>Event:</strong> ${data.conferenceName}</p>
+              ${data.conferenceDate ? `<p style="margin: 5px 0;"><strong>Date:</strong> ${data.conferenceDate}</p>` : ''}
+            </div>
+          ` : ''}
+          
+          <p><strong>Please keep this email for your records.</strong> This serves as your official payment receipt.</p>
+          
+          ${data.remittanceAddress ? `
+            <div class="info-box">
+              <h3 style="margin: 0 0 10px 0; color: #1e40af;">Remittance Address</h3>
+              <div style="white-space: pre-line;">${data.remittanceAddress}</div>
+            </div>
+          ` : ''}
+          
+          <p>If you have any questions about your payment or registration, please don't hesitate to contact us at <a href="mailto:${contactEmail}" style="color: #1e3a8a;">${contactEmail}</a> or call us at ${contactPhone}.</p>
+          
+          <p>Thank you for your payment!</p>
+          
+          <p style="margin-top: 30px; margin-bottom: 0;">
+            Best regards,<br>
+            <strong>${orgName}</strong><br>
+            <a href="https://tapt.org" style="color: #1e3a8a;">www.tapt.org</a>
+          </p>
+        </div>
+        
+        <div class="footer">
+          <p style="margin: 5px 0;">${footerMsg}</p>
+          <p style="margin: 5px 0;">&copy; ${new Date().getFullYear()} ${orgName}. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+

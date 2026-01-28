@@ -123,7 +123,7 @@ const ExhibitorRegistration: React.FC = () => {
     }
 
     if (paymentMethod === 'po' && !poNumber.trim()) {
-      throw new Error('Please enter a purchase order number.');
+      throw new Error('Please enter a check or PO number.');
     }
 
     if (paymentMethod === 'paypal' && !paypalDetails) {

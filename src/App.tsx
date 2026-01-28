@@ -35,7 +35,9 @@ import { AdminHallOfFameMembers } from './pages/AdminHallOfFameMembers';
 import { HallOfFameNomination } from './pages/HallOfFameNomination';
 import { HallOfFameMembers } from './pages/HallOfFameMembers';
 import AdminSiteSettings from './pages/AdminSiteSettings';
+import AdminPaymentSettings from './pages/AdminPaymentSettings';
 import AdminContactMessages from './pages/AdminContactMessages';
+import AdminPaymentManagement from './pages/AdminPaymentManagement';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import './index.css';
@@ -100,6 +102,11 @@ function App() {
           <Route path="/admin" element={
             <ProtectedRoute requireAdmin>
               <AdminDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/payment-management" element={
+            <ProtectedRoute requireAdmin>
+              <AdminPaymentManagement />
             </ProtectedRoute>
           } />
           <Route path="/admin/users" element={
@@ -185,6 +192,11 @@ function App() {
           <Route path="/admin/site-settings" element={
             <ProtectedRoute requireAdmin>
               <AdminSiteSettings />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/payment-settings" element={
+            <ProtectedRoute requireAdmin>
+              <AdminPaymentSettings />
             </ProtectedRoute>
           } />
           <Route path="/admin/contact-messages" element={

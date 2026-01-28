@@ -41,8 +41,8 @@ export function PaymentMethodSelector({
           >
             <FileText className={`w-8 h-8 mr-4 ${selectedMethod === 'po' ? 'text-primary' : 'text-gray-400'}`} />
             <div className="text-left flex-1">
-              <div className="font-semibold text-gray-900">Purchase Order</div>
-              <div className="text-sm text-gray-500">Pay via PO number</div>
+              <div className="font-semibold text-gray-900">Check/PO</div>
+              <div className="text-sm text-gray-500">Pay by check or purchase order</div>
             </div>
             {selectedMethod === 'po' && (
               <div className="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
@@ -87,7 +87,7 @@ export function PaymentMethodSelector({
       {selectedMethod === 'po' && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <label htmlFor="poNumber" className="block text-sm font-medium text-gray-700 mb-2">
-            Purchase Order Number <span className="text-red-500">*</span>
+            Check/PO Number <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
@@ -95,7 +95,7 @@ export function PaymentMethodSelector({
             value={poNumber}
             onChange={(e) => onPoNumberChange?.(e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-            placeholder="Enter PO number"
+            placeholder="Enter check or PO number"
             required
             disabled={disabled}
           />

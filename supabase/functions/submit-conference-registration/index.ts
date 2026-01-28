@@ -3,6 +3,7 @@ import { sendEmail } from '../_shared/email.ts';
 import { generateConferenceConfirmationEmail, generateConferenceAdminNotification } from '../_shared/emailTemplates.ts';
 import type { ConferenceRegistrationData } from '../_shared/emailTemplates.ts';
 import { sanitizeObject, sanitizeArray, type SanitizationRule } from '../_shared/sanitize.ts';
+import { fetchSettings, formatRemittanceAddressPlain } from '../_shared/settings.ts';
 
 const allowedOrigins = [
   'https://tapt.org',
@@ -251,6 +252,10 @@ Deno.serve(async (req) => {
       .eq('id', sanitizedData.conferenceId)
       .single();
 
+    // Fetch site settings for remittance address
+    console.log('⚙️ Fetching site settings...');
+    const settings = await fetchSettings(supabaseAdmin);
+
     // Prepare email data with sanitized values
     const emailData: ConferenceRegistrationData = {
       firstName: sanitizedData.firstName || '',
@@ -276,7 +281,10 @@ Deno.serve(async (req) => {
         ? `${conferenceDetails.venue}, ${conferenceDetails.location}` 
         : 'TBD',
       paymentInstructions: conferenceDetails?.payment_instructions || 'Payment instructions will be sent separately.',
-      additionalAttendees: sanitizedAttendees || []
+      additionalAttendees: sanitizedAttendees || [],
+      remittanceAddress: formatRemittanceAddressPlain(settings),
+      contactEmail: settings.payment_contact_email,
+      contactPhone: settings.payment_contact_phone
     };
 
     // Send confirmation email to user

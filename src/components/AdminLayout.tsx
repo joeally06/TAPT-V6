@@ -17,7 +17,8 @@ import {
   Image,
   MessageSquare,
   Store,
-  GraduationCap
+  GraduationCap,
+  DollarSign
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -61,6 +62,16 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {  const [isSi
       path: '/admin'
     },
     {
+      name: 'Payment Management',
+      icon: DollarSign,
+      path: '/admin/payment-management'
+    },
+    {
+      name: 'Email Settings',
+      icon: Settings,
+      path: '/admin/payment-settings'
+    },
+    {
       name: 'Form Settings',
       icon: Settings,
       submenu: [
@@ -89,6 +100,11 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {  const [isSi
         { name: 'Board Members', path: '/admin/board-members' },
         { name: 'Site Settings', path: '/admin/site-settings' }
       ]
+    },
+    {
+      name: 'Photo Gallery',
+      icon: Image,
+      path: '/admin/photo-gallery'
     },
     {
       name: 'Registrations',
@@ -128,9 +144,9 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {  const [isSi
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 pt-16">
       {/* Mobile Sidebar Toggle */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 px-4 py-2">
+      <div className="lg:hidden fixed top-16 left-0 right-0 z-50 bg-white border-b border-gray-200 px-4 py-2">
         <button
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
           className="p-2 rounded-md text-gray-500 hover:bg-gray-100"
@@ -141,7 +157,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {  const [isSi
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 z-40 w-64 h-screen transition-transform ${
+        className={`fixed top-16 left-0 z-40 w-64 h-[calc(100vh-4rem)] transition-transform ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } lg:translate-x-0`}
       >
@@ -222,7 +238,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {  const [isSi
       </aside>
 
       {/* Main Content */}
-      <div className="lg:ml-64">
+      <div className="lg:ml-64 pt-16">
         <div className="p-4">
           {children}
         </div>

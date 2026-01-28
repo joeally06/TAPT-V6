@@ -383,7 +383,7 @@ const ConferenceRegistration: React.FC = () => {
                   </div>
                 )}
 
-                {/* Registration Deadline Notice */}
+                {/* Photo Gallery */}
                 {conferenceSettings?.registration_end_date && (
                   <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
                     <div className="flex items-start">

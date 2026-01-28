@@ -62,6 +62,7 @@ export const Navbar = () => {
       path: '/events',
       subItems: [
         { name: 'Conference Registration', path: '/conference-registration' },
+        { name: 'Conference Gallery', path: '/conference-gallery' },
         { name: 'Tech Conference Registration', path: '/tech-conference-registration' },
         { name: 'Exhibitor Registration', path: '/exhibitor-registration' },
         { name: 'Student Scholarship', path: '/student-scholarship-application' }
@@ -95,6 +96,7 @@ export const Navbar = () => {
     { name: 'Site Settings', path: '/admin/site-settings' },
     { name: 'Conference Settings', path: '/admin/conference-settings' },
     { name: 'Conference Registrations', path: '/admin/conference-registrations' },
+    { name: 'Photo Gallery', path: '/admin/photo-gallery' },
     { name: 'Tech Conference Settings', path: '/admin/tech-conference-settings' },
     { name: 'Tech Conference Registrations', path: '/admin/tech-conference-registrations' },
     { name: 'Exhibitor Settings', path: '/admin/exhibitor-settings' },
