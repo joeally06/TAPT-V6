@@ -38,8 +38,6 @@ import AdminSiteSettings from './pages/AdminSiteSettings';
 import AdminPaymentSettings from './pages/AdminPaymentSettings';
 import AdminContactMessages from './pages/AdminContactMessages';
 import AdminPaymentManagement from './pages/AdminPaymentManagement';
-import AdminPhotoGallery from './pages/AdminPhotoGallery';
-import ConferenceGalleryPage from './pages/ConferenceGalleryPage';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import './index.css';
@@ -92,7 +90,6 @@ function App() {
                       <Route path="/student-scholarship-application" element={<StudentScholarshipApplication />} />
                       <Route path="/hall-of-fame-nomination" element={<HallOfFameNomination />} />
                       <Route path="/hall-of-fame-members" element={<HallOfFameMembers />} />
-                      <Route path="/conference-gallery" element={<ConferenceGalleryPage />} />
                     </Routes>
                   </div>
                 </main>
@@ -205,11 +202,6 @@ function App() {
           <Route path="/admin/contact-messages" element={
             <ProtectedRoute requireAdmin>
               <AdminContactMessages />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/photo-gallery" element={
-            <ProtectedRoute requireAdmin>
-              <AdminPhotoGallery />
             </ProtectedRoute>
           } />
         </Routes>
