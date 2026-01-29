@@ -38,6 +38,8 @@ import AdminSiteSettings from './pages/AdminSiteSettings';
 import AdminPaymentSettings from './pages/AdminPaymentSettings';
 import AdminContactMessages from './pages/AdminContactMessages';
 import AdminPaymentManagement from './pages/AdminPaymentManagement';
+import AdminPhotoGallery from './pages/AdminPhotoGallery';
+import ConferenceGalleryPage from './pages/ConferenceGalleryPage';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import './index.css';
@@ -68,36 +70,7 @@ function App() {
       <BrowserRouter>
         <Navbar />
         <Routes>
-          {/* Public Routes */}
-          <Route
-            path="/*"
-            element={
-              <div className="flex flex-col min-h-screen bg-gray-50">
-                <main className="flex-grow">
-                  <div className="container mx-auto px-4 py-8">
-                    <Routes>
-                      <Route path="/" element={<Home />} />
-                      <Route path="/about" element={<About />} />
-                      <Route path="/board-members" element={<BoardMembers />} />
-                      <Route path="/resources" element={<Resources />} />
-                      <Route path="/news" element={<News />} />
-                      <Route path="/events" element={<Events />} />
-                      <Route path="/members" element={<Members />} />
-                      <Route path="/contact" element={<Contact />} />
-                      <Route path="/conference-registration" element={<ConferenceRegistration />} />
-                      <Route path="/tech-conference-registration" element={<TechConferenceRegistration />} />
-                      <Route path="/exhibitor-registration" element={<ExhibitorRegistration />} />
-                      <Route path="/student-scholarship-application" element={<StudentScholarshipApplication />} />
-                      <Route path="/hall-of-fame-nomination" element={<HallOfFameNomination />} />
-                      <Route path="/hall-of-fame-members" element={<HallOfFameMembers />} />
-                    </Routes>
-                  </div>
-                </main>
-              </div>
-            }
-          />
-
-          {/* Admin Routes */}
+          {/* Admin Routes - Must come BEFORE catch-all */}
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin" element={
             <ProtectedRoute requireAdmin>
@@ -204,6 +177,41 @@ function App() {
               <AdminContactMessages />
             </ProtectedRoute>
           } />
+          <Route path="/admin/photo-gallery" element={
+            <ProtectedRoute requireAdmin>
+              <AdminPhotoGallery />
+            </ProtectedRoute>
+          } />
+
+          {/* Public Routes - Catch-all with layout */}
+          <Route
+            path="/*"
+            element={
+              <div className="flex flex-col min-h-screen bg-gray-50">
+                <main className="flex-grow">
+                  <div className="container mx-auto px-4 py-8">
+                    <Routes>
+                      <Route path="/" element={<Home />} />
+                      <Route path="/about" element={<About />} />
+                      <Route path="/board-members" element={<BoardMembers />} />
+                      <Route path="/resources" element={<Resources />} />
+                      <Route path="/news" element={<News />} />
+                      <Route path="/events" element={<Events />} />
+                      <Route path="/members" element={<Members />} />
+                      <Route path="/contact" element={<Contact />} />
+                      <Route path="/conference-registration" element={<ConferenceRegistration />} />
+                      <Route path="/tech-conference-registration" element={<TechConferenceRegistration />} />
+                      <Route path="/exhibitor-registration" element={<ExhibitorRegistration />} />
+                      <Route path="/student-scholarship-application" element={<StudentScholarshipApplication />} />
+                      <Route path="/hall-of-fame-nomination" element={<HallOfFameNomination />} />
+                      <Route path="/hall-of-fame-members" element={<HallOfFameMembers />} />
+                      <Route path="/conference-gallery" element={<ConferenceGalleryPage />} />
+                    </Routes>
+                  </div>
+                </main>
+              </div>
+            }
+          />
         </Routes>
         <Footer />
       </BrowserRouter>

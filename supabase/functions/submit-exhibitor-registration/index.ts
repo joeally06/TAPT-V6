@@ -120,11 +120,15 @@ Deno.serve(async (req) => {
     let payload: any;
     try {
       payload = await req.json();
-      console.log("Received payload:", JSON.stringify({
+      console.log("✅ Received payload:", JSON.stringify({
         businessName: payload.businessName,
         firstName: payload.firstName,
         lastName: payload.lastName,
         email: payload.email,
+        exhibitorFee: payload.exhibitorFee,
+        paymentMethod: payload.paymentMethod,
+        poNumber: payload.poNumber,
+        turnstileToken: payload.turnstileToken ? '(present)' : '(missing)',
         // Omit other fields for privacy in logs
       }));
     } catch (error) {
@@ -149,7 +153,7 @@ Deno.serve(async (req) => {
       productsDescription: { type: 'string', required: false, maxLength: 2000 },
       additionalComments: { type: 'string', required: false, maxLength: 2000 },
       website: { type: 'url', required: false },
-      exhibitorFee: { type: 'number', required: true, min: 0 },
+      exhibitorFee: { type: 'number', required: false, min: 0 },
       paymentMethod: { type: 'string', required: true },
       paymentStatus: { type: 'string', required: false, maxLength: 50 },
       poNumber: { type: 'string', required: false, maxLength: 100 },
@@ -161,9 +165,13 @@ Deno.serve(async (req) => {
     // Sanitize payload
     let sanitizedData;
     try {
+      console.log("🔍 Starting validation with schema...");
       sanitizedData = sanitizeObject(payload, exhibitorSchema);
+      console.log("✅ Validation successful");
     } catch (error) {
       console.error('❌ Validation error:', error);
+      console.error('❌ Error message:', error instanceof Error ? error.message : 'Unknown error');
+      console.error('❌ Payload keys:', Object.keys(payload));
       return new Response(
         JSON.stringify({ success: false, error: error instanceof Error ? error.message : 'Validation failed' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -322,6 +330,7 @@ Deno.serve(async (req) => {
         products_description: sanitizedData.productsDescription || null,
         additional_comments: sanitizedData.additionalComments || null,
         // Payment fields
+        total_amount: sanitizedData.exhibitorFee || 0,
         payment_method: sanitizedData.paymentMethod,
         payment_status: sanitizedData.paymentStatus || 'pending',
         po_number: sanitizedData.poNumber || null,
