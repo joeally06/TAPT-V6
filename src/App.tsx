@@ -22,10 +22,13 @@ import ConferenceRegistration from './pages/ConferenceRegistration';
 import TechConferenceRegistration from './pages/TechConferenceRegistration';
 import ExhibitorRegistration from './pages/ExhibitorRegistration';
 import StudentScholarshipApplication from './pages/StudentScholarshipApplication';
+import RegionalLuncheonRegistration from './pages/RegionalLuncheonRegistration';
 import { AdminConferenceRegistrations } from './pages/AdminConferenceRegistrations';
 import AdminTechConferenceRegistrations from './pages/AdminTechConferenceRegistrations';
 import AdminExhibitorRegistrations from './pages/AdminExhibitorRegistrations';
 import AdminStudentScholarshipApplications from './pages/AdminStudentScholarshipApplications';
+import AdminRegionalLuncheonRegistrations from './pages/AdminRegionalLuncheonRegistrations';
+import AdminRegionalLuncheonSettings from './pages/AdminRegionalLuncheonSettings';
 import { AdminConferenceSettings } from './pages/AdminConferenceSettings';
 import { AdminTechConferenceSettings } from './pages/AdminTechConferenceSettings';
 import AdminExhibitorSettings from './pages/AdminExhibitorSettings';
@@ -128,6 +131,11 @@ function App() {
               <AdminStudentScholarshipApplications />
             </ProtectedRoute>
           } />
+          <Route path="/admin/regional-luncheon-registrations" element={
+            <ProtectedRoute requireAdmin>
+              <AdminRegionalLuncheonRegistrations />
+            </ProtectedRoute>
+          } />
           <Route path="/admin/conference-settings" element={
             <ProtectedRoute requireAdmin>
               <AdminConferenceSettings />
@@ -146,6 +154,11 @@ function App() {
           <Route path="/admin/student-scholarship-settings" element={
             <ProtectedRoute requireAdmin>
               <AdminStudentScholarshipSettings />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/regional-luncheon-settings" element={
+            <ProtectedRoute requireAdmin>
+              <AdminRegionalLuncheonSettings />
             </ProtectedRoute>
           } />
           <Route path="/admin/hall-of-fame-settings" element={
@@ -205,6 +218,7 @@ function App() {
                       <Route path="/tech-conference-registration" element={<TechConferenceRegistration />} />
                       <Route path="/exhibitor-registration" element={<ExhibitorRegistration />} />
                       <Route path="/student-scholarship-application" element={<StudentScholarshipApplication />} />
+                      <Route path="/regional-luncheon-registration" element={<RegionalLuncheonRegistration />} />
                       <Route path="/hall-of-fame-nomination" element={<HallOfFameNomination />} />
                       <Route path="/hall-of-fame-members" element={<HallOfFameMembers />} />
                       <Route path="/conference-gallery" element={<ConferenceGalleryPage />} />

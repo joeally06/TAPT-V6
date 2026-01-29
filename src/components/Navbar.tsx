@@ -63,6 +63,7 @@ export const Navbar = () => {
       subItems: [
         { name: 'Conference Registration', path: '/conference-registration' },
         { name: 'Tech Conference Registration', path: '/tech-conference-registration' },
+        { name: 'Regional Luncheon Registration', path: '/regional-luncheon-registration' },
         { name: 'Exhibitor Registration', path: '/exhibitor-registration' },
         { name: 'Student Scholarship', path: '/student-scholarship-application' }
       ]

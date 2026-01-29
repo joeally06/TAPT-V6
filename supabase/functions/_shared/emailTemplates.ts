@@ -847,6 +847,21 @@ export interface PaymentReceiptData {
   footerMessage?: string;
 }
 
+export interface RegionalLuncheonRegistrationData {
+  name: string;
+  email: string;
+  districtOrganization: string;
+  numberOfAttendees: number;
+  preferredRegion: string;
+  eventName: string;
+  registrationDeadline: string;
+  regionalDate?: string;
+  regionalTime?: string;
+  regionalVenue?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+}
+
 /**
  * Generate HTML email for payment receipt/confirmation
  */
@@ -1073,6 +1088,158 @@ export function generatePaymentReceiptEmail(data: PaymentReceiptData): string {
           <p style="margin-top: 30px; margin-bottom: 0;">
             Best regards,<br>
             <strong>${orgName}</strong><br>
+            ${contactEmail || 'contact@tapt.org'}
+          </p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+/**
+ * Generate HTML email for regional luncheon registration confirmation
+ */
+export function generateRegionalLuncheonConfirmationEmail(data: RegionalLuncheonRegistrationData): string {
+  const orgName = 'Tennessee Association of Pupil Transportation';
+  const footerMsg = 'This is an automated confirmation email. Please keep it for your records.';
+  
+  // Format registration deadline to human-readable format
+  let formattedDeadline = data.registrationDeadline;
+  if (formattedDeadline && formattedDeadline !== 'TBD') {
+    try {
+      const deadlineDate = new Date(formattedDeadline);
+      formattedDeadline = deadlineDate.toLocaleDateString('en-US', { 
+        weekday: 'long',
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+    } catch (e) {
+      // Keep original format if parsing fails
+    }
+  }
+  
+  const regionalInfo = data.regionalDate && data.regionalTime
+    ? `
+      <div style="background-color: #f3f4f6; padding: 15px; border-radius: 6px; margin: 20px 0;">
+        <h3 style="color: #1e3a8a; margin-top: 0;">Your Selected Regional Luncheon:</h3>
+        <p style="margin: 5px 0;"><strong>Region:</strong> ${data.preferredRegion}</p>
+        <p style="margin: 5px 0;"><strong>Date:</strong> ${data.regionalDate}</p>
+        <p style="margin: 5px 0;"><strong>Time:</strong> ${data.regionalTime}</p>
+        ${data.regionalVenue ? `<p style="margin: 5px 0;"><strong>Venue:</strong> ${data.regionalVenue}</p>` : ''}
+        <p style="margin: 5px 0;"><strong>Number of Attendees:</strong> ${data.numberOfAttendees}</p>
+      </div>
+    `
+    : `
+      <p style="background-color: #f3f4f6; padding: 15px; border-radius: 6px;">
+        <strong>Region:</strong> ${data.preferredRegion}<br>
+        <strong>Number of Attendees:</strong> ${data.numberOfAttendees}
+      </p>
+    `;
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { 
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+          line-height: 1.6; 
+          color: #333; 
+          margin: 0;
+          padding: 0;
+          background-color: #f3f4f6;
+        }
+        .container { 
+          max-width: 600px; 
+          margin: 20px auto; 
+          background: white;
+          border-radius: 8px;
+          overflow: hidden;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header { 
+          background: #1e3a8a; 
+          color: white; 
+          padding: 30px 20px;
+          text-align: center;
+        }
+        .content { 
+          padding: 30px 20px; 
+        }
+        .footer { 
+          background: #f9fafb; 
+          padding: 20px;
+          text-align: center;
+          font-size: 14px;
+          color: #6b7280;
+          border-top: 1px solid #e5e7eb;
+        }
+        h1 { 
+          margin: 0; 
+          font-size: 24px; 
+        }
+        h2 {
+          color: #1e3a8a;
+          font-size: 20px;
+          margin-top: 30px;
+        }
+        .highlight {
+          background-color: #fef3c7;
+          padding: 15px;
+          border-left: 4px solid #f59e0b;
+          margin: 20px 0;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>✅ Registration Confirmed!</h1>
+          <p style="margin: 10px 0 0 0; opacity: 0.9;">${data.eventName}</p>
+        </div>
+        
+        <div class="content">
+          <p>Dear ${data.name},</p>
+          
+          <p>Thank you for registering for the <strong>${data.eventName}</strong>! We're excited to have you join us for this great opportunity for learning, networking, and collaboration with transportation professionals across the state.</p>
+          
+          ${regionalInfo}
+          
+          <h2>Registration Details:</h2>
+          <p style="margin: 10px 0;">
+            <strong>Name:</strong> ${data.name}<br>
+            <strong>Email:</strong> ${data.email}<br>
+            <strong>District/Organization:</strong> ${data.districtOrganization}
+          </p>
+          
+          <div class="highlight">
+            <p style="margin: 0;"><strong>⏰ Registration Deadline:</strong> ${formattedDeadline}</p>
+            <p style="margin: 10px 0 0 0; font-size: 14px;">
+              Please note this deadline so we can plan accordingly for food and seating.
+            </p>
+          </div>
+          
+          <h2>What to Expect:</h2>
+          <ul style="margin: 10px 0; padding-left: 20px;">
+            <li>Enjoy a great meal and fellowship</li>
+            <li>Share ideas and best practices</li>
+            <li>Learn from peers and industry leaders</li>
+            <li>Help strengthen our statewide transportation network</li>
+          </ul>
+          
+          <p style="background-color: #eff6ff; padding: 15px; border-radius: 6px; border-left: 4px solid #3b82f6;">
+            <strong>📧 Keep this email</strong> for your records. If you have any questions or need to make changes to your registration, please contact us.
+          </p>
+          
+          <p>We look forward to seeing you there!</p>
+          
+          <p style="margin-top: 30px; margin-bottom: 0;">
+            Best regards,<br>
+            <strong>Tennessee Association of Pupil Transportation (TAPT)</strong><br>
             <a href="https://tapt.org" style="color: #1e3a8a;">www.tapt.org</a>
           </p>
         </div>
