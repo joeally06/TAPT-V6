@@ -62,7 +62,6 @@ export const Navbar = () => {
       path: '/events',
       subItems: [
         { name: 'Conference Registration', path: '/conference-registration' },
-        { name: 'Conference Gallery', path: '/conference-gallery' },
         { name: 'Tech Conference Registration', path: '/tech-conference-registration' },
         { name: 'Exhibitor Registration', path: '/exhibitor-registration' },
         { name: 'Student Scholarship', path: '/student-scholarship-application' }
@@ -77,7 +76,7 @@ export const Navbar = () => {
       ]
     },
     { name: 'Members', path: '/members' },
-    { name: 'News', path: '/news' },
+    { name: 'Conference Gallery', path: '/conference-gallery' },
     { name: 'Resources', path: '/resources' },
     { 
       name: 'About', 
@@ -121,16 +120,16 @@ export const Navbar = () => {
         scrolled ? 'bg-white shadow-md py-2' : 'bg-white/90 backdrop-blur-sm py-4'
       }`}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6">
         <div className="flex justify-between items-center">
-          <div className="flex items-center">
+          <div className="flex items-center flex-shrink-0 min-w-0">
             <Link to="/" className="flex items-center">
-              <span className="text-primary font-bold text-2xl">{siteTitle}</span>
-              <span className="ml-2 hidden md:block text-secondary text-sm font-medium">{siteTagline}</span>
+              <span className="text-primary font-bold text-xl sm:text-2xl whitespace-nowrap">{siteTitle}</span>
+              {/* Tagline hidden to maximize menu space */}
             </Link>
           </div>
 
-          <div className="hidden md:flex items-center space-x-1">
+          <div className="hidden md:flex items-center space-x-1 ml-4 flex-1 justify-end">
             {navItems.map((item) => (
               <div key={item.name} className="relative group">
                 {item.subItems ? (

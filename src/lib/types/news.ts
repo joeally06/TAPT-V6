@@ -11,6 +11,9 @@ export interface NewsItem {
   link: string | null;
   created_at: string;
   is_featured: boolean;
+  file_url?: string | null;
+  file_type?: string | null;
+  file_size?: number | null;
 }
 
 export type NewsCategory = 'announcements' | 'events' | 'safety' | 'regulations' | 'industry';

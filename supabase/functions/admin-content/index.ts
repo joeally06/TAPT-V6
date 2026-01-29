@@ -177,7 +177,10 @@ Deno.serve(async (req) => {
         date: body.date || null,
         category: body.category || null,
         link: body.link || null,
-        linked_form_type: body.linked_form_type || null
+        linked_form_type: body.linked_form_type || null,
+        file_url: body.file_url || null,
+        file_type: body.file_type || null,
+        file_size: body.file_size || null
       };
 
       let result;

@@ -8,6 +8,7 @@ import { Resources } from './pages/Resources';
 import { Contact } from './pages/Contact';
 import { News } from './pages/News';
 import { Events } from './pages/Events';
+import { EventDetail } from './pages/EventDetail';
 import { Members } from './pages/Members';
 import { AdminLogin } from './pages/AdminLogin';
 import { AdminDashboard } from './pages/AdminDashboard';
@@ -197,6 +198,7 @@ function App() {
                       <Route path="/resources" element={<Resources />} />
                       <Route path="/news" element={<News />} />
                       <Route path="/events" element={<Events />} />
+                      <Route path="/events/:id" element={<EventDetail />} />
                       <Route path="/members" element={<Members />} />
                       <Route path="/contact" element={<Contact />} />
                       <Route path="/conference-registration" element={<ConferenceRegistration />} />

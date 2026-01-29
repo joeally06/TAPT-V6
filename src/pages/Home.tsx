@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, CheckCircle, Users, Calendar, BookOpen, AlertCircle } from 'lucide-react';
+import { ArrowRight, CheckCircle, Users, Calendar, BookOpen, AlertCircle, FileText, Download, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { NewsItem } from '../lib/types/news';
 import { getSiteSetting } from '../lib/siteSettings';
+import DOMPurify from 'dompurify';
 
 export const Home: React.FC = () => {
   const [featuredEvents, setFeaturedEvents] = useState<NewsItem[]>([]);
+  const [announcements, setAnnouncements] = useState<NewsItem[]>([]);
   const [heroImageUrl, setHeroImageUrl] = useState<string>('https://images.pexels.com/photos/5905700/pexels-photo-5905700.jpeg');
   const [siteTagline, setSiteTagline] = useState<string>('Promoting safe and efficient student transportation across Tennessee');
   const [loading, setLoading] = useState(true);
@@ -40,6 +42,23 @@ export const Home: React.FC = () => {
 
         if (error) throw error;
         setFeaturedEvents(data || []);
+
+        // Fetch announcements - security: only published, featured, limited to 5
+        const { data: announcementsData, error: announcementsError } = await supabase
+          .from('content')
+          .select('*')
+          .eq('type', 'announcement')
+          .eq('status', 'published')
+          .eq('is_featured', true)
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        if (announcementsError) {
+          console.error('Error fetching announcements:', announcementsError);
+          // Don't throw - allow page to load even if announcements fail
+        } else {
+          setAnnouncements(announcementsData || []);
+        }
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {
@@ -190,6 +209,120 @@ export const Home: React.FC = () => {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Announcements Section - Fixed Mobile Layout */}
+      {announcements.length > 0 && (
+        <section className="py-8 sm:py-12 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-6 sm:mb-8">
+              <h2 className="text-2xl sm:text-3xl font-bold text-secondary mb-2">Latest Announcements</h2>
+              <div className="w-16 sm:w-20 h-1 bg-primary mx-auto"></div>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+              {announcements.map((announcement) => {
+                // Sanitize content to prevent XSS attacks
+                const sanitizedTitle = DOMPurify.sanitize(announcement.title, { 
+                  ALLOWED_TAGS: [],
+                  KEEP_CONTENT: true 
+                });
+                const sanitizedDescription = DOMPurify.sanitize(announcement.description, { 
+                  ALLOWED_TAGS: [],
+                  KEEP_CONTENT: true 
+                });
+                
+                // Validate file URL is from Supabase storage
+                const hasValidFile = announcement.file_url && (() => {
+                  try {
+                    const fileUrlObj = new URL(announcement.file_url!);
+                    return fileUrlObj.hostname.includes('supabase.co');
+                  } catch {
+                    return false;
+                  }
+                })();
+                
+                // Get file icon based on file type
+                const getFileIcon = () => {
+                  if (!announcement.file_type) return FileText;
+                  if (announcement.file_type.includes('pdf')) return FileText;
+                  if (announcement.file_type.includes('image')) return ImageIcon;
+                  return FileText;
+                };
+                
+                const FileIcon = getFileIcon();
+                
+                // Get file label based on type
+                const getFileLabel = () => {
+                  if (!announcement.file_type) return 'View Attachment';
+                  if (announcement.file_type.includes('pdf')) return 'View PDF';
+                  if (announcement.file_type.includes('image')) return 'View Image';
+                  if (announcement.file_type.includes('word') || announcement.file_type.includes('document')) return 'View Document';
+                  if (announcement.file_type.includes('excel') || announcement.file_type.includes('spreadsheet')) return 'View Spreadsheet';
+                  return 'View Attachment';
+                };
+                
+                return (
+                  <div key={announcement.id} className="bg-gradient-to-br from-blue-50 to-white rounded-lg shadow-md overflow-hidden border border-blue-100 hover:shadow-lg transition-shadow">
+                    <div className="p-4 sm:p-6">
+                      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                        <span className="px-2 sm:px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                          Announcement
+                        </span>
+                        <span className="text-xs sm:text-sm text-gray-500">
+                          {new Date(announcement.created_at).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
+                        </span>
+                      </div>
+                      <h3 className="text-lg sm:text-xl font-bold text-secondary mb-2 break-words">
+                        {sanitizedTitle}
+                      </h3>
+                      <p className="text-gray-600 text-sm sm:text-base break-words line-clamp-4">
+                        {sanitizedDescription}
+                      </p>
+                      
+                      {/* File Download Button */}
+                      {hasValidFile && (
+                        <div className="mt-4 pt-4 border-t border-gray-200">
+                          <a
+                            href={announcement.file_url!}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 text-primary hover:text-primary/80 font-medium text-sm transition-colors"
+                            onClick={(e) => {
+                              // Additional security check before download
+                              try {
+                                const url = new URL(announcement.file_url!);
+                                if (!url.hostname.includes('supabase.co')) {
+                                  e.preventDefault();
+                                  console.error('Invalid file URL');
+                                }
+                              } catch {
+                                e.preventDefault();
+                              }
+                            }}
+                          >
+                            <FileIcon className="h-4 w-4" />
+                            <span>{getFileLabel()}</span>
+                            <Download className="h-3 w-3" />
+                          </a>
+                          {announcement.file_size && (
+                            <span className="ml-2 text-xs text-gray-500">
+                              ({(announcement.file_size / 1024).toFixed(1)} KB)
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </section>
