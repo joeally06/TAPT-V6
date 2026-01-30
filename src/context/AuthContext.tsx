@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 
 interface AuthState {
@@ -23,27 +23,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshAuth: async () => {}
   });
 
-  const refreshAuth = async () => {
+  // Track if a refresh is already in progress to prevent race conditions
+  const isRefreshing = useRef(false);
+  // Track if initial auth has completed
+  const initialAuthComplete = useRef(false);
+  // Track current user ID to detect changes
+  const currentUserId = useRef<string | null>(null);
+
+  const refreshAuth = async (force = false) => {
+    // Prevent concurrent refreshes unless forced
+    if (isRefreshing.current && !force) {
+      console.log('AuthContext: Refresh already in progress, skipping');
+      return;
+    }
+
     try {
+      isRefreshing.current = true;
       console.log('AuthContext: refreshAuth started, setting loading to true');
       setState(prev => ({ ...prev, loading: true, error: null }));
       
       // Get the current session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      console.log('AuthContext: getSession completed, session:', session);
+      console.log('AuthContext: getSession completed, session:', session ? 'exists' : 'null');
       
       if (sessionError) {
         throw sessionError;
       }
-      
+
       if (!session) {
         console.log('AuthContext: No session found, setting loading to false');
+        currentUserId.current = null;
         setState({
           user: null,
           loading: false,
           error: null,
           refreshAuth
         });
+        initialAuthComplete.current = true;
         return;
       }
       
@@ -56,16 +72,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (roleError) {
         console.error('Error fetching user role:', roleError);
+        currentUserId.current = session.user.id;
         setState({
           user: { ...session.user, role: null, access_token: session.access_token },
           loading: false,
           error: roleError,
           refreshAuth
         });
+        initialAuthComplete.current = true;
         return;
       }
 
-      console.log('AuthContext: User role fetched, setting loading to false');
+      console.log('AuthContext: User role fetched:', role, 'setting loading to false');
+      currentUserId.current = session.user.id;
       setState({
         user: { 
           ...session.user, 
@@ -76,6 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         error: null,
         refreshAuth
       });
+      initialAuthComplete.current = true;
     } catch (error) {
       console.error('Auth refresh error:', error);
       console.log('AuthContext: Error during refreshAuth, setting loading to false. Error:', error);
@@ -86,13 +106,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         error: error instanceof Error ? error : new Error('Unknown authentication error'),
         refreshAuth
       }));
+      initialAuthComplete.current = true;
+    } finally {
+      isRefreshing.current = false;
     }
   };
+
   useEffect(() => {
     let mounted = true;
     
     const initAuth = async () => {
-      await refreshAuth();
+      await refreshAuth(true); // Force initial refresh
     };
     
     initAuth();
@@ -104,10 +128,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (event === 'SIGNED_OUT') {
         console.log('AuthContext: User signed out, clearing state and redirecting');
+        currentUserId.current = null;
         // Immediately clear state and redirect
         setState({
           user: null,
-          loading: false, // Critical: Set loading to false immediately
+          loading: false,
           error: null,
           refreshAuth
         });
@@ -118,21 +143,64 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
+      // Only refresh on SIGNED_IN if we don't already have this user loaded
+      // This prevents the double-refresh when tab becomes visible
       if (event === 'SIGNED_IN' && session?.user) {
+        if (currentUserId.current === session.user.id && initialAuthComplete.current) {
+          console.log('AuthContext: User already loaded, skipping refresh');
+          return;
+        }
         console.log('AuthContext: User signed in, refreshing auth');
-        setState(prev => ({ ...prev, loading: true }));
         await refreshAuth();
       } else if (event === 'TOKEN_REFRESHED') {
-        console.log('AuthContext: Token refreshed, refreshing auth');
-        await refreshAuth();
+        console.log('AuthContext: Token refreshed, updating token without full refresh');
+        // Just update the access token without triggering a full refresh
+        setState(prev => {
+          if (prev.user && session) {
+            return {
+              ...prev,
+              user: { ...prev.user, access_token: session.access_token }
+            };
+          }
+          return prev;
+        });
       }
     });
     
-    // Add visibility change listener to refresh auth when tab becomes visible again
+    // Debounced visibility change handler
+    let visibilityTimeout: ReturnType<typeof setTimeout> | null = null;
+    
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        console.log('AuthContext: Tab became visible, refreshing auth state');
-        refreshAuth();
+        // Clear any pending timeout
+        if (visibilityTimeout) {
+          clearTimeout(visibilityTimeout);
+        }
+        
+        // Debounce the refresh to avoid race conditions with auth state change
+        visibilityTimeout = setTimeout(() => {
+          // Only check session if we're not already refreshing and initial auth is complete
+          if (!isRefreshing.current && initialAuthComplete.current) {
+            console.log('AuthContext: Tab became visible, checking session validity');
+            // Instead of full refresh, just verify the session is still valid
+            supabase.auth.getSession().then(({ data: { session } }) => {
+              if (!session && currentUserId.current) {
+                console.log('AuthContext: Session expired, clearing user');
+                currentUserId.current = null;
+                setState({
+                  user: null,
+                  loading: false,
+                  error: null,
+                  refreshAuth
+                });
+              } else if (session && !currentUserId.current) {
+                console.log('AuthContext: Have session but no user, refreshing');
+                refreshAuth();
+              }
+              // If session exists and user exists, do nothing - we're good
+            });
+          }
+        }, 500); // 500ms debounce
       }
     };
     
@@ -142,6 +210,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       mounted = false;
       authListener.subscription.unsubscribe();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (visibilityTimeout) {
+        clearTimeout(visibilityTimeout);
+      }
     };
   }, []);
 
@@ -151,6 +222,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const timeoutId = setTimeout(() => {
       console.warn('AuthContext: Auth loading timeout - forcing state reset');
+      isRefreshing.current = false;
       setState(prev => ({ 
         ...prev, 
         loading: false,
