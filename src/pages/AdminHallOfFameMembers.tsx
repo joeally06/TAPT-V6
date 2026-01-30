@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Award, MapPin, Globe, Mail, Plus, Edit, Trash2, ArrowLeft, Search, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
+import { Award, MapPin, Globe, Mail, Plus, Edit, Trash2, Search, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { uploadFile } from '../lib/upload';
+import AdminLayout from '../components/AdminLayout';
 
 interface HallOfFameMember {
   id: string;
@@ -255,32 +256,22 @@ export const AdminHallOfFameMembers: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-      </div>
+      <AdminLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+        </div>
+      </AdminLayout>
     );
   }
 
   return (
-    <div className="pt-16">
-      {/* Hero Section */}
-      <section className="bg-secondary text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="flex items-center space-x-4">
-            <button 
-              onClick={() => navigate('/admin')}
-              className="inline-flex items-center text-white hover:text-gray-200 transition-colors"
-            >
-              <ArrowLeft className="h-6 w-6 mr-2" />
-              Back to Dashboard
-            </button>
-            <h1 className="text-3xl font-bold">Manage Hall of Fame Members</h1>
-          </div>
-          <p className="mt-2">Add, edit, or remove Hall of Fame members</p>
+    <AdminLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Manage Hall of Fame Members</h1>
+          <p className="mt-1 text-gray-600">Add, edit, or remove Hall of Fame members</p>
         </div>
-      </section>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Status Messages */}
         {error && (
           <div className="mb-6 bg-red-50 border-l-4 border-red-400 p-4">
@@ -633,7 +624,7 @@ export const AdminHallOfFameMembers: React.FC = () => {
           )}
         </div>
       </div>
-    </div>
+    </AdminLayout>
   );
 };
 

@@ -14,6 +14,11 @@ export const Navbar = () => {
   const isAdmin = user?.role === 'admin';
   const location = useLocation();
 
+  // Don't render navbar on admin pages (AdminLayout handles its own navigation)
+  if (location.pathname.startsWith('/admin')) {
+    return null;
+  }
+
   // Toggle mobile menu
   const toggleMenu = () => setIsOpen(!isOpen);
 

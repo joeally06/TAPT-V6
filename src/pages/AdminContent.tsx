@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { 
-  ArrowLeft, 
   Plus, 
   Trash2, 
   Edit, 
@@ -20,6 +19,7 @@ import { NEWS_CATEGORIES } from '../lib/types/news';
 import { useAuth } from '../context/AuthContext';
 import { uploadFile } from '../lib/upload';
 import { getPublicUrl } from '../lib/storage';
+import AdminLayout from '../components/AdminLayout';
 
 interface ContentItem {
   id: string;
@@ -34,9 +34,6 @@ interface ContentItem {
   link: string | null;
   is_featured: boolean;
   linked_form_type: 'conference' | 'tech-conference' | 'hall-of-fame' | 'student-scholarship' | 'exhibitor' | null;
-  file_url?: string | null;
-  file_type?: string | null;
-  file_size?: number | null;
 }
 
 interface ResourceItem {
@@ -206,73 +203,17 @@ export const AdminContent: React.FC = () => {
         fetchResources();
       } else {
         let imagePath = formData.image_url;
-        let filePath = null;
-        let fileType = null;
-        let fileSize = null;
-        
-        // Handle file upload for announcements
-        if (selectedType === 'announcement' && selectedFile) {
-          // Validate file size (max 10MB)
-          const maxSize = 10 * 1024 * 1024; // 10MB
-          if (selectedFile.size > maxSize) {
-            throw new Error('File size must be less than 10MB');
-          }
-
-          // Validate file type for non-images
-          if (!selectedFile.type.startsWith('image/')) {
-            const allowedTypes = [
-              'application/pdf',
-              'application/msword',
-              'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-              'application/vnd.ms-excel',
-              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-              'text/plain',
-              'text/csv'
-            ];
-            
-            if (!allowedTypes.includes(selectedFile.type)) {
-              throw new Error('Invalid file type. Only PDF, DOC, DOCX, XLS, XLSX, TXT, CSV, and image files are allowed.');
-            }
-          }
-
+        if (selectedFile) {
           const fileExt = selectedFile.name.split('.').pop();
           const fileName = `${crypto.randomUUID()}.${fileExt}`;
-          const fileStoragePath = selectedFile.type.startsWith('image/') 
-            ? `content/${fileName}` 
-            : `content/attachments/${fileName}`;
-          
+          const filePath = `content/${fileName}`;
           const { error: uploadError } = await supabase.storage
             .from('public')
-            .upload(fileStoragePath, selectedFile);
-            
-          if (uploadError) throw uploadError;
-          
-          const { data: { publicUrl } } = supabase.storage
-            .from('public')
-            .getPublicUrl(fileStoragePath);
-            
-          // For images, set both image_url AND file metadata for download capability
-          if (selectedFile.type.startsWith('image/')) {
-            imagePath = publicUrl;
-          }
-          
-          // Always set file metadata for announcements
-          filePath = publicUrl;
-          fileType = selectedFile.type;
-          fileSize = selectedFile.size;
-        }
-        // Handle image upload for other content types (events, news)
-        else if (selectedFile && selectedFile.type.startsWith('image/')) {
-          const fileExt = selectedFile.name.split('.').pop();
-          const fileName = `${crypto.randomUUID()}.${fileExt}`;
-          const imageStoragePath = `content/${fileName}`;
-          const { error: uploadError } = await supabase.storage
-            .from('public')
-            .upload(imageStoragePath, selectedFile);
+            .upload(filePath, selectedFile);
           if (uploadError) throw uploadError;
           const { data: { publicUrl } } = supabase.storage
             .from('public')
-            .getPublicUrl(imageStoragePath);
+            .getPublicUrl(filePath);
           imagePath = publicUrl;
         }
 
@@ -304,9 +245,6 @@ export const AdminContent: React.FC = () => {
           body: JSON.stringify({
             ...formData,
             image_url: imagePath,
-            file_url: filePath,
-            file_type: fileType,
-            file_size: fileSize,
             type: selectedType,
             id: editingItem?.id, // Pass id for update, undefined for insert
             linked_form_type: formData.linked_form_type
@@ -427,25 +365,13 @@ export const AdminContent: React.FC = () => {
   };
 
   return (
-    <div className="pt-16">
-      {/* Hero Section */}
-      <section className="bg-secondary text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="flex items-center space-x-4">
-            <button 
-              onClick={() => navigate('/admin')}
-              className="inline-flex items-center text-white hover:text-gray-200 transition-colors"
-            >
-              <ArrowLeft className="h-6 w-6 mr-2" />
-              Back to Dashboard
-            </button>
-            <h1 className="text-3xl font-bold">Content Management</h1>
-          </div>
-          <p className="mt-2">Manage website content, featured items, and resources</p>
+    <AdminLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Content Management</h1>
+          <p className="mt-1 text-gray-600">Manage website content, featured items, and resources</p>
         </div>
-      </section>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error && (
           <div className="mb-6 bg-red-50 border-l-4 border-red-400 p-4">
             <p className="text-red-700">{error}</p>
@@ -604,43 +530,17 @@ export const AdminContent: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Image upload - hide for announcements since they use attachment field */}
-                  {selectedType !== 'announcement' && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Image
-                      </label>
-                      <input
-                        type="file"
-                        onChange={handleFileSelect}
-                        accept="image/*"
-                        className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
-                      />
-                    </div>
-                  )}
-
-                  {selectedType === 'announcement' && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Attachment (Optional)
-                      </label>
-                      <input
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handleFileSelect}
-                        accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,image/*"
-                        className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
-                      />
-                      <p className="mt-1 text-sm text-gray-500">
-                        Accepted files: PDF, DOC, DOCX, XLS, XLSX, TXT, CSV, or Images (Max 10MB)
-                      </p>
-                      {selectedFile && (
-                        <p className="mt-2 text-sm text-green-600">
-                          Selected: {selectedFile.name} ({formatFileSize(selectedFile.size)})
-                        </p>
-                      )}
-                    </div>
-                  )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Image
+                    </label>
+                    <input
+                      type="file"
+                      onChange={handleFileSelect}
+                      accept="image/*"
+                      className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                    />
+                  </div>
 
                   {selectedType === 'event' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -971,7 +871,7 @@ export const AdminContent: React.FC = () => {
           )}
         </div>
       </div>
-    </div>
+    </AdminLayout>
   );
 };
 

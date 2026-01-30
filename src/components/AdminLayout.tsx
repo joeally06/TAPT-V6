@@ -146,9 +146,9 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {  const [isSi
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 pt-16">
+    <div className="min-h-screen bg-gray-100">
       {/* Mobile Sidebar Toggle */}
-      <div className="lg:hidden fixed top-16 left-0 right-0 z-50 bg-white border-b border-gray-200 px-4 py-2">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 px-4 py-2">
         <button
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
           className="p-2 rounded-md text-gray-500 hover:bg-gray-100"
@@ -159,7 +159,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {  const [isSi
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-16 left-0 z-40 w-64 h-[calc(100vh-4rem)] transition-transform ${
+        className={`fixed top-0 left-0 z-40 w-64 h-screen transition-transform ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } lg:translate-x-0`}
       >
@@ -240,8 +240,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {  const [isSi
       </aside>
 
       {/* Main Content */}
-      <div className="lg:ml-64 pt-16">
-        <div className="p-4">
+      <div className="lg:ml-64">
+        <div className="p-6 pt-16 lg:pt-6">
           {children}
         </div>
       </div>

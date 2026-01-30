@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Archive, Search, Download, ArrowLeft } from 'lucide-react';
+import { Archive, Search, Download } from 'lucide-react';
+import AdminLayout from '../components/AdminLayout';
 import { useAuth } from '../context/AuthContext';
 
 interface ArchiveItem {
@@ -194,25 +195,13 @@ export const AdminArchives: React.FC = () => {
   };
 
   return (
-    <div className="pt-16">
-      {/* Hero Section */}
-      <section className="bg-secondary text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="flex items-center space-x-4">
-            <button 
-              onClick={() => navigate('/admin')}
-              className="inline-flex items-center text-white hover:text-gray-200 transition-colors"
-            >
-              <ArrowLeft className="h-6 w-6 mr-2" />
-              Back to Dashboard
-            </button>
-            <h1 className="text-3xl font-bold">Archives</h1>
-          </div>
-          <p className="mt-2">View and manage archived data</p>
+    <AdminLayout>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Archives</h1>
+          <p className="mt-1 text-gray-600">View and manage archived data</p>
         </div>
-      </section>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error && (
           <div className="mb-6 bg-red-50 border-l-4 border-red-400 p-4">
             <p className="text-red-700">{error}</p>
@@ -334,7 +323,7 @@ export const AdminArchives: React.FC = () => {
           )}
         </div>
       </div>
-    </div>
+    </AdminLayout>
   );
 };
 

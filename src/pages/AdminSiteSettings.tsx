@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, Upload, X, Image, AlertCircle, CheckCircle, Mail, Phone, Globe, Type, Clock } from 'lucide-react';
+import { Save, Upload, X, Image, AlertCircle, CheckCircle, Mail, Phone, Globe, Type, Clock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { getSiteSetting, updateSiteSetting } from '../lib/siteSettings';
@@ -210,7 +210,7 @@ export const AdminSiteSettings: React.FC = () => {
   if (loading || authLoading) {
     return (
       <AdminLayout>
-        <div className="flex items-center justify-center min-h-screen">
+        <div className="flex items-center justify-center min-h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
         </div>
       </AdminLayout>
@@ -219,21 +219,11 @@ export const AdminSiteSettings: React.FC = () => {
 
   return (
     <AdminLayout>
-      <div className="mb-8 flex items-center justify-between">
+      <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Site Settings</h1>
-          <p className="mt-1 text-sm text-gray-600">
-            Manage site-wide settings and appearance
-          </p>
+          <h1 className="text-3xl font-bold text-gray-900">Site Settings</h1>
+          <p className="mt-1 text-gray-600">Manage site-wide settings and appearance</p>
         </div>
-        <button
-          onClick={() => navigate('/admin')}
-          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-        >
-          <ArrowLeft className="h-5 w-5 mr-2" />
-          Back to Dashboard
-        </button>
-      </div>
 
       {error && (
         <div className="mb-6 bg-red-50 border-l-4 border-red-400 p-4">
@@ -629,6 +619,7 @@ export const AdminSiteSettings: React.FC = () => {
             </div>
           </div>
         </form>
+      </div>
       </div>
     </AdminLayout>
   );

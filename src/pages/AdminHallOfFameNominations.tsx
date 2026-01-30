@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Download, Search, ChevronDown, ChevronUp, Edit, Trash2, Eye, ArrowLeft } from 'lucide-react';
+import { Download, Search, ChevronDown, ChevronUp, Edit, Trash2, Eye } from 'lucide-react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { useAuth } from '../context/AuthContext';
+import AdminLayout from '../components/AdminLayout';
 
 interface HallOfFameNomination {
   id: string;
@@ -294,26 +295,15 @@ export const AdminHallOfFameNominations: React.FC = () => {
   };
 
   return (
-    <div className="pt-16">
-      {/* Hero Section */}
-      <section className="bg-secondary text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="flex items-center space-x-4">
-            <button 
-              onClick={() => navigate('/admin')}
-              className="inline-flex items-center text-white hover:text-gray-200 transition-colors"
-            >
-              <ArrowLeft className="h-6 w-6 mr-2" />
-              Back to Dashboard
-            </button>
-            <h1 className="text-3xl font-bold">Hall of Fame Nominations</h1>
-          </div>
-          <p className="mt-2">Manage and review Hall of Fame nominations</p>
+    <AdminLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Hall of Fame Nominations</h1>
+          <p className="mt-1 text-gray-600">Manage and review Hall of Fame nominations</p>
         </div>
-      </section>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Main Content */}
         {error && (
           <div className="mb-6 bg-red-50 border-l-4 border-red-400 p-4">
             <div className="flex">
@@ -611,7 +601,7 @@ export const AdminHallOfFameNominations: React.FC = () => {
           </div>
         )}
       </div>
-    </div>
+    </AdminLayout>
   );
 };
 

@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { fetchSettingsByCategory, updateSetting } from '@/lib/settings';
 import type { ParsedSetting } from '@/types/settings';
+import AdminLayout from '../components/AdminLayout';
 
 export default function AdminPaymentSettings() {
   const [settings, setSettings] = useState<ParsedSetting[]>([]);
@@ -89,31 +90,38 @@ export default function AdminPaymentSettings() {
   };
 
   if (loading) {
-    return <div className="p-6 text-center text-gray-500">Loading...</div>;
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+        </div>
+      </AdminLayout>
+    );
   }
 
   if (error) {
     return (
-      <div className="p-6 max-w-3xl mx-auto">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <h3 className="text-red-800 font-semibold mb-2">Error</h3>
-          <p className="text-red-600 text-sm mb-3">{error}</p>
-          <button onClick={loadSettings} className="px-4 py-2 bg-red-600 text-white rounded text-sm hover:bg-red-700">
-            Retry
-          </button>
+      <AdminLayout>
+        <div className="max-w-3xl mx-auto">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <h3 className="text-red-800 font-semibold mb-2">Error</h3>
+            <p className="text-red-600 text-sm mb-3">{error}</p>
+            <button onClick={loadSettings} className="px-4 py-2 bg-red-600 text-white rounded text-sm hover:bg-red-700">
+              Retry
+            </button>
+          </div>
         </div>
-      </div>
+      </AdminLayout>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Email Template Settings</h1>
-        <p className="text-sm text-gray-600 mt-1">
-          Configure payment receipt email variables
-        </p>
-      </div>
+    <AdminLayout>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Email Template Settings</h1>
+          <p className="mt-1 text-gray-600">Configure payment receipt email variables</p>
+        </div>
 
       {settings.length === 0 ? (
         <div className="text-center py-12 text-gray-500">No settings found</div>
@@ -187,6 +195,7 @@ export default function AdminPaymentSettings() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </AdminLayout>
   );
 }

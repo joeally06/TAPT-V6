@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { 
-  ArrowLeft, 
   Search, 
   Inbox, 
   Mail, 
@@ -267,68 +266,58 @@ const AdminContactMessages: React.FC = () => {
 
   return (
     <AdminLayout>
-      <div className="mb-8 flex items-center justify-between">
+      <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Contact Messages</h1>
-          <p className="mt-1 text-sm text-gray-600">
-            View and manage messages from the contact form
-          </p>
+          <h1 className="text-3xl font-bold text-gray-900">Contact Messages</h1>
+          <p className="mt-1 text-gray-600">View and manage messages from the contact form</p>
         </div>
-        <button
-          onClick={() => navigate('/admin')}
-          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-        >
-          <ArrowLeft className="h-5 w-5 mr-2" />
-          Back to Dashboard
-        </button>
-      </div>
 
-      {error && (
-        <div className="mb-6 bg-red-50 border-l-4 border-red-400 p-4">
-          <div className="flex">
-            <AlertCircle className="h-5 w-5 text-red-400" />
-            <div className="ml-3">
-              <p className="text-sm text-red-700">{error}</p>
+        {error && (
+          <div className="mb-6 bg-red-50 border-l-4 border-red-400 p-4">
+            <div className="flex">
+              <AlertCircle className="h-5 w-5 text-red-400" />
+              <div className="ml-3">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {success && (
-        <div className="mb-6 bg-green-50 border-l-4 border-green-400 p-4">
-          <div className="flex">
-            <CheckCircle className="h-5 w-5 text-green-400" />
-            <div className="ml-3">
-              <p className="text-sm text-green-700">{success}</p>
+        {success && (
+          <div className="mb-6 bg-green-50 border-l-4 border-green-400 p-4">
+            <div className="flex">
+              <CheckCircle className="h-5 w-5 text-green-400" />
+              <div className="ml-3">
+                <p className="text-sm text-green-700">{success}</p>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Message List */}
-        <div className="md:col-span-1 bg-white rounded-lg shadow-md overflow-hidden">
-          <div className="p-4 border-b border-gray-200">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-medium text-gray-900">
-                Messages {totalCount > 0 && `(${totalCount})`}
-              </h2>
-              <button
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className="text-gray-500 hover:text-gray-700"
-                title="Refresh messages"
-              >
-                <RefreshCw className={`h-5 w-5 ${refreshing ? 'animate-spin' : ''}`} />
-              </button>
-            </div>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search messages..."
-                value={searchTerm}
-                onChange={handleSearch}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Message List */}
+          <div className="md:col-span-1 bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="p-4 border-b border-gray-200">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-medium text-gray-900">
+                  Messages {totalCount > 0 && `(${totalCount})`}
+                </h2>
+                <button
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  className="text-gray-500 hover:text-gray-700"
+                  title="Refresh messages"
+                >
+                  <RefreshCw className={`h-5 w-5 ${refreshing ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search messages..."
+                  value={searchTerm}
+                  onChange={handleSearch}
                 className="pl-10 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
               />
             </div>
@@ -529,6 +518,7 @@ const AdminContactMessages: React.FC = () => {
             </div>
           )}
         </div>
+      </div>
       </div>
     </AdminLayout>
   );

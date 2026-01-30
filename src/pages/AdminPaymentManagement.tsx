@@ -257,8 +257,8 @@ export default function AdminPaymentManagement() {
   if (loading || authLoading) {
     return (
       <AdminLayout>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        <div className="flex items-center justify-center min-h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
         </div>
       </AdminLayout>
     );
@@ -266,11 +266,10 @@ export default function AdminPaymentManagement() {
 
   return (
     <AdminLayout>
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-secondary mb-2">Payment Management</h1>
-          <p className="text-gray-600">Review and process pending purchase order payments</p>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Payment Management</h1>
+          <p className="mt-1 text-gray-600">Review and process pending purchase order payments</p>
         </div>
 
         {/* Status Messages */}

@@ -328,31 +328,21 @@ const AdminStudentScholarshipSettings: React.FC = () => {
 
   if (loading || authLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-      </div>
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+        </div>
+      </AdminLayout>
     );
   }
 
   return (
-    <div className="pt-16">
-      <section className="bg-secondary text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="flex items-center space-x-4">
-            <button 
-              onClick={() => navigate('/admin')}
-              className="inline-flex items-center text-white hover:text-gray-200 transition-colors"
-            >
-              <ArrowLeft className="h-6 w-6 mr-2" />
-              Back to Dashboard
-            </button>
-            <h1 className="text-3xl font-bold">Student Scholarship Settings</h1>
-          </div>
-          <p className="mt-2">Manage scholarship application period and requirements</p>
+    <AdminLayout>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Student Scholarship Settings</h1>
+          <p className="mt-1 text-gray-600">Manage scholarship application period and requirements</p>
         </div>
-      </section>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error && (
           <div className="mb-6 bg-red-50 border-l-4 border-red-400 p-4">
             <div className="flex">
@@ -726,7 +716,7 @@ const AdminStudentScholarshipSettings: React.FC = () => {
           loadingText="Clearing..."
         />
       </div>
-    </div>
+    </AdminLayout>
   );
 };
 
