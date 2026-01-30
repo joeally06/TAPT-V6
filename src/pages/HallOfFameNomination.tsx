@@ -68,8 +68,13 @@ export const HallOfFameNomination: React.FC = () => {
 
       // Check if we're within the nomination period
       const now = new Date();
-      const startDate = new Date(data.start_date);
-      const endDate = new Date(data.end_date);
+      now.setHours(0, 0, 0, 0);
+      
+      const [y1, m1, d1] = data.start_date.split('T')[0].split('-').map(Number);
+      const startDate = new Date(y1, m1 - 1, d1);
+      
+      const [y2, m2, d2] = data.end_date.split('T')[0].split('-').map(Number);
+      const endDate = new Date(y2, m2 - 1, d2);
       
       if (now < startDate) {
         setIsNominationPeriodOpen(false);
@@ -87,6 +92,16 @@ export const HallOfFameNomination: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Format nomination period dates
+  const getNominationPeriodDisplay = () => {
+    if (!settings?.start_date || !settings?.end_date) return '';
+    const [y1, m1, d1] = settings.start_date.split('T')[0].split('-').map(Number);
+    const [y2, m2, d2] = settings.end_date.split('T')[0].split('-').map(Number);
+    const start = new Date(y1, m1 - 1, d1);
+    const end = new Date(y2, m2 - 1, d2);
+    return `${start.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -249,6 +264,19 @@ export const HallOfFameNomination: React.FC = () => {
 
       <section className="py-16">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Nomination Period - Prominent Display */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-400 rounded-lg p-6 mb-8">
+            <div className="flex items-center">
+              <Calendar className="h-8 w-8 text-blue-600 mr-3 flex-shrink-0" />
+              <div>
+                <h3 className="text-lg font-bold text-blue-900 mb-1">Nomination Period</h3>
+                <p className="text-xl font-bold text-blue-700">
+                  {getNominationPeriodDisplay()}
+                </p>
+              </div>
+            </div>
+          </div>
+
           {settings.nomination_instructions && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
               <h3 className="text-lg font-semibold text-blue-800 mb-2">Nomination Instructions</h3>

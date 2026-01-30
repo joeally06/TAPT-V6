@@ -159,8 +159,11 @@ const AdminRegionalLuncheonSettings: React.FC = () => {
         throw new Error('All regional dates and times are required');
       }
 
-      const deadlineDate = new Date(settings.registration_deadline);
+      // Parse deadline date to avoid timezone issues
+      const [year, month, day] = settings.registration_deadline.split('-').map(Number);
+      const deadlineDate = new Date(year, month - 1, day);
       const now = new Date();
+      now.setHours(0, 0, 0, 0); // Reset time for accurate date comparison
       
       if (deadlineDate < now) {
         const proceed = window.confirm('Warning: The registration deadline is in the past. Do you want to continue?');
@@ -489,7 +492,11 @@ const AdminRegionalLuncheonSettings: React.FC = () => {
                       </div>
                       <p className="text-sm text-gray-600 mb-1">
                         <Calendar className="inline w-4 h-4 mr-1" />
-                        Registration Deadline: {new Date(setting.registration_deadline).toLocaleDateString()}
+                        Registration Deadline: {(() => {
+                          const dateStr = setting.registration_deadline.split('T')[0];
+                          const [year, month, day] = dateStr.split('-');
+                          return `${month}/${day}/${year}`;
+                        })()}
                       </p>
                       {setting.description && (
                         <p className="text-sm text-gray-500 mt-2 line-clamp-2">{setting.description}</p>

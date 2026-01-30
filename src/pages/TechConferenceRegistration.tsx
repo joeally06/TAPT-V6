@@ -375,8 +375,15 @@ const TechConferenceRegistration: React.FC = () => {
                           <Calendar className="h-6 w-6" />
                         </span>
                         <div>
-                          <span className="font-medium">Date:</span>
-                          <p>{new Date(conferenceSettings?.start_date || '').toLocaleDateString()} - {new Date(conferenceSettings?.end_date || '').toLocaleDateString()}</p>
+                          <span className="font-medium">Conference Dates:</span>
+                          <p>{(() => {
+                            if (!conferenceSettings?.start_date || !conferenceSettings?.end_date) return '';
+                            const [y1, m1, d1] = conferenceSettings.start_date.split('T')[0].split('-');
+                            const [y2, m2, d2] = conferenceSettings.end_date.split('T')[0].split('-');
+                            const start = new Date(parseInt(y1), parseInt(m1) - 1, parseInt(d1));
+                            const end = new Date(parseInt(y2), parseInt(m2) - 1, parseInt(d2));
+                            return `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`;
+                          })()}</p>
                         </div>
                       </li>
                       <li className="flex items-start">
@@ -390,6 +397,29 @@ const TechConferenceRegistration: React.FC = () => {
                         </div>
                       </li>
                     </ul>
+
+                    {/* Registration Deadline - Prominent Display */}
+                    <div className="mt-6 bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-400 rounded-lg p-4">
+                      <div className="flex items-center">
+                        <AlertCircle className="h-6 w-6 text-yellow-600 mr-2 flex-shrink-0" />
+                        <div>
+                          <h4 className="text-sm font-bold text-yellow-900 mb-1">Registration Deadline</h4>
+                          <p className="text-xl font-bold text-yellow-700">
+                            {(() => {
+                              if (!conferenceSettings?.registration_end_date) return '';
+                              const [y, m, d] = conferenceSettings.registration_end_date.split('T')[0].split('-');
+                              const date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+                              return date.toLocaleDateString('en-US', { 
+                                weekday: 'long',
+                                year: 'numeric', 
+                                month: 'long', 
+                                day: 'numeric' 
+                              });
+                            })()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                   
                   <div>
@@ -446,10 +476,14 @@ const TechConferenceRegistration: React.FC = () => {
                         <p className={`mt-1 text-sm ${
                           isRegistrationClosed ? 'text-red-700' : 'text-yellow-700'
                         }`}>
-                          {isRegistrationClosed
-                            ? `Registration closed on ${new Date(conferenceSettings.registration_end_date).toLocaleDateString()}`
-                            : `Registration closes on ${new Date(conferenceSettings.registration_end_date).toLocaleDateString()}`
-                          }
+                          {(() => {
+                            const [y, m, d] = conferenceSettings.registration_end_date.split('T')[0].split('-');
+                            const date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+                            const dateStr = date.toLocaleDateString();
+                            return isRegistrationClosed
+                              ? `Registration closed on ${dateStr}`
+                              : `Registration closes on ${dateStr}`;
+                          })()}
                         </p>
                       </div>
                     </div>

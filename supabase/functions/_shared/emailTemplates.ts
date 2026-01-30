@@ -1108,7 +1108,10 @@ export function generateRegionalLuncheonConfirmationEmail(data: RegionalLuncheon
   let formattedDeadline = data.registrationDeadline;
   if (formattedDeadline && formattedDeadline !== 'TBD') {
     try {
-      const deadlineDate = new Date(formattedDeadline);
+      // Parse the date string to avoid timezone issues
+      const dateStr = formattedDeadline.split('T')[0];
+      const [year, month, day] = dateStr.split('-');
+      const deadlineDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
       formattedDeadline = deadlineDate.toLocaleDateString('en-US', { 
         weekday: 'long',
         year: 'numeric', 

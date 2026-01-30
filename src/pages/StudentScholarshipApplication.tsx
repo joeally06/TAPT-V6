@@ -104,8 +104,10 @@ const StudentScholarshipApplication: React.FC = () => {
 
       // Check if application deadline has passed
       if (data.application_deadline) {
-        const deadlineDate = new Date(data.application_deadline);
+        const [year, month, day] = data.application_deadline.split('T')[0].split('-').map(Number);
+        const deadlineDate = new Date(year, month - 1, day);
         const now = new Date();
+        now.setHours(0, 0, 0, 0);
         
         if (now > deadlineDate) {
           setIsApplicationClosed(true);
@@ -285,7 +287,11 @@ const StudentScholarshipApplication: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-24">
           <div className="max-w-3xl">
             <h1 className="text-4xl md:text-5xl font-bold mb-6 fade-in">{scholarshipSettings?.name || 'TAPT Scholarship Application'}</h1>
-            <p className="text-xl text-gray-200 mb-8 fade-in">Application Deadline: {scholarshipSettings?.application_deadline ? new Date(scholarshipSettings.application_deadline).toLocaleDateString() : 'May 15, 2025'}</p>
+            <p className="text-xl text-gray-200 mb-8 fade-in">Application Deadline: {scholarshipSettings?.application_deadline ? (() => {
+              const [y, m, d] = scholarshipSettings.application_deadline.split('T')[0].split('-').map(Number);
+              const date = new Date(y, m - 1, d);
+              return date.toLocaleDateString();
+            })() : 'May 15, 2025'}</p>
           </div>
         </div>
       </section>
@@ -294,6 +300,28 @@ const StudentScholarshipApplication: React.FC = () => {
       {!isApplicationClosed && scholarshipSettings?.is_active && (
         <section className="py-12 bg-gray-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            {/* Application Deadline - Prominent Display */}
+            <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-400 rounded-lg p-6 mb-8">
+              <div className="flex items-center">
+                <AlertCircle className="h-8 w-8 text-yellow-600 mr-3 flex-shrink-0" />
+                <div>
+                  <h3 className="text-lg font-bold text-yellow-900 mb-1">Application Deadline</h3>
+                  <p className="text-2xl font-bold text-yellow-700">
+                    {scholarshipSettings?.application_deadline ? (() => {
+                      const [y, m, d] = scholarshipSettings.application_deadline.split('T')[0].split('-').map(Number);
+                      const date = new Date(y, m - 1, d);
+                      return date.toLocaleDateString('en-US', { 
+                        weekday: 'long',
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      });
+                    })() : 'May 15, 2025'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <div className="bg-white rounded-lg shadow-lg overflow-hidden">
               <div className="p-8 md:p-10">
                 <h2 className="text-3xl font-bold text-secondary mb-6">{scholarshipSettings?.name || 'TAPT Scholarship Application'}</h2>
@@ -329,7 +357,12 @@ const StudentScholarshipApplication: React.FC = () => {
                         Application deadline approaching
                       </h3>
                       <p className="mt-1 text-sm text-yellow-700">
-                        Applications must be submitted by {new Date(scholarshipSettings?.application_deadline || '').toLocaleDateString()}
+                        Applications must be submitted by {(() => {
+                          if (!scholarshipSettings?.application_deadline) return '';
+                          const [y, m, d] = scholarshipSettings.application_deadline.split('T')[0].split('-').map(Number);
+                          const date = new Date(y, m - 1, d);
+                          return date.toLocaleDateString();
+                        })()}
                       </p>
                     </div>
                   </div>

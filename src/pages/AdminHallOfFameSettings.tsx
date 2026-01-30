@@ -396,7 +396,11 @@ export const AdminHallOfFameSettings: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-500">
-                          {new Date(setting.start_date).toLocaleDateString()} - {new Date(setting.end_date).toLocaleDateString()}
+                          {(() => {
+                            const [y1, m1, d1] = setting.start_date.split('T')[0].split('-');
+                            const [y2, m2, d2] = setting.end_date.split('T')[0].split('-');
+                            return `${m1}/${d1}/${y1} - ${m2}/${d2}/${y2}`;
+                          })()}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">

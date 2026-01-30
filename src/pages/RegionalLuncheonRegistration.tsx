@@ -247,7 +247,16 @@ const RegionalLuncheonRegistration: React.FC = () => {
               <div>
                 <h3 className="text-lg font-semibold text-yellow-800 mb-2">Registration Deadline</h3>
                 <p className="text-yellow-700">
-                  Please register by <strong>March 20, 2026</strong> so we can plan for food and seating.
+                  Please register by <strong>{settings?.registration_deadline ? (() => {
+                    const dateStr = settings.registration_deadline.split('T')[0];
+                    const [year, month, day] = dateStr.split('-');
+                    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                    return date.toLocaleDateString('en-US', { 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric'
+                    });
+                  })() : ''}</strong> so we can plan for food and seating.
                 </p>
               </div>
             </div>
