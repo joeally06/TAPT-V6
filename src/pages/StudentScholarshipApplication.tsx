@@ -104,7 +104,8 @@ const StudentScholarshipApplication: React.FC = () => {
 
       // Check if application deadline has passed
       if (data.application_deadline) {
-        const [year, month, day] = data.application_deadline.split('T')[0].split('-').map(Number);
+        const deadlineStr = data.application_deadline.includes('T') ? data.application_deadline.split('T')[0] : data.application_deadline;
+        const [year, month, day] = deadlineStr.split('-').map(Number);
         const deadlineDate = new Date(year, month - 1, day);
         const now = new Date();
         now.setHours(0, 0, 0, 0);
@@ -288,7 +289,8 @@ const StudentScholarshipApplication: React.FC = () => {
           <div className="max-w-3xl">
             <h1 className="text-4xl md:text-5xl font-bold mb-6 fade-in">{scholarshipSettings?.name || 'TAPT Scholarship Application'}</h1>
             <p className="text-xl text-gray-200 mb-8 fade-in">Application Deadline: {scholarshipSettings?.application_deadline ? (() => {
-              const [y, m, d] = scholarshipSettings.application_deadline.split('T')[0].split('-').map(Number);
+              const deadlineStr = scholarshipSettings.application_deadline.includes('T') ? scholarshipSettings.application_deadline.split('T')[0] : scholarshipSettings.application_deadline;
+              const [y, m, d] = deadlineStr.split('-').map(Number);
               const date = new Date(y, m - 1, d);
               return date.toLocaleDateString();
             })() : 'May 15, 2025'}</p>
@@ -308,7 +310,8 @@ const StudentScholarshipApplication: React.FC = () => {
                   <h3 className="text-lg font-bold text-yellow-900 mb-1">Application Deadline</h3>
                   <p className="text-2xl font-bold text-yellow-700">
                     {scholarshipSettings?.application_deadline ? (() => {
-                      const [y, m, d] = scholarshipSettings.application_deadline.split('T')[0].split('-').map(Number);
+                      const deadlineStr = scholarshipSettings.application_deadline.includes('T') ? scholarshipSettings.application_deadline.split('T')[0] : scholarshipSettings.application_deadline;
+                      const [y, m, d] = deadlineStr.split('-').map(Number);
                       const date = new Date(y, m - 1, d);
                       return date.toLocaleDateString('en-US', { 
                         weekday: 'long',
@@ -359,7 +362,8 @@ const StudentScholarshipApplication: React.FC = () => {
                       <p className="mt-1 text-sm text-yellow-700">
                         Applications must be submitted by {(() => {
                           if (!scholarshipSettings?.application_deadline) return '';
-                          const [y, m, d] = scholarshipSettings.application_deadline.split('T')[0].split('-').map(Number);
+                          const deadlineStr = scholarshipSettings.application_deadline.includes('T') ? scholarshipSettings.application_deadline.split('T')[0] : scholarshipSettings.application_deadline;
+                          const [y, m, d] = deadlineStr.split('-').map(Number);
                           const date = new Date(y, m - 1, d);
                           return date.toLocaleDateString();
                         })()}

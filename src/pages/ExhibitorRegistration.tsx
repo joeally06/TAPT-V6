@@ -324,8 +324,10 @@ const ExhibitorRegistration: React.FC = () => {
                           <span className="font-medium">Event Dates:</span>
                           <p>{(() => {
                             if (!exhibitorSettings?.start_date || !exhibitorSettings?.end_date) return '';
-                            const [y1, m1, d1] = exhibitorSettings.start_date.split('T')[0].split('-');
-                            const [y2, m2, d2] = exhibitorSettings.end_date.split('T')[0].split('-');
+                            const startStr = exhibitorSettings.start_date.includes('T') ? exhibitorSettings.start_date.split('T')[0] : exhibitorSettings.start_date;
+                            const endStr = exhibitorSettings.end_date.includes('T') ? exhibitorSettings.end_date.split('T')[0] : exhibitorSettings.end_date;
+                            const [y1, m1, d1] = startStr.split('-');
+                            const [y2, m2, d2] = endStr.split('-');
                             const start = new Date(parseInt(y1), parseInt(m1) - 1, parseInt(d1));
                             const end = new Date(parseInt(y2), parseInt(m2) - 1, parseInt(d2));
                             return `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`;
@@ -343,7 +345,8 @@ const ExhibitorRegistration: React.FC = () => {
                           <p className="text-xl font-bold text-yellow-700">
                             {(() => {
                               if (!exhibitorSettings?.registration_end_date) return '';
-                              const [y, m, d] = exhibitorSettings.registration_end_date.split('T')[0].split('-');
+                              const deadlineStr = exhibitorSettings.registration_end_date.includes('T') ? exhibitorSettings.registration_end_date.split('T')[0] : exhibitorSettings.registration_end_date;
+                              const [y, m, d] = deadlineStr.split('-');
                               const date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
                               return date.toLocaleDateString('en-US', { 
                                 weekday: 'long',

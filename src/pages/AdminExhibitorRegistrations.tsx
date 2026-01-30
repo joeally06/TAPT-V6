@@ -558,6 +558,55 @@ const AdminExhibitorRegistrations: React.FC = () => {
                 </div>
               </div>
               
+              {/* Payment Information */}
+              <div className="mb-6">
+                <h4 className="font-medium text-gray-700 mb-2">Payment Information</h4>
+                <div className="bg-gray-50 p-4 rounded-md">
+                  <dl className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Payment Method</dt>
+                      <dd className="mt-1 text-sm text-gray-900">{selectedRegistration.payment_method?.toUpperCase() || 'N/A'}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Payment Status</dt>
+                      <dd className="mt-1">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          selectedRegistration.payment_status === 'completed' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {selectedRegistration.payment_status || 'pending'}
+                        </span>
+                      </dd>
+                    </div>
+                    {selectedRegistration.po_number && (
+                      <div>
+                        <dt className="text-sm font-medium text-gray-500">PO Number</dt>
+                        <dd className="mt-1 text-sm text-gray-900">{selectedRegistration.po_number}</dd>
+                      </div>
+                    )}
+                    {selectedRegistration.paypal_transaction_id && (
+                      <div>
+                        <dt className="text-sm font-medium text-gray-500">PayPal Transaction ID</dt>
+                        <dd className="mt-1 text-sm text-gray-900">{selectedRegistration.paypal_transaction_id}</dd>
+                      </div>
+                    )}
+                    {selectedRegistration.paypal_payer_email && (
+                      <div>
+                        <dt className="text-sm font-medium text-gray-500">PayPal Payer Email</dt>
+                        <dd className="mt-1 text-sm text-gray-900">{selectedRegistration.paypal_payer_email}</dd>
+                      </div>
+                    )}
+                    {selectedRegistration.payment_completed_at && (
+                      <div>
+                        <dt className="text-sm font-medium text-gray-500">Payment Completed At</dt>
+                        <dd className="mt-1 text-sm text-gray-900">{new Date(selectedRegistration.payment_completed_at).toLocaleString()}</dd>
+                      </div>
+                    )}
+                  </dl>
+                </div>
+              </div>
+
               <div className="mb-6">
                 <h4 className="font-medium text-gray-700 mb-2">Registration Information</h4>
                 <div className="bg-gray-50 p-4 rounded-md">

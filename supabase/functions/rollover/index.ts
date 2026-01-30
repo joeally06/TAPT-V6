@@ -157,23 +157,37 @@ Deno.serve(async (req) => {
     const requestBody = await req.json();
     const { type, settings }: RolloverRequest = requestBody;
 
+    console.log('Rollover request:', { type });
+
     if (!type || !settings) {
+      console.error('Missing type or settings');
       return new Response(
-        JSON.stringify({ success: false, error: 'Missing required fields' }),
+        JSON.stringify({ success: false, error: 'Missing required fields: type and settings are required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Validate settings
-    if (!settings.id || !settings.start_date || !settings.end_date) {
+    // Validate settings based on type
+    const requiredFields = ['id', 'start_date', 'end_date'];
+    if (type === 'tech-conference' || type === 'conference') {
+      requiredFields.push('registration_end_date');
+    }
+
+    const missingFields = requiredFields.filter(field => !settings[field]);
+    if (missingFields.length > 0) {
+      console.error('Missing required settings fields:', missingFields);
       return new Response(
-        JSON.stringify({ success: false, error: 'Missing required settings fields' }),
+        JSON.stringify({ 
+          success: false, 
+          error: `Missing required settings fields: ${missingFields.join(', ')}` 
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     // Extract year from settings
     const settingsYear = new Date(settings.start_date).getFullYear();
+    console.log('Processing rollover for year:', settingsYear);
     
     // Check for existing archive based on type
     let existingArchiveQuery;
@@ -594,9 +608,8 @@ Deno.serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Rollover error:', error);
     
-    // Create a sanitized error message
     const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
     
     try {

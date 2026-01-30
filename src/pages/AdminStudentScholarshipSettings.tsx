@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, MapPin, Save, AlertCircle, ArrowLeft, Trash2, Archive, ToggleLeft, ToggleRight, FileText } from 'lucide-react';
 import ConfirmationModal from '../components/ConfirmationModal';
+import AdminLayout from '../components/AdminLayout';
 import { useAuth } from '../context/AuthContext';
 
 interface ScholarshipSettings {

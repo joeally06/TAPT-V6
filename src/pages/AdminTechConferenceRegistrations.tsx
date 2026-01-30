@@ -41,10 +41,13 @@ const AdminTechConferenceRegistrations: React.FC = () => {
   const [registrations, setRegistrations] = useState<TechConferenceRegistration[]>([]);
   const [loading, setLoading] = useState(true);
   const [clearing, setClearing] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [selectedRegistration, setSelectedRegistration] = useState<TechConferenceRegistration | null>(null);
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
@@ -86,6 +89,37 @@ const AdminTechConferenceRegistrations: React.FC = () => {
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
+  };
+
+  const handleDeleteRegistration = async (registrationId: string) => {
+    if (!confirm('Are you sure you want to delete this registration? This action cannot be undone.')) {
+      return;
+    }
+
+    setDeleting(registrationId);
+    setError(null);
+    try {
+      const { error: deleteError } = await supabase
+        .from('tech_conference_registrations')
+        .delete()
+        .eq('id', registrationId);
+
+      if (deleteError) throw deleteError;
+
+      setSuccess('Registration deleted successfully!');
+      fetchRegistrations();
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (error: any) {
+      setError(`Failed to delete registration: ${error.message}`);
+      setTimeout(() => setError(null), 5000);
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const handleViewRegistration = (registration: TechConferenceRegistration) => {
+    setSelectedRegistration(registration);
+    setShowViewModal(true);
   };
 
   const handleClearTable = async () => {
@@ -297,6 +331,9 @@ const AdminTechConferenceRegistrations: React.FC = () => {
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Total Amount
                     </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Payment Status
+                    </th>
                     <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
                     </th>
@@ -325,19 +362,40 @@ const AdminTechConferenceRegistrations: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         ${registration.total_amount.toFixed(2)}
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          registration.payment_status === 'completed' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {registration.payment_status || 'pending'}
+                        </span>
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button
-                          onClick={() => {/* View details */}}
-                          className="text-primary hover:text-primary/80 mr-3"
-                        >
-                          <Eye className="h-5 w-5" />
-                        </button>
-                        <button
-                          onClick={() => {/* Delete registration */}}
-                          className="text-red-600 hover:text-red-800"
-                        >
-                          <Trash2 className="h-5 w-5" />
-                        </button>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => handleViewRegistration(registration)}
+                            className="text-primary hover:text-primary/80"
+                            title="View details"
+                          >
+                            <Eye className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteRegistration(registration.id)}
+                            disabled={deleting === registration.id}
+                            className="text-red-600 hover:text-red-800 disabled:opacity-50"
+                            title="Delete registration"
+                          >
+                            {deleting === registration.id ? (
+                              <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                            ) : (
+                              <Trash2 className="h-5 w-5" />
+                            )}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -376,6 +434,147 @@ const AdminTechConferenceRegistrations: React.FC = () => {
           onClose={() => setShowArchiveModal(false)}
           type="tech-conference"
         />
+
+        {/* View Registration Modal */}
+        {showViewModal && selectedRegistration && (
+          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <h3 className="text-lg font-medium text-gray-900">Tech Conference Registration Details</h3>
+                <button
+                  onClick={() => setShowViewModal(false)}
+                  className="text-gray-400 hover:text-gray-500"
+                >
+                  <span className="sr-only">Close</span>
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="px-6 py-4 space-y-6">
+                {/* Registration Info */}
+                <div>
+                  <h4 className="text-sm font-medium text-gray-500 uppercase mb-3">Registration Information</h4>
+                  <dl className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Registration Date</dt>
+                      <dd className="mt-1 text-sm text-gray-900">{new Date(selectedRegistration.created_at).toLocaleString()}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">School District</dt>
+                      <dd className="mt-1 text-sm text-gray-900">{selectedRegistration.school_district}</dd>
+                    </div>
+                  </dl>
+                </div>
+
+                {/* Primary Contact */}
+                <div>
+                  <h4 className="text-sm font-medium text-gray-500 uppercase mb-3">Primary Contact</h4>
+                  <dl className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Name</dt>
+                      <dd className="mt-1 text-sm text-gray-900">{selectedRegistration.first_name} {selectedRegistration.last_name}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Email</dt>
+                      <dd className="mt-1 text-sm text-gray-900">{selectedRegistration.email}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Phone</dt>
+                      <dd className="mt-1 text-sm text-gray-900">{selectedRegistration.phone}</dd>
+                    </div>
+                  </dl>
+                </div>
+
+                {/* Payment Information */}
+                <div>
+                  <h4 className="text-sm font-medium text-gray-500 uppercase mb-3">Payment Information</h4>
+                  <dl className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Total Attendees</dt>
+                      <dd className="mt-1 text-sm text-gray-900">{selectedRegistration.total_attendees}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Total Amount</dt>
+                      <dd className="mt-1 text-sm text-gray-900">${selectedRegistration.total_amount?.toFixed(2) || '0.00'}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Payment Method</dt>
+                      <dd className="mt-1 text-sm text-gray-900">{selectedRegistration.payment_method?.toUpperCase() || 'N/A'}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Payment Status</dt>
+                      <dd className="mt-1">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          selectedRegistration.payment_status === 'completed' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {selectedRegistration.payment_status || 'pending'}
+                        </span>
+                      </dd>
+                    </div>
+                    {selectedRegistration.po_number && (
+                      <div>
+                        <dt className="text-sm font-medium text-gray-500">PO Number</dt>
+                        <dd className="mt-1 text-sm text-gray-900">{selectedRegistration.po_number}</dd>
+                      </div>
+                    )}
+                    {selectedRegistration.paypal_transaction_id && (
+                      <div>
+                        <dt className="text-sm font-medium text-gray-500">PayPal Transaction ID</dt>
+                        <dd className="mt-1 text-sm text-gray-900">{selectedRegistration.paypal_transaction_id}</dd>
+                      </div>
+                    )}
+                    {selectedRegistration.paypal_payer_email && (
+                      <div>
+                        <dt className="text-sm font-medium text-gray-500">PayPal Payer Email</dt>
+                        <dd className="mt-1 text-sm text-gray-900">{selectedRegistration.paypal_payer_email}</dd>
+                      </div>
+                    )}
+                    {selectedRegistration.payment_completed_at && (
+                      <div>
+                        <dt className="text-sm font-medium text-gray-500">Payment Completed At</dt>
+                        <dd className="mt-1 text-sm text-gray-900">{new Date(selectedRegistration.payment_completed_at).toLocaleString()}</dd>
+                      </div>
+                    )}
+                  </dl>
+                </div>
+
+                {/* Additional Attendees */}
+                {selectedRegistration.attendees && selectedRegistration.attendees.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-500 uppercase mb-3">Additional Attendees</h4>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <ul className="space-y-2">
+                        {selectedRegistration.attendees.map((attendee: TechConferenceAttendee, index: number) => (
+                          <li key={attendee.id} className="flex justify-between items-center">
+                            <div>
+                              <span className="text-sm font-medium text-gray-900">
+                                {index + 1}. {attendee.first_name} {attendee.last_name}
+                              </span>
+                              <span className="ml-2 text-sm text-gray-500">({attendee.email})</span>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+                <button
+                  onClick={() => setShowViewModal(false)}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AdminLayout>
   );

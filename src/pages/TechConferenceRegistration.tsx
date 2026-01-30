@@ -378,8 +378,10 @@ const TechConferenceRegistration: React.FC = () => {
                           <span className="font-medium">Conference Dates:</span>
                           <p>{(() => {
                             if (!conferenceSettings?.start_date || !conferenceSettings?.end_date) return '';
-                            const [y1, m1, d1] = conferenceSettings.start_date.split('T')[0].split('-');
-                            const [y2, m2, d2] = conferenceSettings.end_date.split('T')[0].split('-');
+                            const startStr = conferenceSettings.start_date.includes('T') ? conferenceSettings.start_date.split('T')[0] : conferenceSettings.start_date;
+                            const endStr = conferenceSettings.end_date.includes('T') ? conferenceSettings.end_date.split('T')[0] : conferenceSettings.end_date;
+                            const [y1, m1, d1] = startStr.split('-');
+                            const [y2, m2, d2] = endStr.split('-');
                             const start = new Date(parseInt(y1), parseInt(m1) - 1, parseInt(d1));
                             const end = new Date(parseInt(y2), parseInt(m2) - 1, parseInt(d2));
                             return `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`;
@@ -407,7 +409,8 @@ const TechConferenceRegistration: React.FC = () => {
                           <p className="text-xl font-bold text-yellow-700">
                             {(() => {
                               if (!conferenceSettings?.registration_end_date) return '';
-                              const [y, m, d] = conferenceSettings.registration_end_date.split('T')[0].split('-');
+                              const deadlineStr = conferenceSettings.registration_end_date.includes('T') ? conferenceSettings.registration_end_date.split('T')[0] : conferenceSettings.registration_end_date;
+                              const [y, m, d] = deadlineStr.split('-');
                               const date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
                               return date.toLocaleDateString('en-US', { 
                                 weekday: 'long',
@@ -477,7 +480,8 @@ const TechConferenceRegistration: React.FC = () => {
                           isRegistrationClosed ? 'text-red-700' : 'text-yellow-700'
                         }`}>
                           {(() => {
-                            const [y, m, d] = conferenceSettings.registration_end_date.split('T')[0].split('-');
+                            const deadlineStr = conferenceSettings.registration_end_date.includes('T') ? conferenceSettings.registration_end_date.split('T')[0] : conferenceSettings.registration_end_date;
+                            const [y, m, d] = deadlineStr.split('-');
                             const date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
                             const dateStr = date.toLocaleDateString();
                             return isRegistrationClosed
@@ -849,14 +853,14 @@ const TechConferenceRegistration: React.FC = () => {
               <div className="mb-8">
                 <h2 className="text-xl font-semibold text-secondary mb-6">Payment Method</h2>
                 <PaymentMethodSelector
-                  paymentMethod={paymentMethod}
-                  onPaymentMethodChange={setPaymentMethod}
+                  selectedMethod={paymentMethod}
+                  onMethodChange={setPaymentMethod}
                   poNumber={poNumber}
                   onPoNumberChange={setPoNumber}
-                  totalAmount={totalAmount}
+                  amount={totalAmount}
                 />
                 
-                {paymentMethod === 'paypal' && (
+                {paymentMethod === 'paypal' && !paypalDetails && (
                   <div className="mt-6">
                     <PayPalButton
                       amount={totalAmount}
@@ -867,7 +871,34 @@ const TechConferenceRegistration: React.FC = () => {
                     />
                   </div>
                 )}
+
+                {paymentMethod === 'paypal' && paypalDetails && (
+                  <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-md">
+                    <div className="flex items-start">
+                      <svg className="h-5 w-5 text-green-400 mt-0.5 mr-3" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      <div>
+                        <p className="text-sm font-medium text-green-800">Payment Completed!</p>
+                        <p className="text-sm text-green-700 mt-1">Transaction ID: {paypalDetails.id}</p>
+                        <p className="text-sm text-green-700">Click "Submit" below to complete your registration.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
+
+              {/* Hidden input to enable submit button when payment is ready */}
+              <input 
+                type="hidden" 
+                name="paymentReady" 
+                value={
+                  paymentMethod && 
+                  ((paymentMethod === 'po' && poNumber.trim() !== '') || 
+                   (paymentMethod === 'paypal' && paypalDetails !== null)) ? 'true' : ''
+                }
+                required={!paymentMethod || (paymentMethod === 'po' && !poNumber.trim()) || (paymentMethod === 'paypal' && !paypalDetails)}
+              />
 
             </SecureForm>
           </div>

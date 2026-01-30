@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { User, Mail, Phone, Building, Clock, Award } from 'lucide-react';
+import { User, Mail, Phone, Building, Clock, Award, Calendar } from 'lucide-react';
 import { SecureForm } from '../components/forms/SecureForm';
 
 interface HallOfFameSettings {
@@ -70,10 +70,13 @@ export const HallOfFameNomination: React.FC = () => {
       const now = new Date();
       now.setHours(0, 0, 0, 0);
       
-      const [y1, m1, d1] = data.start_date.split('T')[0].split('-').map(Number);
+      // Parse dates - handle both 'YYYY-MM-DD' and 'YYYY-MM-DDTHH:MM:SS' formats
+      const startDateStr = data.start_date.includes('T') ? data.start_date.split('T')[0] : data.start_date;
+      const [y1, m1, d1] = startDateStr.split('-').map(Number);
       const startDate = new Date(y1, m1 - 1, d1);
       
-      const [y2, m2, d2] = data.end_date.split('T')[0].split('-').map(Number);
+      const endDateStr = data.end_date.includes('T') ? data.end_date.split('T')[0] : data.end_date;
+      const [y2, m2, d2] = endDateStr.split('-').map(Number);
       const endDate = new Date(y2, m2 - 1, d2);
       
       if (now < startDate) {
@@ -97,8 +100,10 @@ export const HallOfFameNomination: React.FC = () => {
   // Format nomination period dates
   const getNominationPeriodDisplay = () => {
     if (!settings?.start_date || !settings?.end_date) return '';
-    const [y1, m1, d1] = settings.start_date.split('T')[0].split('-').map(Number);
-    const [y2, m2, d2] = settings.end_date.split('T')[0].split('-').map(Number);
+    const startDateStr = settings.start_date.includes('T') ? settings.start_date.split('T')[0] : settings.start_date;
+    const [y1, m1, d1] = startDateStr.split('-').map(Number);
+    const endDateStr = settings.end_date.includes('T') ? settings.end_date.split('T')[0] : settings.end_date;
+    const [y2, m2, d2] = endDateStr.split('-').map(Number);
     const start = new Date(y1, m1 - 1, d1);
     const end = new Date(y2, m2 - 1, d2);
     return `${start.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
