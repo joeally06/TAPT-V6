@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { supabase, testSupabaseConnection } from '../lib/supabase';
-import { useNavigate } from 'react-router-dom';
-import { Lock, Mail } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Lock, Mail, Home } from 'lucide-react';
 
 export const AdminLogin: React.FC = () => {
   const navigate = useNavigate();
@@ -98,6 +98,15 @@ export const AdminLogin: React.FC = () => {
           <h2 className="mt-6 text-center text-3xl font-bold text-secondary">
             Admin Login
           </h2>
+          <div className="mt-4 text-center">
+            <Link
+              to="/"
+              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+            >
+              <Home className="h-4 w-4 mr-2" />
+              Back to Homepage
+            </Link>
+          </div>
         </div>
 
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">

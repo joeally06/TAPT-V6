@@ -14,10 +14,8 @@ export const Navbar = () => {
   const isAdmin = user?.role === 'admin';
   const location = useLocation();
 
-  // Don't render navbar on admin pages (AdminLayout handles its own navigation)
-  if (location.pathname.startsWith('/admin')) {
-    return null;
-  }
+  // Check if we're on admin pages
+  const isAdminPage = location.pathname.startsWith('/admin');
 
   // Toggle mobile menu
   const toggleMenu = () => setIsOpen(!isOpen);
@@ -59,6 +57,12 @@ export const Navbar = () => {
 
     fetchSettings();
   }, []);
+
+  // Don't render navbar on admin pages (AdminLayout handles its own navigation)
+  // This check must come AFTER all hooks to follow React's rules of hooks
+  if (isAdminPage) {
+    return null;
+  }
 
   const navItems = [
     { name: 'Home', path: '/' },
