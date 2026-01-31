@@ -133,9 +133,13 @@ export const Navbar = () => {
       <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6">
         <div className="flex justify-between items-center">
           <div className="flex items-center flex-shrink-0 min-w-0">
-            <Link to="/" className="flex items-center">
-              <span className="text-primary font-bold text-xl sm:text-2xl whitespace-nowrap">{siteTitle}</span>
-              {/* Tagline hidden to maximize menu space */}
+            <Link to="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+              <img 
+                src="/tapt-logo.png" 
+                alt="TAPT Logo" 
+                className="h-12 w-12 object-contain"
+              />
+              <span className="text-tapt-navy font-heading font-bold text-lg sm:text-xl leading-tight">{siteTitle}</span>
             </Link>
           </div>
 
@@ -147,8 +151,8 @@ export const Navbar = () => {
                     <button
                       className={`px-3 py-2 rounded-md text-sm font-medium transition-colors inline-flex items-center ${
                         isActive(item.path)
-                          ? 'text-primary border-b-2 border-primary'
-                          : 'text-gray-700 hover:text-primary'
+                          ? 'text-tapt-blue border-b-2 border-tapt-blue'
+                          : 'text-tapt-navy hover:text-tapt-blue'
                       }`}
                     >
                       {item.name}
@@ -173,8 +177,8 @@ export const Navbar = () => {
                     to={item.path}
                     className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                       isActive(item.path)
-                        ? 'text-primary border-b-2 border-primary'
-                        : 'text-gray-700 hover:text-primary'
+                        ? 'text-tapt-blue border-b-2 border-tapt-blue'
+                        : 'text-tapt-navy hover:text-tapt-blue'
                     }`}
                   >
                     {item.name}
@@ -189,8 +193,8 @@ export const Navbar = () => {
                 <button
                   className={`px-3 py-2 rounded-md text-sm font-medium transition-colors inline-flex items-center ${
                     location.pathname.startsWith('/admin')
-                      ? 'text-primary border-b-2 border-primary'
-                      : 'text-gray-700 hover:text-primary'
+                      ? 'text-tapt-blue border-b-2 border-tapt-blue'
+                      : 'text-tapt-navy hover:text-tapt-blue'
                   }`}
                 >
                   Admin
@@ -216,7 +220,7 @@ export const Navbar = () => {
           <div className="md:hidden">
             <button
               onClick={toggleMenu}
-              className="inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:text-primary focus:outline-none"
+              className="inline-flex items-center justify-center p-2 rounded-md text-tapt-navy hover:text-tapt-blue focus:outline-none"
             >
               {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>
@@ -235,7 +239,7 @@ export const Navbar = () => {
             <div key={item.name}>
               {item.subItems ? (
                 <div>
-                  <div className="px-3 py-2 text-base font-medium text-gray-700">
+                  <div className="px-3 py-2 text-base font-medium text-tapt-navy">
                     {item.name}
                   </div>
                   <div className="pl-6">
@@ -245,8 +249,8 @@ export const Navbar = () => {
                         to={subItem.path}
                         className={`block px-3 py-2 rounded-md text-sm font-medium ${
                           isActive(subItem.path)
-                            ? 'bg-primary/10 text-primary'
-                            : 'text-gray-600 hover:bg-gray-100 hover:text-primary'
+                            ? 'bg-tapt-blue/10 text-tapt-blue'
+                            : 'text-gray-600 hover:bg-gray-100 hover:text-tapt-blue'
                         }`}
                       >
                         {subItem.name}
@@ -259,8 +263,8 @@ export const Navbar = () => {
                   to={item.path}
                   className={`block px-3 py-2 rounded-md text-base font-medium ${
                     isActive(item.path)
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-gray-700 hover:bg-gray-100 hover:text-primary'
+                      ? 'bg-tapt-blue/10 text-tapt-blue'
+                      : 'text-tapt-navy hover:bg-gray-100 hover:text-tapt-blue'
                   }`}
                 >
                   {item.name}
@@ -272,7 +276,7 @@ export const Navbar = () => {
           {/* Mobile Admin Menu */}
           {isAdmin && (
             <>
-              <div className="px-3 py-2 text-base font-medium text-gray-700">
+              <div className="px-3 py-2 text-base font-medium text-tapt-navy">
                 Admin
               </div>
               <div className="pl-6">
@@ -282,8 +286,8 @@ export const Navbar = () => {
                     to={item.path}
                     className={`block px-3 py-2 rounded-md text-sm font-medium ${
                       isActive(item.path)
-                        ? 'bg-primary/10 text-primary'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-primary'
+                        ? 'bg-tapt-blue/10 text-tapt-blue'
+                        : 'text-gray-600 hover:bg-gray-100 hover:text-tapt-blue'
                     }`}
                   >
                     {item.name}

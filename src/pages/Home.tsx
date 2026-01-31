@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, CheckCircle, Users, Calendar, BookOpen, AlertCircle, FileText, Download, Image as ImageIcon } from 'lucide-react';
+import { ArrowRight, CheckCircle, Users, Calendar, BookOpen, AlertCircle, FileText, Download, Image as ImageIcon, Award } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { NewsItem } from '../lib/types/news';
 import { getSiteSetting } from '../lib/siteSettings';
@@ -9,7 +9,7 @@ import DOMPurify from 'dompurify';
 export const Home: React.FC = () => {
   const [featuredEvents, setFeaturedEvents] = useState<NewsItem[]>([]);
   const [announcements, setAnnouncements] = useState<NewsItem[]>([]);
-  const [heroImageUrl, setHeroImageUrl] = useState<string>('https://images.pexels.com/photos/5905700/pexels-photo-5905700.jpeg');
+  const [heroImageUrl, setHeroImageUrl] = useState<string>('');
   const [siteTagline, setSiteTagline] = useState<string>('Promoting safe and efficient student transportation across Tennessee');
   const [loading, setLoading] = useState(true);
 
@@ -102,32 +102,30 @@ export const Home: React.FC = () => {
 
   return (
     <div className="pt-16 overflow-x-hidden">
-      {/* Hero Section - Fixed Mobile Layout */}
-      <section className="relative bg-gradient-to-r from-secondary to-primary text-white min-h-[60vh] sm:min-h-[70vh]">
-        <div 
-          className="absolute inset-0 bg-cover bg-center mix-blend-overlay opacity-20" 
-          style={{ backgroundImage: `url('${heroImageUrl}')` }}
-        ></div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 md:py-20 lg:py-28 relative z-10">
-          <div className="max-w-full sm:max-w-2xl lg:max-w-3xl">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight mb-4 sm:mb-6 slide-in-left break-words">
-              Student Safety is Our Priority
+      {/* Hero Section */}
+      <section className="relative h-[600px] flex items-center overflow-hidden">
+        <div className="absolute inset-0">
+          <img 
+            src={heroImageUrl} 
+            alt="Hero" 
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/90 via-primary/50 to-transparent"></div>
+        </div>
+        <div className="relative z-10 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
+          <div className="max-w-2xl">
+            <h1 className="text-white text-4xl sm:text-5xl md:text-6xl font-bold mb-4 [text-shadow:_2px_2px_4px_rgb(0_0_0_/_80%)]">
+              Tennessee Association of Pupil Transportation
             </h1>
-            <p className="text-base sm:text-lg md:text-xl text-gray-100 mb-6 sm:mb-8 slide-in-left break-words" style={{ animationDelay: '0.1s' }}>
-              Education is Our Destination! {siteTagline}
+            <p className="text-white text-xl sm:text-2xl mb-8 [text-shadow:_1px_1px_3px_rgb(0_0_0_/_70%)]">
+              {siteTagline}
             </p>
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 slide-in-left" style={{ animationDelay: '0.2s' }}>
-              <Link 
-                to="/about" 
-                className="bg-white text-primary hover:bg-gray-100 px-4 sm:px-6 py-2 sm:py-3 rounded-md font-medium inline-flex items-center justify-center transition-all text-sm sm:text-base"
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Link
+                to="/about"
+                className="inline-flex items-center justify-center px-6 py-3 border-2 border-white text-base font-medium rounded-md text-white hover:bg-white hover:text-primary transition-colors"
               >
-                Learn More <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-              <Link 
-                to="/members" 
-                className="bg-transparent text-white border border-white hover:bg-white/10 px-4 sm:px-6 py-2 sm:py-3 rounded-md font-medium transition-all text-sm sm:text-base text-center"
-              >
-                Become a Member
+                Learn More
               </Link>
             </div>
           </div>
@@ -157,74 +155,121 @@ export const Home: React.FC = () => {
         </div>
       </div>
 
-      {/* Featured Events - Fixed Mobile Layout */}
+      {/* Featured Events - Horizontal Scroll */}
       {featuredEvents.length > 0 && (
         <section className="py-8 sm:py-12 bg-gradient-to-b from-gray-100 to-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-6 sm:mb-8">
-              <h2 className="text-2xl sm:text-3xl font-bold text-secondary mb-2">Featured Events</h2>
-              <div className="w-16 sm:w-20 h-1 bg-primary mx-auto"></div>
+            <div className="flex items-center justify-between mb-6 sm:mb-8">
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-bold text-tapt-navy mb-2">Featured Events</h2>
+                <div className="w-16 sm:w-20 h-1 bg-tapt-blue"></div>
+              </div>
+              <Link 
+                to="/events" 
+                className="hidden sm:inline-flex items-center text-tapt-blue hover:text-tapt-navy font-semibold"
+              >
+                View All <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
             </div>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-              {featuredEvents.map((event) => (
-                <div key={event.id} className="bg-white rounded-lg shadow-lg overflow-hidden">
-                  {event.image_url && (
-                    <img
-                      className="w-full h-36 sm:h-48 object-cover"
-                      src={event.image_url}
-                      alt={event.title}
-                    />
-                  )}
-                  <div className="p-4 sm:p-6">
-                    <div className="flex items-center justify-between mb-3 sm:mb-4 flex-wrap gap-2">
-                      <span className="px-2 sm:px-3 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
-                        Featured Event
-                      </span>
-                      <span className="text-xs sm:text-sm text-gray-500">
-                        {new Date(event.date).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <h3 className="text-lg sm:text-xl font-bold text-secondary mb-2 break-words">{event.title}</h3>
-                    <p className="text-gray-600 mb-3 sm:mb-4 text-sm sm:text-base break-words">{event.description}</p>
-                    {isExternalLink(event) ? (
-                      <a
-                        href={event.link!}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center text-primary hover:text-primary/80 font-medium text-sm sm:text-base"
-                      >
-                        Learn More
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </a>
+            {/* Mobile: Horizontal Scroll, Desktop: Grid */}
+            <div className="overflow-x-auto pb-4 -mx-4 px-4 sm:overflow-visible sm:pb-0 sm:mx-0 sm:px-0">
+              <div className="flex gap-6 sm:grid sm:grid-cols-2 lg:grid-cols-3">
+                {featuredEvents.map((event) => (
+                  <div 
+                    key={event.id} 
+                    className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all flex-shrink-0 w-80 sm:w-auto group"
+                  >
+                    {event.image_url ? (
+                      <div className="relative h-48 overflow-hidden">
+                        <img
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          src={event.image_url}
+                          alt={event.title}
+                        />
+                        <div className="absolute top-4 left-4">
+                          <span className="px-3 py-1 text-xs font-bold rounded-full bg-tapt-gold text-white shadow-lg">
+                            Featured
+                          </span>
+                        </div>
+                      </div>
                     ) : (
-                      <Link
-                        to={getEventLink(event)}
-                        className="inline-flex items-center text-primary hover:text-primary/80 font-medium text-sm sm:text-base"
-                      >
-                        {event.linked_form_type ? 'Register Now' : 'Learn More'}
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </Link>
+                      <div className="h-48 bg-gradient-to-br from-tapt-blue/10 to-tapt-navy/10 flex items-center justify-center">
+                        <Calendar className="h-16 w-16 text-tapt-blue/30" />
+                      </div>
                     )}
+                    
+                    <div className="p-6">
+                      <div className="flex items-center gap-2 mb-3 text-sm text-tapt-blue">
+                        <Calendar className="h-4 w-4" />
+                        <time dateTime={event.date}>
+                          {new Date(event.date).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
+                        </time>
+                      </div>
+                      
+                      <h3 className="text-xl font-bold text-tapt-navy mb-2 line-clamp-2 group-hover:text-tapt-blue transition-colors">
+                        {event.title}
+                      </h3>
+                      
+                      <p className="text-gray-600 mb-4 text-sm line-clamp-3">
+                        {event.description}
+                      </p>
+                      
+                      {isExternalLink(event) ? (
+                        <a
+                          href={event.link!}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center text-tapt-blue hover:text-tapt-navy font-semibold text-sm group/link"
+                        >
+                          Learn More
+                          <ArrowRight className="ml-2 h-4 w-4 group-hover/link:translate-x-1 transition-transform" />
+                        </a>
+                      ) : (
+                        <Link
+                          to={getEventLink(event)}
+                          className="inline-flex items-center text-tapt-blue hover:text-tapt-navy font-semibold text-sm group/link"
+                        >
+                          {event.linked_form_type ? 'Register Now' : 'Learn More'}
+                          <ArrowRight className="ml-2 h-4 w-4 group-hover/link:translate-x-1 transition-transform" />
+                        </Link>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            </div>
+            
+            {/* Mobile: View All Link */}
+            <div className="mt-6 text-center sm:hidden">
+              <Link 
+                to="/events" 
+                className="inline-flex items-center text-tapt-blue hover:text-tapt-navy font-semibold"
+              >
+                View All Events <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
             </div>
           </div>
         </section>
       )}
 
-      {/* Announcements Section - Fixed Mobile Layout */}
+      {/* Announcements Section - Enhanced Design */}
       {announcements.length > 0 && (
         <section className="py-8 sm:py-12 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-6 sm:mb-8">
-              <h2 className="text-2xl sm:text-3xl font-bold text-secondary mb-2">Latest Announcements</h2>
-              <div className="w-16 sm:w-20 h-1 bg-primary mx-auto"></div>
+            <div className="flex items-center justify-between mb-6 sm:mb-8">
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-bold text-tapt-navy mb-2">Latest Announcements</h2>
+                <div className="w-16 sm:w-20 h-1 bg-tapt-blue"></div>
+              </div>
             </div>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-              {announcements.map((announcement) => {
+            <div className="space-y-4 sm:space-y-6">
+              {announcements.map((announcement, index) => {
                 // Sanitize content to prevent XSS attacks
                 const sanitizedTitle = DOMPurify.sanitize(announcement.title, { 
                   ALLOWED_TAGS: [],
@@ -265,38 +310,113 @@ export const Home: React.FC = () => {
                   return 'View Attachment';
                 };
                 
-                return (
-                  <div key={announcement.id} className="bg-gradient-to-br from-blue-50 to-white rounded-lg shadow-md overflow-hidden border border-blue-100 hover:shadow-lg transition-shadow">
-                    <div className="p-4 sm:p-6">
-                      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-                        <span className="px-2 sm:px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                          Announcement
-                        </span>
-                        <span className="text-xs sm:text-sm text-gray-500">
-                          {new Date(announcement.created_at).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric'
-                          })}
-                        </span>
+                // First announcement is featured/larger
+                if (index === 0) {
+                  return (
+                    <div 
+                      key={announcement.id} 
+                      className="bg-gradient-to-br from-tapt-blue/5 via-white to-tapt-gold/5 rounded-2xl shadow-lg overflow-hidden border-2 border-tapt-blue/20 hover:shadow-xl transition-all"
+                    >
+                      <div className="p-6 sm:p-8">
+                        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="px-3 py-1 text-xs font-bold rounded-full bg-tapt-blue text-white">
+                              Latest
+                            </span>
+                            <span className="px-3 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-700">
+                              Announcement
+                            </span>
+                          </div>
+                          <time className="text-sm text-gray-500" dateTime={announcement.created_at}>
+                            {new Date(announcement.created_at).toLocaleDateString('en-US', {
+                              month: 'long',
+                              day: 'numeric',
+                              year: 'numeric'
+                            })}
+                          </time>
+                        </div>
+                        
+                        <h3 className="text-2xl sm:text-3xl font-bold text-tapt-navy mb-3">
+                          {sanitizedTitle}
+                        </h3>
+                        
+                        <p className="text-gray-700 text-base sm:text-lg leading-relaxed mb-4">
+                          {sanitizedDescription}
+                        </p>
+                        
+                        {hasValidFile && (
+                          <div className="flex items-center gap-4 pt-4 border-t border-gray-200">
+                            <a
+                              href={announcement.file_url!}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 px-4 py-2 bg-tapt-blue text-white rounded-lg hover:bg-tapt-navy font-medium text-sm transition-colors"
+                              onClick={(e) => {
+                                try {
+                                  const url = new URL(announcement.file_url!);
+                                  if (!url.hostname.includes('supabase.co')) {
+                                    e.preventDefault();
+                                    console.error('Invalid file URL');
+                                  }
+                                } catch {
+                                  e.preventDefault();
+                                }
+                              }}
+                            >
+                              <FileIcon className="h-4 w-4" />
+                              <span>{getFileLabel()}</span>
+                              <Download className="h-4 w-4" />
+                            </a>
+                            {announcement.file_size && (
+                              <span className="text-sm text-gray-500">
+                                {(announcement.file_size / 1024).toFixed(1)} KB
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <h3 className="text-lg sm:text-xl font-bold text-secondary mb-2 break-words">
-                        {sanitizedTitle}
-                      </h3>
-                      <p className="text-gray-600 text-sm sm:text-base break-words line-clamp-4">
-                        {sanitizedDescription}
-                      </p>
-                      
-                      {/* File Download Button */}
-                      {hasValidFile && (
-                        <div className="mt-4 pt-4 border-t border-gray-200">
+                    </div>
+                  );
+                }
+                
+                // Remaining announcements are compact
+                return (
+                  <div 
+                    key={announcement.id} 
+                    className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 hover:shadow-lg transition-all group"
+                  >
+                    <div className="p-4 sm:p-6">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-700">
+                              Announcement
+                            </span>
+                            <time className="text-xs text-gray-500" dateTime={announcement.created_at}>
+                              {new Date(announcement.created_at).toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric'
+                              })}
+                            </time>
+                          </div>
+                          
+                          <h4 className="text-lg font-bold text-tapt-navy mb-2 group-hover:text-tapt-blue transition-colors">
+                            {sanitizedTitle}
+                          </h4>
+                          
+                          <p className="text-gray-600 text-sm line-clamp-2">
+                            {sanitizedDescription}
+                          </p>
+                        </div>
+                        
+                        {hasValidFile && (
                           <a
                             href={announcement.file_url!}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-2 text-primary hover:text-primary/80 font-medium text-sm transition-colors"
+                            className="flex-shrink-0 p-3 bg-tapt-blue/10 text-tapt-blue rounded-lg hover:bg-tapt-blue hover:text-white transition-colors"
+                            title={getFileLabel()}
                             onClick={(e) => {
-                              // Additional security check before download
                               try {
                                 const url = new URL(announcement.file_url!);
                                 if (!url.hostname.includes('supabase.co')) {
@@ -308,17 +428,10 @@ export const Home: React.FC = () => {
                               }
                             }}
                           >
-                            <FileIcon className="h-4 w-4" />
-                            <span>{getFileLabel()}</span>
-                            <Download className="h-3 w-3" />
+                            <FileIcon className="h-5 w-5" />
                           </a>
-                          {announcement.file_size && (
-                            <span className="ml-2 text-xs text-gray-500">
-                              ({(announcement.file_size / 1024).toFixed(1)} KB)
-                            </span>
-                          )}
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -331,18 +444,7 @@ export const Home: React.FC = () => {
       {/* Quick Links Section - Fixed Mobile Layout */}
       <section className="py-8 sm:py-12 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-            <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 hover:shadow-lg transition-shadow border-t-4 border-primary">
-              <div className="flex items-center mb-3 sm:mb-4">
-                <Calendar className="h-6 sm:h-8 w-6 sm:w-8 text-primary flex-shrink-0" />
-                <h3 className="text-lg sm:text-xl font-semibold ml-3">Upcoming Events</h3>
-              </div>
-              <p className="text-gray-600 mb-3 sm:mb-4 text-sm sm:text-base">Stay informed about conferences, workshops, and training opportunities.</p>
-              <Link to="/events" className="text-primary font-medium inline-flex items-center hover:underline text-sm sm:text-base">
-                View Calendar <ArrowRight className="ml-1 h-4 w-4" />
-              </Link>
-            </div>
-            
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 hover:shadow-lg transition-shadow border-t-4 border-primary">
               <div className="flex items-center mb-3 sm:mb-4">
                 <BookOpen className="h-6 sm:h-8 w-6 sm:w-8 text-primary flex-shrink-0" />
@@ -368,24 +470,39 @@ export const Home: React.FC = () => {
         </div>
       </section>
 
-      {/* Call to Action - Fixed Mobile Layout */}
-      <section className="bg-gradient-to-r from-primary to-accent py-12 sm:py-16 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4 sm:mb-6 break-words">Ready to connect with transportation professionals?</h2>
-          <p className="text-base sm:text-lg lg:text-xl mb-6 sm:mb-8 max-w-3xl mx-auto break-words">Join the Tennessee Association of Pupil Transportation today to access exclusive resources, networking opportunities, and professional development.</p>
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center max-w-md sm:max-w-none mx-auto">
-            <Link 
-              to="/members" 
-              className="bg-white text-primary hover:bg-gray-100 px-6 sm:px-8 py-2 sm:py-3 rounded-md font-medium transition-colors text-sm sm:text-base"
-            >
-              Join TAPT
-            </Link>
-            <Link 
-              to="/contact" 
-              className="bg-transparent border border-white hover:bg-white/10 text-white px-6 sm:px-8 py-2 sm:py-3 rounded-md font-medium transition-colors text-sm sm:text-base"
-            >
-              Contact Us
-            </Link>
+      {/* Bottom CTA Section - Upcoming Events & Contact */}
+      <section className="py-12 sm:py-16 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid md:grid-cols-2 gap-6 sm:gap-8">
+            {/* Upcoming Events Card */}
+            <div className="bg-white rounded-lg shadow-lg p-6 sm:p-8 hover:shadow-xl transition-shadow border-t-4 border-primary">
+              <div className="flex items-center mb-4">
+                <Calendar className="h-8 w-8 text-primary flex-shrink-0" />
+                <h3 className="text-2xl font-semibold ml-3">Upcoming Events</h3>
+              </div>
+              <p className="text-gray-600 mb-6 text-base">Stay informed about conferences, workshops, and training opportunities throughout Tennessee.</p>
+              <Link 
+                to="/events" 
+                className="inline-flex items-center justify-center px-6 py-3 bg-primary text-white rounded-md font-medium hover:bg-tapt-navy transition-colors w-full sm:w-auto"
+              >
+                View Calendar <ArrowRight className="ml-2 h-5 w-5" />
+              </Link>
+            </div>
+            
+            {/* Contact Us Card */}
+            <div className="bg-white rounded-lg shadow-lg p-6 sm:p-8 hover:shadow-xl transition-shadow border-t-4 border-accent">
+              <div className="flex items-center mb-4">
+                <Users className="h-8 w-8 text-accent flex-shrink-0" />
+                <h3 className="text-2xl font-semibold ml-3">Contact Us</h3>
+              </div>
+              <p className="text-gray-600 mb-6 text-base">Have questions? Our team is here to help you with membership, events, and resources.</p>
+              <Link 
+                to="/contact" 
+                className="inline-flex items-center justify-center px-6 py-3 bg-accent text-white rounded-md font-medium hover:bg-orange-600 transition-colors w-full sm:w-auto"
+              >
+                Get in Touch <ArrowRight className="ml-2 h-5 w-5" />
+              </Link>
+            </div>
           </div>
         </div>
       </section>

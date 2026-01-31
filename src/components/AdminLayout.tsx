@@ -163,9 +163,17 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {  const [isSi
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } lg:translate-x-0`}
       >
-        <div className="h-full px-3 py-4 overflow-y-auto bg-secondary">
+        <div className="h-full px-3 py-4 overflow-y-auto bg-tapt-navy">
           <div className="mb-8 px-2">
-            <h1 className="text-2xl font-bold text-white">TAPT Admin</h1>
+            <div className="flex items-center gap-3 mb-2">
+              <img 
+                src="/tapt-logo.png" 
+                alt="TAPT Logo" 
+                className="h-10 w-10 object-contain"
+              />
+              <h1 className="text-2xl font-heading font-bold text-white">TAPT</h1>
+            </div>
+            <p className="text-sm text-gray-300">Admin Panel</p>
           </div>
 
           <nav className="space-y-1">
@@ -177,8 +185,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {  const [isSi
                       onClick={() => toggleMenu(item.name)}
                       className={`flex items-center justify-between w-full px-2 py-2 text-base font-medium rounded-lg ${
                         isSubmenuActive(item.submenu)
-                          ? 'bg-primary text-white'
-                          : 'text-gray-300 hover:bg-primary/20 hover:text-white'
+                          ? 'bg-tapt-blue text-white'
+                          : 'text-gray-300 hover:bg-tapt-blue/20 hover:text-white'
                       }`}
                     >
                       <div className="flex items-center">
@@ -203,8 +211,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {  const [isSi
                           to={subItem.path}
                           className={`block px-3 py-2 text-sm font-medium rounded-lg ${
                             location.pathname === subItem.path
-                              ? 'bg-primary text-white'
-                              : 'text-gray-300 hover:bg-primary/20 hover:text-white'
+                              ? 'bg-tapt-blue text-white'
+                              : 'text-gray-300 hover:bg-tapt-blue/20 hover:text-white'
                           }`}
                         >
                           {subItem.name}
@@ -217,8 +225,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {  const [isSi
                     to={item.path}
                     className={`flex items-center px-2 py-2 text-base font-medium rounded-lg ${
                       isActive(item.path)
-                        ? 'bg-primary text-white'
-                        : 'text-gray-300 hover:bg-primary/20 hover:text-white'
+                        ? 'bg-tapt-blue text-white'
+                        : 'text-gray-300 hover:bg-tapt-blue/20 hover:text-white'
                     }`}
                   >
                     <item.icon className="h-5 w-5 mr-3" />
@@ -230,7 +238,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {  const [isSi
 
             <button
               onClick={handleLogout}
-              className="flex items-center w-full px-2 py-2 text-base font-medium text-gray-300 rounded-lg hover:bg-primary/20 hover:text-white"
+              className="flex items-center w-full px-2 py-2 text-base font-medium text-gray-300 rounded-lg hover:bg-tapt-blue/20 hover:text-white"
             >
               <LogOut className="h-5 w-5 mr-3" />
               Sign Out

@@ -86,20 +86,22 @@ export const BoardMembers: React.FC = () => {
                 return (
                   <div key={member.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-all">
                     {imageUrl ? (
-                      <img 
-                        src={imageUrl}
-                        alt={member.name}
-                        className="w-full h-60 object-cover" // Increased height from h-48 to h-56
-                        onError={e => { (e.target as HTMLImageElement).src = '/images/board-members/default.png'; }}
-                      />
+                      <div className="w-full h-64 bg-gradient-to-br from-tapt-blue/5 to-tapt-navy/5 flex items-center justify-center">
+                        <img 
+                          src={imageUrl}
+                          alt={member.name}
+                          className="w-full h-full object-contain p-2"
+                          onError={e => { (e.target as HTMLImageElement).src = '/images/board-members/default.png'; }}
+                        />
+                      </div>
                     ) : (
-                      <div className="w-full h-56 bg-gray-200 flex items-center justify-center"> {/* Increased height from h-48 to h-56 */}
-                        <Building className="h-14 w-14 text-gray-400" /> {/* Increased icon size from h-12 w-12 to h-14 w-14 */}
+                      <div className="w-full h-64 bg-gradient-to-br from-tapt-blue/5 to-tapt-navy/5 flex items-center justify-center">
+                        <Building className="h-14 w-14 text-gray-400" />
                       </div>
                     )}
                     <div className="p-6">
-                      <h3 className="text-xl font-bold text-secondary">{member.name}</h3>
-                      <p className="text-primary font-medium">{member.title}</p>
+                      <h3 className="text-xl font-bold text-tapt-navy">{member.name}</h3>
+                      <p className="text-tapt-blue font-medium">{member.title}</p>
                       {member.district && (
                         <div className="flex items-center mt-2 text-gray-600">
                           <MapPin className="h-4 w-4 mr-2" />

@@ -165,20 +165,22 @@ export const HallOfFameMembers: React.FC = () => {
               {filteredMembers.map((member) => (
                 <div key={member.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-all">
                   {member.image_url ? (
-                    <img 
-                      src={member.image_url} 
-                      alt={member.name}
-                      className="w-full h-48 object-cover"
-                    />
+                    <div className="w-full h-64 bg-gradient-to-br from-tapt-blue/5 to-tapt-navy/5 flex items-center justify-center">
+                      <img 
+                        src={member.image_url} 
+                        alt={member.name}
+                        className="w-full h-full object-contain p-2"
+                      />
+                    </div>
                   ) : (
-                    <div className="w-full h-48 bg-gray-200 flex items-center justify-center">
+                    <div className="w-full h-64 bg-gradient-to-br from-tapt-blue/5 to-tapt-navy/5 flex items-center justify-center">
                       <Award className="h-12 w-12 text-gray-400" />
                     </div>
                   )}
                   <div className="p-6">
                     <div className="mb-4">
-                      <h3 className="text-xl font-bold text-secondary">{member.name}</h3>
-                      <p className="text-primary font-medium">{member.title}</p>
+                      <h3 className="text-xl font-bold text-tapt-navy">{member.name}</h3>
+                      <p className="text-tapt-blue font-medium">{member.title}</p>
                       {member.organization && (
                         <p className="text-gray-600">{member.organization}</p>
                       )}

@@ -49,27 +49,34 @@ export const Footer: React.FC = () => {
   }, []);
 
   return (
-    <footer className="bg-secondary text-white">
+    <footer className="bg-tapt-navy text-white">
       <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-8">
           <div className="col-span-1 md:col-span-1 lg:col-span-1">
             <div className="flex flex-col h-full">
-              <h2 className="text-xl font-bold text-white mb-4">TAPT</h2>
-              <p className="text-gray-300 mb-4">Tennessee Association of Pupil Transportation</p>
-              <p className="text-gray-300 mb-6">{footerText}</p>
+              <div className="flex items-center gap-3 mb-4">
+                <img 
+                  src="/tapt-logo.png" 
+                  alt="TAPT Logo" 
+                  className="h-12 w-12 object-contain"
+                />
+                <h2 className="text-xl font-heading font-bold text-white">TAPT</h2>
+              </div>
+              <p className="text-gray-100 mb-4">Tennessee Association of Pupil Transportation</p>
+              <p className="text-gray-100 mb-6">{footerText}</p>
               <div className="flex space-x-4 mt-auto">
                 {socialFacebook && (
-                  <a href={socialFacebook} target="_blank" rel="noopener noreferrer" className="text-gray-300 hover:text-white">
+                  <a href={socialFacebook} target="_blank" rel="noopener noreferrer" className="text-gray-100 hover:text-tapt-gold transition-colors">
                     <Facebook size={20} />
                   </a>
                 )}
                 {socialTwitter && (
-                  <a href={socialTwitter} target="_blank" rel="noopener noreferrer" className="text-gray-300 hover:text-white">
+                  <a href={socialTwitter} target="_blank" rel="noopener noreferrer" className="text-gray-100 hover:text-tapt-gold transition-colors">
                     <Twitter size={20} />
                   </a>
                 )}
                 {socialInstagram && (
-                  <a href={socialInstagram} target="_blank" rel="noopener noreferrer" className="text-gray-300 hover:text-white">
+                  <a href={socialInstagram} target="_blank" rel="noopener noreferrer" className="text-gray-100 hover:text-tapt-gold transition-colors">
                     <Instagram size={20} />
                   </a>
                 )}
@@ -80,25 +87,25 @@ export const Footer: React.FC = () => {
           <div className="col-span-1 md:col-span-1 lg:col-span-1">
             <h3 className="text-lg font-bold text-white mb-4">Quick Links</h3>
             <ul className="space-y-2">
-              <li><Link to="/" className="text-gray-300 hover:text-white transition-colors">Home</Link></li>
-              <li><Link to="/about" className="text-gray-300 hover:text-white transition-colors">About Us</Link></li>
-              <li><Link to="/resources" className="text-gray-300 hover:text-white transition-colors">Resources</Link></li>
-              <li><Link to="/news" className="text-gray-300 hover:text-white transition-colors">News</Link></li>
-              <li><Link to="/events" className="text-gray-300 hover:text-white transition-colors">Events</Link></li>
-              <li><Link to="/members" className="text-gray-300 hover:text-white transition-colors">Membership</Link></li>
-              <li><Link to="/contact" className="text-gray-300 hover:text-white transition-colors">Contact Us</Link></li>
+              <li><Link to="/" className="text-gray-100 hover:text-tapt-gold transition-colors">Home</Link></li>
+              <li><Link to="/about" className="text-gray-100 hover:text-tapt-gold transition-colors">About Us</Link></li>
+              <li><Link to="/resources" className="text-gray-100 hover:text-tapt-gold transition-colors">Resources</Link></li>
+              <li><Link to="/news" className="text-gray-100 hover:text-tapt-gold transition-colors">News</Link></li>
+              <li><Link to="/events" className="text-gray-100 hover:text-tapt-gold transition-colors">Events</Link></li>
+              <li><Link to="/members" className="text-gray-100 hover:text-tapt-gold transition-colors">Membership</Link></li>
+              <li><Link to="/contact" className="text-gray-100 hover:text-tapt-gold transition-colors">Contact Us</Link></li>
             </ul>
           </div>
 
           <div className="col-span-1 md:col-span-1 lg:col-span-1">
             <h3 className="text-lg font-bold text-white mb-4">Resources</h3>
             <ul className="space-y-2">
-              <li><Link to="/resources" className="text-gray-300 hover:text-white transition-colors">Training Materials</Link></li>
-              <li><Link to="/resources" className="text-gray-300 hover:text-white transition-colors">Safety Guidelines</Link></li>
-              <li><Link to="/resources" className="text-gray-300 hover:text-white transition-colors">State Regulations</Link></li>
-              <li><Link to="/resources" className="text-gray-300 hover:text-white transition-colors">Best Practices</Link></li>
-              <li><Link to="/resources" className="text-gray-300 hover:text-white transition-colors">Forms & Documents</Link></li>
-              <li><Link to="/resources" className="text-gray-300 hover:text-white transition-colors">FAQ</Link></li>
+              <li><Link to="/resources" className="text-gray-100 hover:text-tapt-gold transition-colors">Training Materials</Link></li>
+              <li><Link to="/resources" className="text-gray-100 hover:text-tapt-gold transition-colors">Safety Guidelines</Link></li>
+              <li><Link to="/resources" className="text-gray-100 hover:text-tapt-gold transition-colors">State Regulations</Link></li>
+              <li><Link to="/resources" className="text-gray-100 hover:text-tapt-gold transition-colors">Best Practices</Link></li>
+              <li><Link to="/resources" className="text-gray-100 hover:text-tapt-gold transition-colors">Forms & Documents</Link></li>
+              <li><Link to="/resources" className="text-gray-100 hover:text-tapt-gold transition-colors">FAQ</Link></li>
             </ul>
           </div>
 
@@ -106,22 +113,22 @@ export const Footer: React.FC = () => {
             <h3 className="text-lg font-bold text-white mb-4">Contact Us</h3>
             <address className="not-italic">
               <div className="flex items-start mb-3">
-                <MapPin size={20} className="mr-2 mt-1 flex-shrink-0" />
-                <span className="text-gray-300">P.O. Box 700<br />Portland, TN 37148</span>
+                <MapPin size={20} className="mr-2 mt-1 flex-shrink-0 text-tapt-gold" />
+                <span className="text-gray-100">P.O. Box 700<br />Portland, TN 37148</span>
               </div>
               <div className="flex items-start mb-3">
-                <Phone size={20} className="mr-2 mt-1 flex-shrink-0" />
+                <Phone size={20} className="mr-2 mt-1 flex-shrink-0 text-tapt-gold" />
                 <div>
-                  <a href={`tel:+1${contactPhone.replace(/\D/g, '')}`} className="text-gray-300 hover:text-white">{contactPhone}</a>
-                  <div className="text-gray-400 text-sm flex items-center mt-1">
+                  <a href={`tel:+1${contactPhone.replace(/\D/g, '')}`} className="text-gray-100 hover:text-tapt-gold">{contactPhone}</a>
+                  <div className="text-gray-200 text-sm flex items-center mt-1">
                     <Clock size={14} className="mr-1" />
                     <span>{businessHoursDays}, {businessHoursTime}</span>
                   </div>
                 </div>
               </div>
               <div className="flex items-center">
-                <Mail size={20} className="mr-2 flex-shrink-0" />
-                <a href={`mailto:${contactEmail}`} className="text-gray-300 hover:text-white">{contactEmail}</a>
+                <Mail size={20} className="mr-2 flex-shrink-0 text-tapt-gold" />
+                <a href={`mailto:${contactEmail}`} className="text-gray-100 hover:text-tapt-gold">{contactEmail}</a>
               </div>
             </address>
           </div>
@@ -129,11 +136,11 @@ export const Footer: React.FC = () => {
         
         <div className="border-t border-gray-700 mt-10 pt-6">
           <div className="flex flex-col md:flex-row justify-between items-center">
-            <p className="text-gray-300 text-sm">&copy; {currentYear} Tennessee Association of Pupil Transportation. All rights reserved.</p>
+            <p className="text-gray-100 text-sm">&copy; {currentYear} Tennessee Association of Pupil Transportation. All rights reserved.</p>
             <div className="flex space-x-6 mt-4 md:mt-0">
-              <Link to="/privacy-policy" className="text-gray-300 text-sm hover:text-white">Privacy Policy</Link>
-              <Link to="/terms-of-service" className="text-gray-300 text-sm hover:text-white">Terms of Service</Link>
-              <Link to="/accessibility" className="text-gray-300 text-sm hover:text-white">Accessibility</Link>
+              <Link to="/privacy-policy" className="text-gray-100 text-sm hover:text-tapt-gold">Privacy Policy</Link>
+              <Link to="/terms-of-service" className="text-gray-100 text-sm hover:text-tapt-gold">Terms of Service</Link>
+              <Link to="/accessibility" className="text-gray-100 text-sm hover:text-tapt-gold">Accessibility</Link>
             </div>
           </div>
         </div>

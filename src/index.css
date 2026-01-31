@@ -2,43 +2,49 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --primary: #4720B7;
-  --secondary: #281A39;
-  --accent: #6247EA;
-  --light: #F5F5F7;
-  --dark: #1A1A1A;
+@layer base {
+  :root {
+    --tapt-navy: #1e3a5f;
+    --tapt-blue: #2b7eb8;
+    --tapt-gold: #d4a74a;
+    --tapt-green: #6b9f4d;
+    --tapt-orange: #f5a623;
+  }
+
+  body {
+    @apply bg-gray-50 text-gray-900 font-sans;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading font-bold text-tapt-navy;
+  }
 }
 
-body {
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  color: var(--dark);
-  background-color: var(--light);
-  overflow-x: hidden;
-}
+@layer components {
+  .section {
+    @apply py-12 md:py-16 lg:py-20 px-4;
+  }
 
-.section {
-  @apply py-12 md:py-16 lg:py-20 px-4;
-}
+  .container {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
 
-.container {
-  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
-}
+  .btn-primary {
+    @apply bg-tapt-blue hover:bg-tapt-navy text-white font-medium py-3 px-6 rounded-lg transition-colors shadow-sm;
+  }
 
-.btn-primary {
-  @apply bg-primary hover:bg-primary/90 text-white font-medium py-2 px-6 rounded-md transition-all;
-}
+  .btn-secondary {
+    @apply bg-tapt-gold hover:bg-tapt-orange text-white font-medium py-3 px-6 rounded-lg transition-colors shadow-sm;
+  }
 
-.btn-secondary {
-  @apply bg-white hover:bg-gray-50 text-primary border border-primary font-medium py-2 px-6 rounded-md transition-all;
-}
+  .btn-outline {
+    @apply border-2 border-tapt-blue text-tapt-blue hover:bg-tapt-blue hover:text-white font-medium py-3 px-6 rounded-lg transition-colors;
+  }
 
-.card {
-  @apply bg-white rounded-lg shadow-md overflow-hidden transition-all hover:shadow-lg;
-}
-
-h1, h2, h3, h4, h5, h6 {
-  @apply font-bold text-secondary;
+  .card {
+    @apply bg-white rounded-lg shadow-md overflow-hidden transition-all hover:shadow-lg;
+  }
 }
 
 .fade-in {
