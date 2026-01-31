@@ -29,12 +29,58 @@ interface ContentItem {
   status: 'draft' | 'published';
   featured: boolean;
   image_url: string | null;
+  file_url: string | null;
+  file_type: string | null;
+  file_size: number | null;
   date: string | null;
   category: string | null;
   link: string | null;
   is_featured: boolean;
   linked_form_type: 'conference' | 'tech-conference' | 'hall-of-fame' | 'student-scholarship' | 'exhibitor' | null;
 }
+
+// Allowed file types for announcements (documents + images)
+const ANNOUNCEMENT_ALLOWED_TYPES = [
+  // Documents
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain',
+  // Images
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp'
+];
+
+// File extensions for the accept attribute
+const ANNOUNCEMENT_ACCEPT_EXTENSIONS = '.pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.gif,.webp';
+
+// Helper to determine if a file is an image
+const isImageFile = (mimeType: string | null): boolean => {
+  if (!mimeType) return false;
+  return mimeType.startsWith('image/');
+};
+
+// Helper to get file type display name
+const getFileTypeDisplay = (mimeType: string | null): string => {
+  if (!mimeType) return 'Unknown';
+  const typeMap: Record<string, string> = {
+    'application/pdf': 'PDF',
+    'application/msword': 'Word',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'Word',
+    'application/vnd.ms-excel': 'Excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'Excel',
+    'text/plain': 'Text',
+    'image/jpeg': 'Image',
+    'image/png': 'Image',
+    'image/gif': 'Image',
+    'image/webp': 'Image',
+  };
+  return typeMap[mimeType] || mimeType.split('/')[1]?.toUpperCase() || 'File';
+};
 
 interface ResourceItem {
   id: string;
@@ -47,6 +93,51 @@ interface ResourceItem {
   created_at: string;
   updated_at: string;
 }
+
+// Type-safe visibility options for content publishing
+type HomepageVisibility = 'draft' | 'published' | 'featured';
+
+const VISIBILITY_OPTIONS: { value: HomepageVisibility; label: string; description: string }[] = [
+  { value: 'draft', label: 'Hidden (Draft)', description: 'Not visible to public' },
+  { value: 'published', label: 'Published', description: 'Live but not featured on homepage' },
+  { value: 'featured', label: 'Featured on Homepage', description: 'Prominently displayed on homepage' },
+];
+
+// Helper to derive visibility from content item flags
+const getVisibilityFromItem = (item: Partial<ContentItem>): HomepageVisibility => {
+  if (item.status === 'draft') return 'draft';
+  if (item.is_featured || item.featured) return 'featured';
+  return 'published';
+};
+
+// Helper to convert visibility back to database flags (maintains backwards compatibility)
+const getItemFlagsFromVisibility = (visibility: HomepageVisibility): Pick<ContentItem, 'status' | 'featured' | 'is_featured'> => {
+  switch (visibility) {
+    case 'draft':
+      return { status: 'draft', featured: false, is_featured: false };
+    case 'published':
+      return { status: 'published', featured: false, is_featured: false };
+    case 'featured':
+      return { status: 'published', featured: true, is_featured: true };
+    default:
+      // Exhaustive check for type safety
+      const _exhaustive: never = visibility;
+      return { status: 'draft', featured: false, is_featured: false };
+  }
+};
+
+// Get badge styling based on visibility
+const getVisibilityBadge = (item: ContentItem): { label: string; className: string } => {
+  const visibility = getVisibilityFromItem(item);
+  switch (visibility) {
+    case 'draft':
+      return { label: 'Draft', className: 'bg-gray-100 text-gray-800' };
+    case 'published':
+      return { label: 'Published', className: 'bg-green-100 text-green-800' };
+    case 'featured':
+      return { label: 'Featured', className: 'bg-yellow-100 text-yellow-800' };
+  }
+};
 
 export const AdminContent: React.FC = () => {
   const navigate = useNavigate();
@@ -203,7 +294,16 @@ export const AdminContent: React.FC = () => {
         fetchResources();
       } else {
         let imagePath = formData.image_url;
+        let fileUrl = formData.file_url;
+        let fileType = formData.file_type;
+        let fileSize = formData.file_size;
+        
         if (selectedFile) {
+          // Validate file type for announcements
+          if (selectedType === 'announcement' && !ANNOUNCEMENT_ALLOWED_TYPES.includes(selectedFile.type)) {
+            throw new Error(`Invalid file type. Allowed types: PDF, Word, Excel, Text, and Images`);
+          }
+          
           const fileExt = selectedFile.name.split('.').pop();
           const fileName = `${crypto.randomUUID()}.${fileExt}`;
           const filePath = `content/${fileName}`;
@@ -214,7 +314,22 @@ export const AdminContent: React.FC = () => {
           const { data: { publicUrl } } = supabase.storage
             .from('public')
             .getPublicUrl(filePath);
-          imagePath = publicUrl;
+          
+          // For images, store in image_url; for documents, store in file_url
+          if (isImageFile(selectedFile.type)) {
+            imagePath = publicUrl;
+            // Clear file fields if uploading an image
+            fileUrl = null;
+            fileType = null;
+            fileSize = null;
+          } else {
+            // Document file
+            fileUrl = publicUrl;
+            fileType = selectedFile.type;
+            fileSize = selectedFile.size;
+            // Clear image if uploading a document
+            imagePath = null;
+          }
         }
 
         // Get the current session
@@ -245,6 +360,9 @@ export const AdminContent: React.FC = () => {
           body: JSON.stringify({
             ...formData,
             image_url: imagePath,
+            file_url: fileUrl,
+            file_type: fileType,
+            file_size: fileSize,
             type: selectedType,
             id: editingItem?.id, // Pass id for update, undefined for insert
             linked_form_type: formData.linked_form_type
@@ -347,6 +465,72 @@ export const AdminContent: React.FC = () => {
     setEditingItem(item);
     setFormData(item);
     setShowForm(true);
+  };
+
+  // Quick visibility toggle: cycles between draft -> published -> featured -> draft
+  const handleQuickVisibilityToggle = async (item: ContentItem) => {
+    const currentVisibility = getVisibilityFromItem(item);
+    
+    // Determine next visibility state (cycle through options)
+    let nextVisibility: HomepageVisibility;
+    if (currentVisibility === 'draft') {
+      nextVisibility = 'published';
+    } else if (currentVisibility === 'published') {
+      nextVisibility = 'featured';
+    } else {
+      nextVisibility = 'draft';
+    }
+    
+    const flags = getItemFlagsFromVisibility(nextVisibility);
+    
+    try {
+      setError(null);
+      
+      // Get the current session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        throw new Error(`Session error: ${sessionError.message}`);
+      }
+      
+      if (!session || !session.access_token) {
+        throw new Error('No active session');
+      }
+      
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      if (!supabaseUrl) {
+        throw new Error('VITE_SUPABASE_URL is not defined');
+      }
+      
+      // Use Edge Function for secure content update
+      const response = await fetch(`${supabaseUrl}/functions/v1/admin-content`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          ...item,
+          ...flags
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Failed to parse error response' }));
+        throw new Error(errorData.message || `Request failed with status ${response.status}`);
+      }
+      
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update visibility');
+      }
+      
+      setSuccess(`Content visibility changed to "${VISIBILITY_OPTIONS.find(opt => opt.value === nextVisibility)?.label}"`);
+      fetchContent();
+    } catch (error: any) {
+      console.error('Error updating visibility:', error);
+      setError(`Failed to update visibility: ${error.message}`);
+    }
   };
 
   const contentTypes = [
@@ -532,14 +716,30 @@ export const AdminContent: React.FC = () => {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      Image
+                      {selectedType === 'announcement' ? 'Attachment (Image or Document)' : 'Image'}
                     </label>
                     <input
                       type="file"
                       onChange={handleFileSelect}
-                      accept="image/*"
+                      accept={selectedType === 'announcement' ? ANNOUNCEMENT_ACCEPT_EXTENSIONS : 'image/*'}
                       className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
                     />
+                    {selectedType === 'announcement' && (
+                      <p className="mt-1 text-sm text-gray-500">
+                        Supported: PDF, Word, Excel, Text files, and Images
+                      </p>
+                    )}
+                    {selectedFile && (
+                      <p className="mt-2 text-sm text-green-600">
+                        Selected: {selectedFile.name} ({getFileTypeDisplay(selectedFile.type)}, {formatFileSize(selectedFile.size)})
+                      </p>
+                    )}
+                    {/* Show existing file info when editing */}
+                    {editingItem && !selectedFile && (editingItem.file_url || editingItem.image_url) && (
+                      <p className="mt-2 text-sm text-gray-500">
+                        Current: {editingItem.file_url ? `Document (${getFileTypeDisplay(editingItem.file_type)})` : 'Image'}
+                      </p>
+                    )}
                   </div>
 
                   {selectedType === 'event' && (
@@ -607,46 +807,33 @@ export const AdminContent: React.FC = () => {
                     </div>
                   )}
 
-                  <div className="flex items-center space-x-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Status
-                      </label>
-                      <select
-                        value={formData.status}
-                        onChange={(e) => setFormData({ ...formData, status: e.target.value as 'draft' | 'published' })}
-                        className="mt-1 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
-                      >
-                        <option value="draft">Draft</option>
-                        <option value="published">Published</option>
-                      </select>
-                    </div>
-
-                    <div className="flex items-center">
-                      <input
-                        type="checkbox"
-                        id="featured"
-                        checked={formData.featured}
-                        onChange={(e) => setFormData({ ...formData, featured: e.target.checked })}
-                        className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                      />
-                      <label htmlFor="featured" className="ml-2 block text-sm text-gray-700">
-                        Featured
-                      </label>
-                    </div>
-
-                    <div className="flex items-center">
-                      <input
-                        type="checkbox"
-                        id="is_featured"
-                        checked={formData.is_featured}
-                        onChange={(e) => setFormData({ ...formData, is_featured: e.target.checked })}
-                        className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                      />
-                      <label htmlFor="is_featured" className="ml-2 block text-sm text-gray-700">
-                        Featured Event
-                      </label>
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Homepage Visibility
+                    </label>
+                    <select
+                      value={getVisibilityFromItem(formData)}
+                      onChange={(e) => {
+                        const visibility = e.target.value as HomepageVisibility;
+                        // Validate the visibility value (security: prevent invalid values)
+                        if (!VISIBILITY_OPTIONS.some(opt => opt.value === visibility)) {
+                          console.error('Invalid visibility value:', visibility);
+                          return;
+                        }
+                        const flags = getItemFlagsFromVisibility(visibility);
+                        setFormData({ ...formData, ...flags });
+                      }}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+                    >
+                      {VISIBILITY_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-sm text-gray-500">
+                      {VISIBILITY_OPTIONS.find(opt => opt.value === getVisibilityFromItem(formData))?.description}
+                    </p>
                   </div>
                 </>
               )}
@@ -767,10 +954,7 @@ export const AdminContent: React.FC = () => {
                       </th>
                     )}
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Featured
+                      Visibility
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Date
@@ -785,14 +969,30 @@ export const AdminContent: React.FC = () => {
                     <tr key={item.id}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          {item.image_url && (
+                          {item.image_url ? (
                             <img
                               src={item.image_url}
                               alt={item.title}
                               className="h-10 w-10 rounded-full object-cover mr-3"
                             />
-                          )}
-                          <div className="text-sm font-medium text-gray-900">{item.title}</div>
+                          ) : item.file_url ? (
+                            <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center mr-3" title={`${getFileTypeDisplay(item.file_type)} attachment`}>
+                              <FileText className="h-5 w-5 text-blue-600" />
+                            </div>
+                          ) : null}
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{item.title}</div>
+                            {item.file_url && (
+                              <a 
+                                href={item.file_url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-xs text-blue-600 hover:text-blue-800"
+                              >
+                                {getFileTypeDisplay(item.file_type)} • {item.file_size ? formatFileSize(item.file_size) : 'Download'}
+                              </a>
+                            )}
+                          </div>
                         </div>
                       </td>
                       {selectedType === 'news' && (
@@ -824,41 +1024,42 @@ export const AdminContent: React.FC = () => {
                         </td>
                       )}
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          item.status === 'published'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {item.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <div className="flex items-center space-x-2">
-                          {item.featured && (
-                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                              Featured
+                        {(() => {
+                          const badge = getVisibilityBadge(item);
+                          return (
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${badge.className}`}>
+                              {badge.label}
                             </span>
-                          )}
-                          {item.is_featured && (
-                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
-                              Featured Event
-                            </span>
-                          )}
-                        </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {item.date ? new Date(item.date).toLocaleDateString() : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        {/* Quick visibility toggle button */}
+                        <button
+                          onClick={() => handleQuickVisibilityToggle(item)}
+                          className={`mr-2 px-2 py-1 text-xs font-medium rounded ${
+                            getVisibilityFromItem(item) === 'featured'
+                              ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                          title={getVisibilityFromItem(item) === 'featured' ? 'Click to unfeature' : 'Click to feature'}
+                        >
+                          <Star className={`h-4 w-4 inline-block ${getVisibilityFromItem(item) === 'featured' ? 'fill-yellow-500' : ''}`} />
+                        </button>
                         <button
                           onClick={() => handleEdit(item)}
                           className="text-primary hover:text-primary/80 mr-3"
+                          title="Edit"
                         >
                           <Edit className="h-5 w-5" />
                         </button>
                         <button
                           onClick={() => handleDelete(item.id)}
                           className="text-red-600 hover:text-red-800"
+                          title="Delete"
                         >
                           <Trash2 className="h-5 w-5" />
                         </button>

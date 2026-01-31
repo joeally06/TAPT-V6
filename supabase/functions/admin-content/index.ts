@@ -165,14 +165,43 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Prepare data for insert/update
+      // Validate file_type if present (for announcements with attachments)
+      if (body.file_type) {
+        const allowedFileTypes = [
+          // Documents
+          'application/pdf',
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.ms-excel',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'text/plain',
+          // Images
+          'image/jpeg',
+          'image/png',
+          'image/gif',
+          'image/webp'
+        ];
+        if (!allowedFileTypes.includes(body.file_type)) {
+          throw new Error('Invalid file type. Allowed: PDF, Word, Excel, Text, and Images');
+        }
+      }
+
+      // Explicitly validate boolean fields to prevent type confusion attacks
+      const validateBoolean = (value: unknown): boolean => {
+        if (typeof value === 'boolean') return value;
+        if (value === 'true') return true;
+        if (value === 'false' || value === null || value === undefined) return false;
+        return Boolean(value);
+      };
+
+      // Prepare data for insert/update with explicit boolean conversion
       const contentData = {
         title: body.title,
         description: body.description,
         type: body.type,
         status: body.status,
-        featured: body.featured || false,
-        is_featured: body.is_featured || false,
+        featured: validateBoolean(body.featured),
+        is_featured: validateBoolean(body.is_featured),
         image_url: body.image_url || null,
         date: body.date || null,
         category: body.category || null,
