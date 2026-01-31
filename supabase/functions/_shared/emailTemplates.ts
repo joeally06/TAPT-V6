@@ -30,6 +30,11 @@ export interface ConferenceRegistrationData {
     lastName: string;
     email: string;
   }>;
+  // Billing contact fields (for invoices)
+  billingFirstName?: string;
+  billingLastName?: string;
+  billingEmail?: string;
+  registrantIsAttendee?: boolean;
 }
 
 export interface ExhibitorRegistrationData {

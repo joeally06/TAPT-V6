@@ -86,23 +86,39 @@ Deno.serve(async (req) => {
 
     // Define sanitization schema
     const mainRegistrationSchema: Record<string, SanitizationRule> = {
+      // Billing contact fields
+      billingFirstName: { type: 'string', required: true, maxLength: 100 },
+      billingLastName: { type: 'string', required: true, maxLength: 100 },
+      billingEmail: { type: 'email', required: true },
+      billingPhone: { type: 'phone', required: true },
+      registrantIsAttendee: { type: 'boolean', required: false },
+      
+      // Primary attendee fields (may be same as billing contact)
       firstName: { type: 'string', required: true, maxLength: 100 },
       lastName: { type: 'string', required: true, maxLength: 100 },
       email: { type: 'email', required: true },
       phone: { type: 'phone', required: true },
+      
+      // Organization fields
       schoolDistrict: { type: 'string', required: true, maxLength: 100 },
       streetAddress: { type: 'string', required: true, maxLength: 200 },
       city: { type: 'string', required: true, maxLength: 100 },
       state: { type: 'state', required: true },
       zipCode: { type: 'zip', required: true },
+      
+      // Registration details
       totalAttendees: { type: 'number', required: true, min: 1, max: 20 },
       totalAmount: { type: 'number', required: true, min: 0 },
       conferenceId: { type: 'uuid', required: true },
+      
+      // Payment fields
       paymentMethod: { type: 'string', required: true },
       paymentStatus: { type: 'string', required: false, maxLength: 50 },
       poNumber: { type: 'string', required: false, maxLength: 100 },
       paypalTransactionId: { type: 'string', required: false, maxLength: 100 },
       paypalPayerEmail: { type: 'email', required: false },
+      
+      // Security
       turnstileToken: { type: 'token', required: true, maxLength: 2000 }
     };
 
@@ -226,17 +242,30 @@ Deno.serve(async (req) => {
     const { data: registration, error: regError } = await supabaseAdmin
       .from('tech_conference_registrations')
       .insert([{
-        school_district: sanitizedData.schoolDistrict,
+        // Billing contact info (receives invoices)
+        billing_first_name: sanitizedData.billingFirstName,
+        billing_last_name: sanitizedData.billingLastName,
+        billing_email: sanitizedData.billingEmail,
+        billing_phone: sanitizedData.billingPhone,
+        registrant_is_attendee: sanitizedData.registrantIsAttendee ?? true,
+        
+        // Primary attendee info (for backward compatibility)
         first_name: sanitizedData.firstName,
         last_name: sanitizedData.lastName,
+        email: sanitizedData.email,
+        phone: sanitizedData.phone,
+        
+        // Organization info
+        school_district: sanitizedData.schoolDistrict,
         street_address: sanitizedData.streetAddress,
         city: sanitizedData.city,
         state: sanitizedData.state,
         zip_code: sanitizedData.zipCode,
-        email: sanitizedData.email,
-        phone: sanitizedData.phone,
+        
+        // Registration details
         total_attendees: sanitizedData.totalAttendees,
         total_amount: sanitizedData.totalAmount,
+        
         // Payment fields
         payment_method: sanitizedData.paymentMethod,
         payment_status: sanitizedData.paymentStatus || 'pending',
@@ -305,19 +334,75 @@ Deno.serve(async (req) => {
       paypalTransactionId: sanitizedData.paypalTransactionId,
       remittanceAddress: formatRemittanceAddressPlain(settings),
       contactEmail: settings.payment_contact_email,
-      contactPhone: settings.payment_contact_phone
+      contactPhone: settings.payment_contact_phone,
+      // Billing contact info (for invoices)
+      billingFirstName: sanitizedData.billingFirstName || '',
+      billingLastName: sanitizedData.billingLastName || '',
+      billingEmail: sanitizedData.billingEmail || '',
+      registrantIsAttendee: sanitizedData.registrantIsAttendee ?? true
     };
 
-    // Send confirmation email to user
-    console.log('📧 Sending confirmation email to user...');
-    const userEmailResult = await sendEmail({
-      to: sanitizedData.email || '',
-      subject: `Registration Confirmation - ${emailData.conferenceName}`,
-      html: generateConferenceConfirmationEmail(emailData)
+    // Determine email recipients based on registrant type
+    const billingEmail = sanitizedData.billingEmail || '';
+    const primaryAttendeeEmail = sanitizedData.email || '';
+    const isSameContact = billingEmail.toLowerCase() === primaryAttendeeEmail.toLowerCase();
+
+    // Send invoice/payment confirmation to billing contact
+    console.log('📧 Sending invoice email to billing contact:', billingEmail);
+    const invoiceEmailResult = await sendEmail({
+      to: billingEmail,
+      subject: `Registration Invoice - ${emailData.conferenceName}`,
+      html: generateConferenceConfirmationEmail({
+        ...emailData,
+        // Override name to billing contact for invoice
+        firstName: sanitizedData.billingFirstName || '',
+        lastName: sanitizedData.billingLastName || ''
+      })
     });
 
-    if (!userEmailResult.success) {
-      console.error('⚠️ Failed to send user confirmation email:', userEmailResult.error);
+    if (!invoiceEmailResult.success) {
+      console.error('⚠️ Failed to send billing contact invoice email:', invoiceEmailResult.error);
+    }
+
+    // Send event confirmation to primary attendee (only if different from billing contact)
+    if (!isSameContact) {
+      console.log('📧 Sending event confirmation to primary attendee:', primaryAttendeeEmail);
+      const attendeeEmailResult = await sendEmail({
+        to: primaryAttendeeEmail,
+        subject: `Registration Confirmed - ${emailData.conferenceName}`,
+        html: generateConferenceConfirmationEmail(emailData)
+      });
+
+      if (!attendeeEmailResult.success) {
+        console.error('⚠️ Failed to send primary attendee confirmation email:', attendeeEmailResult.error);
+      }
+    }
+
+    // Send confirmation emails to additional attendees
+    if (sanitizedAttendees.length > 0) {
+      console.log('📧 Sending confirmation emails to additional attendees...');
+      for (const attendee of sanitizedAttendees) {
+        // Skip if same email as billing or primary attendee
+        if (attendee.email.toLowerCase() === billingEmail.toLowerCase() ||
+            attendee.email.toLowerCase() === primaryAttendeeEmail.toLowerCase()) {
+          continue;
+        }
+        
+        const additionalAttendeeResult = await sendEmail({
+          to: attendee.email,
+          subject: `Registration Confirmed - ${emailData.conferenceName}`,
+          html: generateConferenceConfirmationEmail({
+            ...emailData,
+            firstName: attendee.firstName,
+            lastName: attendee.lastName,
+            email: attendee.email
+          })
+        });
+
+        if (!additionalAttendeeResult.success) {
+          console.error(`⚠️ Failed to send confirmation to ${attendee.email}:`, additionalAttendeeResult.error);
+        }
+      }
     }
 
     // Send notification to admin(s)

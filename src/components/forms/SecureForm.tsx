@@ -108,10 +108,24 @@ export const SecureForm = forwardRef<SecureFormHandle, SecureFormProps>(({
       setTurnstileToken('');
       setIsVerified(false);
       
+      // Reset the Turnstile widget to get a fresh token for the next submission
+      if (turnstileResetRef.current) {
+        console.log('🔒 SecureForm: Resetting Turnstile widget after successful submission');
+        turnstileResetRef.current();
+      }
+      
     } catch (error) {
       console.error('❌ Form submission error:', error);
       setTurnstileError(error instanceof Error ? error.message : 'Submission failed');
       setIsVerified(false);
+      
+      // Reset the Turnstile widget on error to get a fresh token for retry
+      // Turnstile tokens are single-use, so we need a new one after any submission attempt
+      if (turnstileResetRef.current) {
+        console.log('🔒 SecureForm: Resetting Turnstile widget after error');
+        turnstileResetRef.current();
+        setTurnstileToken('');
+      }
     } finally {
       setIsSubmitting(false);
     }

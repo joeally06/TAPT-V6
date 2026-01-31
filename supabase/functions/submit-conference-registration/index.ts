@@ -71,11 +71,24 @@ Deno.serve(async (req) => {
     
     // Define sanitization schema
     const mainRegistrationSchema: Record<string, SanitizationRule> = {
-      firstName: { type: 'string', required: true, maxLength: 100 },
-      lastName: { type: 'string', required: true, maxLength: 100 },
-      email: { type: 'email', required: true },
-      phone: { type: 'phone', required: true },
-      schoolDistrict: { type: 'string', required: true, maxLength: 100 },
+      // Billing contact fields
+      billingFirstName: { type: 'string', required: true, maxLength: 100 },
+      billingLastName: { type: 'string', required: true, maxLength: 100 },
+      billingEmail: { type: 'email', required: true },
+      billingPhone: { type: 'phone', required: true },
+      registrantIsAttendee: { type: 'boolean', required: true },
+      // Legacy fields (mapped from billing for backwards compatibility)
+      firstName: { type: 'string', required: false, maxLength: 100 },
+      lastName: { type: 'string', required: false, maxLength: 100 },
+      email: { type: 'email', required: false },
+      phone: { type: 'phone', required: false },
+      // Primary attendee fields (when registrant is NOT attending)
+      primaryAttendeeFirstName: { type: 'string', required: false, maxLength: 100 },
+      primaryAttendeeLastName: { type: 'string', required: false, maxLength: 100 },
+      primaryAttendeeEmail: { type: 'email', required: false },
+      primaryAttendeeSchoolDistrict: { type: 'string', required: false, maxLength: 100 },
+      // Other fields
+      schoolDistrict: { type: 'string', required: false, maxLength: 100 },
       streetAddress: { type: 'string', required: true, maxLength: 200 },
       city: { type: 'string', required: true, maxLength: 100 },
       state: { type: 'state', required: true },
@@ -167,7 +180,7 @@ Deno.serve(async (req) => {
     }
 
     // Rate limiting: max 3 submissions per hour per email
-    const rateLimitKey = `conference_registration_${sanitizedData.email}`;
+    const rateLimitKey = `conference_registration_${sanitizedData.billingEmail}`;
     const { data: rateLimit } = await supabaseAdmin
       .from('rate_limits')
       .select('count, last_attempt')
@@ -202,21 +215,43 @@ Deno.serve(async (req) => {
     }
 
     // Insert main registration with sanitized data
+    // Determine the effective school district (from registrant if attending, or from primary attendee)
+    const effectiveSchoolDistrict = sanitizedData.registrantIsAttendee 
+      ? sanitizedData.schoolDistrict 
+      : sanitizedData.primaryAttendeeSchoolDistrict;
+    
+    // For backwards compatibility, use billing info as the primary contact
+    const effectiveFirstName = sanitizedData.registrantIsAttendee 
+      ? sanitizedData.billingFirstName 
+      : sanitizedData.primaryAttendeeFirstName;
+    const effectiveLastName = sanitizedData.registrantIsAttendee 
+      ? sanitizedData.billingLastName 
+      : sanitizedData.primaryAttendeeLastName;
+    const effectiveEmail = sanitizedData.registrantIsAttendee 
+      ? sanitizedData.billingEmail 
+      : sanitizedData.primaryAttendeeEmail;
+    
     const { data: registration, error: regError } = await supabaseAdmin
       .from('conference_registrations')
       .insert([{
-        school_district: sanitizedData.schoolDistrict,
-        first_name: sanitizedData.firstName,
-        last_name: sanitizedData.lastName,
+        school_district: effectiveSchoolDistrict,
+        first_name: effectiveFirstName,
+        last_name: effectiveLastName,
         street_address: sanitizedData.streetAddress,
         city: sanitizedData.city,
         state: sanitizedData.state,
         zip_code: sanitizedData.zipCode,
-        email: sanitizedData.email,
-        phone: sanitizedData.phone,
+        email: effectiveEmail,
+        phone: sanitizedData.billingPhone,
         total_attendees: sanitizedData.totalAttendees,
         total_amount: sanitizedData.totalAmount,
         conference_id: sanitizedData.conferenceId,
+        // Billing contact fields
+        billing_first_name: sanitizedData.billingFirstName,
+        billing_last_name: sanitizedData.billingLastName,
+        billing_email: sanitizedData.billingEmail,
+        billing_phone: sanitizedData.billingPhone,
+        registrant_is_attendee: sanitizedData.registrantIsAttendee,
         // Payment fields
         payment_method: sanitizedData.paymentMethod,
         payment_status: sanitizedData.paymentStatus || 'pending',
@@ -258,11 +293,11 @@ Deno.serve(async (req) => {
 
     // Prepare email data with sanitized values
     const emailData: ConferenceRegistrationData = {
-      firstName: sanitizedData.firstName || '',
-      lastName: sanitizedData.lastName || '',
-      email: sanitizedData.email || '',
-      schoolDistrict: sanitizedData.schoolDistrict || '',
-      phone: sanitizedData.phone || '',
+      firstName: effectiveFirstName || '',
+      lastName: effectiveLastName || '',
+      email: effectiveEmail || '',
+      schoolDistrict: effectiveSchoolDistrict || '',
+      phone: sanitizedData.billingPhone || '',
       streetAddress: sanitizedData.streetAddress || '',
       city: sanitizedData.city || '',
       state: sanitizedData.state || '',
@@ -284,19 +319,68 @@ Deno.serve(async (req) => {
       additionalAttendees: sanitizedAttendees || [],
       remittanceAddress: formatRemittanceAddressPlain(settings),
       contactEmail: settings.payment_contact_email,
-      contactPhone: settings.payment_contact_phone
+      contactPhone: settings.payment_contact_phone,
+      // Billing contact info for email template
+      billingFirstName: sanitizedData.billingFirstName || '',
+      billingLastName: sanitizedData.billingLastName || '',
+      billingEmail: sanitizedData.billingEmail || '',
+      registrantIsAttendee: sanitizedData.registrantIsAttendee
     };
 
-    // Send confirmation email to user
-    console.log('📧 Sending confirmation email to user...');
-    const userEmailResult = await sendEmail({
-      to: sanitizedData.email || '',
-      subject: `Registration Confirmation - ${emailData.conferenceName}`,
+    // Send confirmation/invoice email to billing contact
+    console.log('📧 Sending invoice email to billing contact:', sanitizedData.billingEmail);
+    const billingEmailResult = await sendEmail({
+      to: sanitizedData.billingEmail || '',
+      subject: `Registration Invoice - ${emailData.conferenceName}`,
       html: generateConferenceConfirmationEmail(emailData)
     });
 
-    if (!userEmailResult.success) {
-      console.error('⚠️ Failed to send user confirmation email:', userEmailResult.error);
+    if (!billingEmailResult.success) {
+      console.error('⚠️ Failed to send billing confirmation email:', billingEmailResult.error);
+    }
+
+    // Build list of all attendees who need event details emails
+    const allAttendeeEmails: { email: string; firstName: string; lastName: string }[] = [];
+    
+    // If registrant is attending, they're the primary attendee (already got billing email)
+    // If registrant is NOT attending, add the primary attendee
+    if (!sanitizedData.registrantIsAttendee && sanitizedData.primaryAttendeeEmail) {
+      allAttendeeEmails.push({
+        email: sanitizedData.primaryAttendeeEmail,
+        firstName: sanitizedData.primaryAttendeeFirstName || '',
+        lastName: sanitizedData.primaryAttendeeLastName || ''
+      });
+    }
+    
+    // Add all additional attendees
+    for (const attendee of sanitizedAttendees) {
+      // Skip if this email is the same as the billing email (they already got the invoice)
+      if (attendee.email && attendee.email.toLowerCase() !== sanitizedData.billingEmail?.toLowerCase()) {
+        allAttendeeEmails.push({
+          email: attendee.email,
+          firstName: attendee.firstName || '',
+          lastName: attendee.lastName || ''
+        });
+      }
+    }
+    
+    // Send event details emails to all attendees who aren't the billing contact
+    for (const attendee of allAttendeeEmails) {
+      console.log(`📧 Sending event details email to attendee: ${attendee.email}`);
+      const attendeeEmailResult = await sendEmail({
+        to: attendee.email,
+        subject: `You're Registered! - ${emailData.conferenceName}`,
+        html: generateConferenceConfirmationEmail({
+          ...emailData,
+          firstName: attendee.firstName,
+          lastName: attendee.lastName,
+          email: attendee.email
+        })
+      });
+      
+      if (!attendeeEmailResult.success) {
+        console.error(`⚠️ Failed to send attendee email to ${attendee.email}:`, attendeeEmailResult.error);
+      }
     }
 
     // Send notification to admin(s)
@@ -304,7 +388,7 @@ Deno.serve(async (req) => {
     console.log('📧 Sending admin notification email...');
     const adminEmailResult = await sendEmail({
       to: adminEmail,
-      subject: `New Registration: ${sanitizedData.schoolDistrict} - ${emailData.conferenceName}`,
+      subject: `New Registration: ${effectiveSchoolDistrict} - ${emailData.conferenceName}`,
       html: generateConferenceAdminNotification(emailData)
     });
 

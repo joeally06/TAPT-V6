@@ -452,16 +452,6 @@ const RegionalLuncheonRegistration: React.FC = () => {
                   </select>
                 </div>
 
-                {/* Submit Button */}
-                <div>
-                  <button
-                    type="submit"
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 shadow-md hover:shadow-lg"
-                  >
-                    Submit Registration
-                  </button>
-                </div>
-
                 <p className="text-sm text-gray-500 text-center">
                   * Required fields
                 </p>

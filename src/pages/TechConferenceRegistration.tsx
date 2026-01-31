@@ -28,15 +28,29 @@ interface TechConferenceSettings {
 
 const TechConferenceRegistration: React.FC = () => {
   const [formData, setFormData] = useState({
+    // Registration type flag
+    registrantIsAttendee: true,
+    
+    // Billing/Registrant Information (person filling out the form)
+    billingFirstName: '',
+    billingLastName: '',
+    billingEmail: '',
+    billingPhone: '',
+    
+    // Primary Attendee (only used if registrantIsAttendee is false)
+    primaryAttendeeFirstName: '',
+    primaryAttendeeLastName: '',
+    primaryAttendeeEmail: '',
+    primaryAttendeeSchoolDistrict: '',
+    
+    // Organization Info
     schoolDistrict: '',
-    firstName: '',
-    lastName: '',
     streetAddress: '',
     city: '',
     state: '',
     zipCode: '',
-    email: '',
-    phone: '',
+    
+    // Attendee tracking
     totalAttendees: 1,
     additionalAttendees: [] as Attendee[]
   });
@@ -143,6 +157,20 @@ const TechConferenceRegistration: React.FC = () => {
     }
   };
 
+  const handleRegistrantTypeChange = (isAttendee: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      registrantIsAttendee: isAttendee,
+      // Clear primary attendee fields if switching back to "I am attending"
+      ...(isAttendee ? {
+        primaryAttendeeFirstName: '',
+        primaryAttendeeLastName: '',
+        primaryAttendeeEmail: '',
+        primaryAttendeeSchoolDistrict: ''
+      } : {})
+    }));
+  };
+
   const handleAttendeeChange = (index: number, field: keyof Attendee, value: string) => {
     setFormData(prev => {
       const newAttendees = [...prev.additionalAttendees];
@@ -177,6 +205,21 @@ const TechConferenceRegistration: React.FC = () => {
       throw new Error('Please complete PayPal payment before submitting.');
     }
 
+    // Validate school district based on registration type
+    if (formData.registrantIsAttendee) {
+      if (!formData.schoolDistrict.trim()) {
+        throw new Error('Please provide your school district or organization.');
+      }
+    } else {
+      // Validate primary attendee fields if registrant is not attending
+      if (!formData.primaryAttendeeFirstName.trim() || !formData.primaryAttendeeLastName.trim() || !formData.primaryAttendeeEmail.trim()) {
+        throw new Error('Please provide primary attendee information.');
+      }
+      if (!formData.primaryAttendeeSchoolDistrict.trim()) {
+        throw new Error('Please provide the primary attendee\'s school district or organization.');
+      }
+    }
+
     try {
       
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -185,20 +228,41 @@ const TechConferenceRegistration: React.FC = () => {
       }
 
       const payload = {
-        schoolDistrict: formData.schoolDistrict,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
+        // Billing contact (person filling out the form - receives invoices)
+        billingFirstName: formData.billingFirstName,
+        billingLastName: formData.billingLastName,
+        billingEmail: formData.billingEmail,
+        billingPhone: formData.billingPhone,
+        registrantIsAttendee: formData.registrantIsAttendee,
+        
+        // Primary attendee info (for backward compatibility - main attendee)
+        firstName: formData.registrantIsAttendee 
+          ? formData.billingFirstName 
+          : formData.primaryAttendeeFirstName,
+        lastName: formData.registrantIsAttendee 
+          ? formData.billingLastName 
+          : formData.primaryAttendeeLastName,
+        email: formData.registrantIsAttendee 
+          ? formData.billingEmail 
+          : formData.primaryAttendeeEmail,
+        phone: formData.billingPhone,
+        
+        // Organization info - use primary attendee's school district when registering for others
+        schoolDistrict: formData.registrantIsAttendee 
+          ? formData.schoolDistrict 
+          : formData.primaryAttendeeSchoolDistrict,
         streetAddress: formData.streetAddress,
         city: formData.city,
         state: formData.state,
         zipCode: formData.zipCode,
-        email: formData.email,
-        phone: formData.phone,
+        
+        // Registration details
         totalAttendees: formData.totalAttendees,
         totalAmount,
         conferenceId: conferenceSettings?.id,
         additionalAttendees: formData.additionalAttendees,
         turnstileToken,
+        
         // Payment fields
         paymentMethod,
         poNumber: paymentMethod === 'po' ? poNumber : null,
@@ -248,15 +312,20 @@ const TechConferenceRegistration: React.FC = () => {
       
       // Reset form
       setFormData({
+        registrantIsAttendee: true,
+        billingFirstName: '',
+        billingLastName: '',
+        billingEmail: '',
+        billingPhone: '',
+        primaryAttendeeFirstName: '',
+        primaryAttendeeLastName: '',
+        primaryAttendeeEmail: '',
+        primaryAttendeeSchoolDistrict: '',
         schoolDistrict: '',
-        firstName: '',
-        lastName: '',
         streetAddress: '',
         city: '',
         state: '',
         zipCode: '',
-        email: '',
-        phone: '',
         totalAttendees: 1,
         additionalAttendees: []
       });
@@ -455,44 +524,6 @@ const TechConferenceRegistration: React.FC = () => {
                     <p className="text-gray-700">{conferenceSettings.description}</p>
                   </div>
                 )}
-
-                {/* Registration Deadline Notice */}
-                {conferenceSettings?.registration_end_date && (
-                  <div className={`mt-6 p-4 rounded-md ${
-                    isRegistrationClosed 
-                      ? 'bg-red-50 border border-red-200' 
-                      : 'bg-yellow-50 border border-yellow-200'
-                  }`}>
-                    <div className="flex items-start">
-                      <AlertCircle className={`h-5 w-5 ${
-                        isRegistrationClosed ? 'text-red-400' : 'text-yellow-400'
-                      }`} />
-                      <div className="ml-3">
-                        <h3 className={`text-sm font-medium ${
-                          isRegistrationClosed ? 'text-red-800' : 'text-yellow-800'
-                        }`}>
-                          {isRegistrationClosed 
-                            ? 'Registration is closed'
-                            : 'Registration deadline approaching'
-                          }
-                        </h3>
-                        <p className={`mt-1 text-sm ${
-                          isRegistrationClosed ? 'text-red-700' : 'text-yellow-700'
-                        }`}>
-                          {(() => {
-                            const deadlineStr = conferenceSettings.registration_end_date.includes('T') ? conferenceSettings.registration_end_date.split('T')[0] : conferenceSettings.registration_end_date;
-                            const [y, m, d] = deadlineStr.split('-');
-                            const date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
-                            const dateStr = date.toLocaleDateString();
-                            return isRegistrationClosed
-                              ? `Registration closed on ${dateStr}`
-                              : `Registration closes on ${dateStr}`;
-                          })()}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -533,36 +564,64 @@ const TechConferenceRegistration: React.FC = () => {
             )}
 
             <SecureForm onSubmit={handleSecureSubmit} className="bg-white shadow-lg rounded-lg p-8">
-              {/* Organization Information */}
+              {/* Registration Type Selection */}
               <div className="mb-8">
-                <h2 className="text-xl font-semibold text-secondary mb-6">Organization Information</h2>
-                <div>
-                  <label htmlFor="schoolDistrict" className="block text-sm font-medium text-gray-700 mb-1">
-                    School District or Organization <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Building className="h-5 w-5 text-gray-400" />
+                <h2 className="text-xl font-semibold text-secondary mb-4">Registration Type</h2>
+                <p className="text-sm text-gray-600 mb-4">
+                  Are you registering for yourself or on behalf of others?
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <button
+                    type="button"
+                    onClick={() => handleRegistrantTypeChange(true)}
+                    className={`p-4 border-2 rounded-lg text-left transition-all ${
+                      formData.registrantIsAttendee
+                        ? 'border-primary bg-primary/5'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center mb-2">
+                      <User className={`h-5 w-5 mr-2 ${formData.registrantIsAttendee ? 'text-primary' : 'text-gray-400'}`} />
+                      <span className="font-medium">I am attending</span>
                     </div>
-                    <input
-                      type="text"
-                      id="schoolDistrict"
-                      name="schoolDistrict"
-                      value={formData.schoolDistrict}
-                      onChange={handleChange}
-                      required
-                      className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
-                    />
-                  </div>
+                    <p className="text-sm text-gray-500">
+                      I'm registering myself (and possibly others)
+                    </p>
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => handleRegistrantTypeChange(false)}
+                    className={`p-4 border-2 rounded-lg text-left transition-all ${
+                      !formData.registrantIsAttendee
+                        ? 'border-primary bg-primary/5'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center mb-2">
+                      <Users className={`h-5 w-5 mr-2 ${!formData.registrantIsAttendee ? 'text-primary' : 'text-gray-400'}`} />
+                      <span className="font-medium">Registering for others</span>
+                    </div>
+                    <p className="text-sm text-gray-500">
+                      I'm a bookkeeper, admin, or registering on behalf of attendees
+                    </p>
+                  </button>
                 </div>
               </div>
 
-              {/* Contact Information */}
+              {/* Billing/Registrant Information */}
               <div className="mb-8">
-                <h2 className="text-xl font-semibold text-secondary mb-6">Primary Contact</h2>
+                <h2 className="text-xl font-semibold text-secondary mb-2">
+                  {formData.registrantIsAttendee ? 'Your Information' : 'Billing Contact'}
+                </h2>
+                <p className="text-sm text-gray-600 mb-6">
+                  {formData.registrantIsAttendee 
+                    ? 'Enter your contact information.' 
+                    : 'Enter your contact information for invoices and payment confirmation.'}
+                </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="billingFirstName" className="block text-sm font-medium text-gray-700 mb-1">
                       First Name <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
@@ -571,9 +630,9 @@ const TechConferenceRegistration: React.FC = () => {
                       </div>
                       <input
                         type="text"
-                        id="firstName"
-                        name="firstName"
-                        value={formData.firstName}
+                        id="billingFirstName"
+                        name="billingFirstName"
+                        value={formData.billingFirstName}
                         onChange={handleChange}
                         required
                         className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
@@ -582,7 +641,7 @@ const TechConferenceRegistration: React.FC = () => {
                   </div>
 
                   <div>
-                    <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="billingLastName" className="block text-sm font-medium text-gray-700 mb-1">
                       Last Name <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
@@ -591,9 +650,9 @@ const TechConferenceRegistration: React.FC = () => {
                       </div>
                       <input
                         type="text"
-                        id="lastName"
-                        name="lastName"
-                        value={formData.lastName}
+                        id="billingLastName"
+                        name="billingLastName"
+                        value={formData.billingLastName}
                         onChange={handleChange}
                         required
                         className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
@@ -602,7 +661,7 @@ const TechConferenceRegistration: React.FC = () => {
                   </div>
 
                   <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="billingEmail" className="block text-sm font-medium text-gray-700 mb-1">
                       Email <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
@@ -611,9 +670,9 @@ const TechConferenceRegistration: React.FC = () => {
                       </div>
                       <input
                         type="email"
-                        id="email"
-                        name="email"
-                        value={formData.email}
+                        id="billingEmail"
+                        name="billingEmail"
+                        value={formData.billingEmail}
                         onChange={handleChange}
                         required
                         className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
@@ -622,7 +681,7 @@ const TechConferenceRegistration: React.FC = () => {
                   </div>
 
                   <div>
-                    <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="billingPhone" className="block text-sm font-medium text-gray-700 mb-1">
                       Phone <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
@@ -631,9 +690,9 @@ const TechConferenceRegistration: React.FC = () => {
                       </div>
                       <input
                         type="tel"
-                        id="phone"
-                        name="phone"
-                        value={formData.phone}
+                        id="billingPhone"
+                        name="billingPhone"
+                        value={formData.billingPhone}
                         onChange={handleChange}
                         required
                         className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
@@ -642,6 +701,110 @@ const TechConferenceRegistration: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              {/* School District (shown when registrant IS attending) */}
+              {formData.registrantIsAttendee && (
+                <div className="mb-8">
+                  <h2 className="text-xl font-semibold text-secondary mb-6">Organization Information</h2>
+                  <div>
+                    <label htmlFor="schoolDistrict" className="block text-sm font-medium text-gray-700 mb-1">
+                      School District or Organization <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Building className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        type="text"
+                        id="schoolDistrict"
+                        name="schoolDistrict"
+                        value={formData.schoolDistrict}
+                        onChange={handleChange}
+                        required={formData.registrantIsAttendee}
+                        className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Primary Attendee (only shown if registrant is NOT attending) */}
+              {!formData.registrantIsAttendee && (
+                <div className="mb-8 p-6 bg-blue-50 border border-blue-200 rounded-lg">
+                  <h2 className="text-xl font-semibold text-secondary mb-2">Primary Attendee</h2>
+                  <p className="text-sm text-gray-600 mb-6">
+                    Enter the information for the main attendee. This person will receive event details and updates.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                      <label htmlFor="primaryAttendeeFirstName" className="block text-sm font-medium text-gray-700 mb-1">
+                        First Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        id="primaryAttendeeFirstName"
+                        name="primaryAttendeeFirstName"
+                        value={formData.primaryAttendeeFirstName}
+                        onChange={handleChange}
+                        required={!formData.registrantIsAttendee}
+                        className="block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="primaryAttendeeLastName" className="block text-sm font-medium text-gray-700 mb-1">
+                        Last Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        id="primaryAttendeeLastName"
+                        name="primaryAttendeeLastName"
+                        value={formData.primaryAttendeeLastName}
+                        onChange={handleChange}
+                        required={!formData.registrantIsAttendee}
+                        className="block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="primaryAttendeeEmail" className="block text-sm font-medium text-gray-700 mb-1">
+                        Email <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        id="primaryAttendeeEmail"
+                        name="primaryAttendeeEmail"
+                        value={formData.primaryAttendeeEmail}
+                        onChange={handleChange}
+                        required={!formData.registrantIsAttendee}
+                        className="block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* School District for Primary Attendee */}
+                  <div className="mt-6">
+                    <label htmlFor="primaryAttendeeSchoolDistrict" className="block text-sm font-medium text-gray-700 mb-1">
+                      School District or Organization <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Building className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        type="text"
+                        id="primaryAttendeeSchoolDistrict"
+                        name="primaryAttendeeSchoolDistrict"
+                        value={formData.primaryAttendeeSchoolDistrict}
+                        onChange={handleChange}
+                        required={!formData.registrantIsAttendee}
+                        className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
+                        placeholder="Enter the attendee's school district or organization"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Address */}
               <div className="mb-8">
@@ -897,7 +1060,6 @@ const TechConferenceRegistration: React.FC = () => {
                   ((paymentMethod === 'po' && poNumber.trim() !== '') || 
                    (paymentMethod === 'paypal' && paypalDetails !== null)) ? 'true' : ''
                 }
-                required={!paymentMethod || (paymentMethod === 'po' && !poNumber.trim()) || (paymentMethod === 'paypal' && !paypalDetails)}
               />
 
             </SecureForm>
