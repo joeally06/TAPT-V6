@@ -750,22 +750,30 @@ const StudentScholarshipApplication: React.FC = () => {
                 </div>
               </div>
 
-              {/* Section III: Nomination Essay */}
+              {/* Section III: Student Essay */}
               <div className="mb-8">
-                <h2 className="text-xl font-semibold text-secondary mb-2">III. Nomination Essay</h2>
-                <p className="text-sm text-gray-600 mb-6">Please provide a detailed recommendation for this student</p>
+                <h2 className="text-xl font-semibold text-secondary mb-2">III. Student Essay</h2>
+                <p className="text-sm text-gray-600 mb-6">Copy and paste the student's essay below</p>
                 
                 <div className="bg-yellow-50 p-4 rounded-md mb-6">
-                  <p className="text-sm text-gray-700">
-                    Your nomination essay should be <strong>300-500 words</strong>. Please describe why you are nominating this student, 
-                    including their character, achievements, involvement in transportation (if any), community contributions, and why 
-                    they would be a worthy recipient of the TAPT scholarship.
+                  <p className="text-sm text-gray-700 mb-3">
+                    <strong>Instructions for the Nominator:</strong> Please have the student write an essay and then copy and paste it into the field below.
                   </p>
+                  <p className="text-sm text-gray-700 mb-3">
+                    <strong>Essay Requirements for the Student:</strong> The essay should be <strong>300-500 words</strong> and address the following:
+                  </p>
+                  <ul className="text-sm text-gray-700 list-disc list-inside ml-2 space-y-1">
+                    <li>Your educational goals and career aspirations</li>
+                    <li>How school transportation has impacted your education</li>
+                    <li>Your involvement in school, community, or extracurricular activities</li>
+                    <li>Why you believe you are a worthy recipient of the TAPT scholarship</li>
+                    <li>Any challenges you have overcome in pursuing your education</li>
+                  </ul>
                 </div>
 
                 <div className="mb-6">
                   <label htmlFor="essay" className="block text-sm font-medium text-gray-700 mb-1">
-                    Nomination Essay <span className="text-red-500">*</span>
+                    Student Essay <span className="text-red-500">*</span>
                   </label>
                   <textarea
                     id="essay"
@@ -774,7 +782,7 @@ const StudentScholarshipApplication: React.FC = () => {
                     onChange={handleChange}
                     rows={10}
                     required
-                    placeholder="Explain why this student deserves the TAPT scholarship..."
+                    placeholder="Paste the student's essay here..."
                     className="block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
                   />
                   <p className={`mt-1 text-sm ${wordCounts.essay < 300 || wordCounts.essay > 500 ? 'text-red-500' : 'text-gray-500'}`}>

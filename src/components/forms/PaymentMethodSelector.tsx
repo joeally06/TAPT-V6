@@ -69,8 +69,8 @@ export function PaymentMethodSelector({
           >
             <DollarSign className={`w-8 h-8 mr-4 ${selectedMethod === 'paypal' ? 'text-primary' : 'text-gray-400'}`} />
             <div className="text-left flex-1">
-              <div className="font-semibold text-gray-900">PayPal</div>
-              <div className="text-sm text-gray-500">Pay securely online</div>
+              <div className="font-semibold text-gray-900">PayPal / Credit Card</div>
+              <div className="text-sm text-gray-500">Pay securely online with PayPal or credit card</div>
             </div>
             {selectedMethod === 'paypal' && (
               <div className="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center">

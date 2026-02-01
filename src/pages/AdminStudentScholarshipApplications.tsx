@@ -355,7 +355,7 @@ const AdminStudentScholarshipApplications: React.FC = () => {
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(71, 32, 183);
-    doc.text('Nomination Essay', margin, yPos);
+    doc.text('Student Essay', margin, yPos);
     doc.setTextColor(0, 0, 0);
     yPos += 8;
 
