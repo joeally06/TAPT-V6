@@ -36,7 +36,7 @@ interface ContentItem {
   category: string | null;
   link: string | null;
   is_featured: boolean;
-  linked_form_type: 'conference' | 'tech-conference' | 'hall-of-fame' | 'student-scholarship' | 'exhibitor' | null;
+  linked_form_type: 'conference' | 'tech-conference' | 'regional-luncheon' | 'hall-of-fame' | 'student-scholarship' | 'exhibitor' | null;
 }
 
 // Allowed file types for announcements (documents + images)
@@ -776,6 +776,7 @@ export const AdminContent: React.FC = () => {
                           <option value="">None (No Form Link)</option>
                           <option value="conference">Conference Registration</option>
                           <option value="tech-conference">Tech Conference Registration</option>
+                          <option value="regional-luncheon">Regional Luncheon Registration</option>
                           <option value="hall-of-fame">Hall of Fame Nomination</option>
                           <option value="student-scholarship">Student Scholarship Application</option>
                           <option value="exhibitor">Exhibitor Registration</option>
@@ -1009,6 +1010,7 @@ export const AdminContent: React.FC = () => {
                               <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
                                 {item.linked_form_type === 'conference' && 'Conference Registration'}
                                 {item.linked_form_type === 'tech-conference' && 'Tech Conference Registration'}
+                                {item.linked_form_type === 'regional-luncheon' && 'Regional Luncheon Registration'}
                                 {item.linked_form_type === 'hall-of-fame' && 'Hall of Fame Nomination'}
                                 {item.linked_form_type === 'student-scholarship' && 'Student Scholarship'}
                                 {item.linked_form_type === 'exhibitor' && 'Exhibitor Registration'}

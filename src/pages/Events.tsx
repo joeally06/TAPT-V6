@@ -16,7 +16,7 @@ interface Event {
   category: string;
   link: string | null;
   created_at: string;
-  linked_form_type: 'conference' | 'tech-conference' | 'hall-of-fame' | 'student-scholarship' | null;
+  linked_form_type: 'conference' | 'tech-conference' | 'regional-luncheon' | 'hall-of-fame' | 'student-scholarship' | 'exhibitor' | null;
 }
 
 export const Events: React.FC = () => {
@@ -71,6 +71,8 @@ export const Events: React.FC = () => {
           return '/conference-registration';
         case 'tech-conference':
           return '/tech-conference-registration';
+        case 'regional-luncheon':
+          return '/regional-luncheon-registration';
         case 'exhibitor':
           return '/exhibitor-registration';
         case 'hall-of-fame':
