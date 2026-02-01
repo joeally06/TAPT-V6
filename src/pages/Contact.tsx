@@ -8,6 +8,11 @@ import { SecureForm } from '../components/forms/SecureForm';
 export const Contact: React.FC = () => {
   const [contactEmail, setContactEmail] = useState<string>('contact@tapt.org');
   const [contactPhone, setContactPhone] = useState<string>('615-406-9199');
+  const [contactAddressLine1, setContactAddressLine1] = useState<string>('P.O. Box 700');
+  const [contactAddressLine2, setContactAddressLine2] = useState<string>('');
+  const [contactCity, setContactCity] = useState<string>('Portland');
+  const [contactState, setContactState] = useState<string>('TN');
+  const [contactZip, setContactZip] = useState<string>('37148');
   const [businessHoursDays, setBusinessHoursDays] = useState<string>('Monday – Friday');
   const [businessHoursTime, setBusinessHoursTime] = useState<string>('8:00 AM – 4:30 PM CST');
   const [formState, setFormState] = useState({
@@ -26,6 +31,21 @@ export const Contact: React.FC = () => {
 
         const phone = await getSiteSetting('contact_phone');
         if (phone) setContactPhone(phone);
+
+        const addressLine1 = await getSiteSetting('contact_address_line1');
+        if (addressLine1) setContactAddressLine1(addressLine1);
+
+        const addressLine2 = await getSiteSetting('contact_address_line2');
+        if (addressLine2) setContactAddressLine2(addressLine2);
+
+        const city = await getSiteSetting('contact_city');
+        if (city) setContactCity(city);
+
+        const state = await getSiteSetting('contact_state');
+        if (state) setContactState(state);
+
+        const zip = await getSiteSetting('contact_zip');
+        if (zip) setContactZip(zip);
 
         const hoursDays = await getSiteSetting('business_hours_days');
         if (hoursDays) setBusinessHoursDays(hoursDays);
@@ -130,8 +150,9 @@ export const Contact: React.FC = () => {
                     <h3 className="text-lg font-semibold text-secondary">Mailing Address</h3>
                     <address className="mt-1 not-italic text-gray-600">
                       Tennessee Association of Pupil Transportation<br />
-                      P.O. Box 700<br />
-                      Portland, TN 37148
+                      {contactAddressLine1}
+                      {contactAddressLine2 && <><br />{contactAddressLine2}</>}
+                      <br />{contactCity}, {contactState} {contactZip}
                     </address>
                   </div>
                 </div>

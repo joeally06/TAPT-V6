@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Save, Upload, X, Image, AlertCircle, CheckCircle, Mail, Phone, Globe, Type, Clock } from 'lucide-react';
+import { Save, Upload, X, Image, AlertCircle, CheckCircle, Mail, Phone, Globe, Type, Clock, MapPin } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { getSiteSetting, updateSiteSetting } from '../lib/siteSettings';
@@ -12,6 +12,11 @@ interface SiteSettingsState {
   siteTagline: string;
   contactEmail: string;
   contactPhone: string;
+  contactAddressLine1: string;
+  contactAddressLine2: string;
+  contactCity: string;
+  contactState: string;
+  contactZip: string;
   businessHoursDays: string;
   businessHoursTime: string;
   socialFacebook: string;
@@ -32,6 +37,11 @@ export const AdminSiteSettings: React.FC = () => {
     siteTagline: '',
     contactEmail: '',
     contactPhone: '',
+    contactAddressLine1: '',
+    contactAddressLine2: '',
+    contactCity: '',
+    contactState: '',
+    contactZip: '',
     businessHoursDays: '',
     businessHoursTime: '',
     socialFacebook: '',
@@ -75,6 +85,11 @@ export const AdminSiteSettings: React.FC = () => {
       const siteTagline = await getSiteSetting('site_tagline');
       const contactEmail = await getSiteSetting('contact_email');
       const contactPhone = await getSiteSetting('contact_phone');
+      const contactAddressLine1 = await getSiteSetting('contact_address_line1');
+      const contactAddressLine2 = await getSiteSetting('contact_address_line2');
+      const contactCity = await getSiteSetting('contact_city');
+      const contactState = await getSiteSetting('contact_state');
+      const contactZip = await getSiteSetting('contact_zip');
       const businessHoursDays = await getSiteSetting('business_hours_days');
       const businessHoursTime = await getSiteSetting('business_hours_time');
       const socialFacebook = await getSiteSetting('social_facebook');
@@ -89,6 +104,11 @@ export const AdminSiteSettings: React.FC = () => {
         siteTagline: siteTagline || 'Promoting safe and efficient student transportation across Tennessee',
         contactEmail: contactEmail || 'contact@tapt.org',
         contactPhone: contactPhone || '615-406-9199',
+        contactAddressLine1: contactAddressLine1 || 'P.O. Box 700',
+        contactAddressLine2: contactAddressLine2 || '',
+        contactCity: contactCity || 'Portland',
+        contactState: contactState || 'TN',
+        contactZip: contactZip || '37148',
         businessHoursDays: businessHoursDays || 'Monday – Friday',
         businessHoursTime: businessHoursTime || '8:00 AM – 4:30 PM CST',
         socialFacebook: socialFacebook || '',
@@ -183,6 +203,11 @@ export const AdminSiteSettings: React.FC = () => {
       await updateSiteSetting('site_tagline', settings.siteTagline);
       await updateSiteSetting('contact_email', settings.contactEmail);
       await updateSiteSetting('contact_phone', settings.contactPhone);
+      await updateSiteSetting('contact_address_line1', settings.contactAddressLine1);
+      await updateSiteSetting('contact_address_line2', settings.contactAddressLine2);
+      await updateSiteSetting('contact_city', settings.contactCity);
+      await updateSiteSetting('contact_state', settings.contactState);
+      await updateSiteSetting('contact_zip', settings.contactZip);
       await updateSiteSetting('business_hours_days', settings.businessHoursDays);
       await updateSiteSetting('business_hours_time', settings.businessHoursTime);
       await updateSiteSetting('social_facebook', settings.socialFacebook);
@@ -481,6 +506,105 @@ export const AdminSiteSettings: React.FC = () => {
                 <p className="mt-1 text-sm text-gray-500">
                   Primary contact phone number displayed on the website.
                 </p>
+              </div>
+
+              {/* Address Section */}
+              <div className="border-t border-gray-200 pt-6 mt-6">
+                <h3 className="text-lg font-semibold text-secondary mb-4 flex items-center">
+                  <MapPin className="h-5 w-5 mr-2 text-primary" />
+                  Mailing Address
+                </h3>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="contactAddressLine1" className="block text-sm font-medium text-gray-700 mb-1">
+                      Address Line 1
+                    </label>
+                    <input
+                      type="text"
+                      id="contactAddressLine1"
+                      name="contactAddressLine1"
+                      value={settings.contactAddressLine1}
+                      onChange={handleChange}
+                      placeholder="P.O. Box 700 or Street Address"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="contactAddressLine2" className="block text-sm font-medium text-gray-700 mb-1">
+                      Address Line 2 <span className="text-gray-400">(Optional)</span>
+                    </label>
+                    <input
+                      type="text"
+                      id="contactAddressLine2"
+                      name="contactAddressLine2"
+                      value={settings.contactAddressLine2}
+                      onChange={handleChange}
+                      placeholder="Suite, Unit, Building, etc."
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="md:col-span-1">
+                      <label htmlFor="contactCity" className="block text-sm font-medium text-gray-700 mb-1">
+                        City
+                      </label>
+                      <input
+                        type="text"
+                        id="contactCity"
+                        name="contactCity"
+                        value={settings.contactCity}
+                        onChange={handleChange}
+                        placeholder="Portland"
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="contactState" className="block text-sm font-medium text-gray-700 mb-1">
+                        State
+                      </label>
+                      <input
+                        type="text"
+                        id="contactState"
+                        name="contactState"
+                        value={settings.contactState}
+                        onChange={handleChange}
+                        placeholder="TN"
+                        maxLength={2}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary uppercase"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="contactZip" className="block text-sm font-medium text-gray-700 mb-1">
+                        ZIP Code
+                      </label>
+                      <input
+                        type="text"
+                        id="contactZip"
+                        name="contactZip"
+                        value={settings.contactZip}
+                        onChange={handleChange}
+                        placeholder="37148"
+                        maxLength={10}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <p className="mt-2 text-sm text-gray-500">
+                  This address will be displayed on the Contact page and in the website footer.
+                </p>
+              </div>
+
+              <div className="border-t border-gray-200 pt-6 mt-6">
+                <h3 className="text-lg font-semibold text-secondary mb-4 flex items-center">
+                  <Clock className="h-5 w-5 mr-2 text-primary" />
+                  Business Hours
+                </h3>
               </div>
 
               <div>

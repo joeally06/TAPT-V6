@@ -7,6 +7,11 @@ export const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
   const [contactEmail, setContactEmail] = useState<string>('contact@tapt.org');
   const [contactPhone, setContactPhone] = useState<string>('615-406-9199');
+  const [contactAddressLine1, setContactAddressLine1] = useState<string>('P.O. Box 700');
+  const [contactAddressLine2, setContactAddressLine2] = useState<string>('');
+  const [contactCity, setContactCity] = useState<string>('Portland');
+  const [contactState, setContactState] = useState<string>('TN');
+  const [contactZip, setContactZip] = useState<string>('37148');
   const [businessHoursDays, setBusinessHoursDays] = useState<string>('Monday – Friday');
   const [businessHoursTime, setBusinessHoursTime] = useState<string>('8:00 AM – 4:30 PM CST');
   const [socialFacebook, setSocialFacebook] = useState<string>('https://facebook.com');
@@ -22,6 +27,21 @@ export const Footer: React.FC = () => {
 
         const phone = await getSiteSetting('contact_phone');
         if (phone) setContactPhone(phone);
+
+        const addressLine1 = await getSiteSetting('contact_address_line1');
+        if (addressLine1) setContactAddressLine1(addressLine1);
+
+        const addressLine2 = await getSiteSetting('contact_address_line2');
+        if (addressLine2) setContactAddressLine2(addressLine2);
+
+        const city = await getSiteSetting('contact_city');
+        if (city) setContactCity(city);
+
+        const state = await getSiteSetting('contact_state');
+        if (state) setContactState(state);
+
+        const zip = await getSiteSetting('contact_zip');
+        if (zip) setContactZip(zip);
 
         const hoursDays = await getSiteSetting('business_hours_days');
         if (hoursDays) setBusinessHoursDays(hoursDays);
@@ -114,7 +134,11 @@ export const Footer: React.FC = () => {
             <address className="not-italic">
               <div className="flex items-start mb-3">
                 <MapPin size={20} className="mr-2 mt-1 flex-shrink-0 text-tapt-gold" />
-                <span className="text-gray-100">P.O. Box 700<br />Portland, TN 37148</span>
+                <span className="text-gray-100">
+                  {contactAddressLine1}
+                  {contactAddressLine2 && <><br />{contactAddressLine2}</>}
+                  <br />{contactCity}, {contactState} {contactZip}
+                </span>
               </div>
               <div className="flex items-start mb-3">
                 <Phone size={20} className="mr-2 mt-1 flex-shrink-0 text-tapt-gold" />
