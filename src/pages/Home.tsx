@@ -77,6 +77,8 @@ export const Home: React.FC = () => {
           return '/conference-registration';
         case 'tech-conference':
           return '/tech-conference-registration';
+        case 'exhibitor':
+          return '/exhibitor-registration';
         case 'hall-of-fame':
           return '/hall-of-fame-nomination';
         case 'student-scholarship':
