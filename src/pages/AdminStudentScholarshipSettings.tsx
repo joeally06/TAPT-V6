@@ -33,13 +33,13 @@ const AdminStudentScholarshipSettings: React.FC = () => {
   
   const [settings, setSettings] = useState<ScholarshipSettings>({
     id: '',
-    name: '2025 TAPT Scholarship Application Form',
+    name: '2025 TAPT Student Scholarship Nomination Form',
     start_date: '',
     end_date: '',
     application_deadline: '',
-    description: 'TAPT offers scholarships to eligible students pursuing higher education in transportation-related fields.',
-    eligibility_criteria: 'Applicants must be high school seniors or current college students with less than 32 credit hours, planning to pursue a degree in a transportation-related field.',
-    instructions: 'Complete all required fields. Winners will be notified on or before April 30, 2025. Scholarship payments will be made directly to the institution upon proper confirmation of student enrollment.',
+    description: 'TAPT offers scholarships to eligible students in Tennessee. Transportation Directors nominate deserving students from their school districts.',
+    eligibility_criteria: 'Students must be graduating seniors in the current year and be nominated by a Transportation Director from their school district.',
+    instructions: 'Transportation Directors: Complete all required fields including your contact information, select your Tennessee region, and provide a nomination essay (300-500 words) explaining why this student deserves the scholarship. Winners will be notified after the deadline.',
     is_active: true
   });
 
@@ -199,13 +199,13 @@ const AdminStudentScholarshipSettings: React.FC = () => {
       const uuid = await fetchUUID();
       setSettings({
         id: uuid,
-        name: '2025 TAPT Scholarship Application Form',
+        name: '2025 TAPT Student Scholarship Nomination Form',
         start_date: '',
         end_date: '',
         application_deadline: '',
-        description: 'TAPT offers scholarships to eligible students pursuing higher education in transportation-related fields.',
-        eligibility_criteria: 'Applicants must be high school seniors or current college students with less than 32 credit hours, planning to pursue a degree in a transportation-related field.',
-        instructions: 'Complete all required fields. Winners will be notified on or before April 30, 2025. Scholarship payments will be made directly to the institution upon proper confirmation of student enrollment.',
+        description: 'TAPT offers scholarships to eligible students in Tennessee. Transportation Directors nominate deserving students from their school districts.',
+        eligibility_criteria: 'Students must be graduating seniors in the current year and be nominated by a Transportation Director from their school district.',
+        instructions: 'Transportation Directors: Complete all required fields including your contact information, select your Tennessee region, and provide a nomination essay (300-500 words) explaining why this student deserves the scholarship. Winners will be notified after the deadline.',
         is_active: true
       });
     } catch (error: any) {
@@ -593,13 +593,13 @@ const AdminStudentScholarshipSettings: React.FC = () => {
                   rows={4}
                   required
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
-                  placeholder="Specify who is eligible to apply for this scholarship..."
+                  placeholder="Specify who is eligible to be nominated for this scholarship..."
                 />
               </div>
 
               <div>
                 <label htmlFor="instructions" className="block text-sm font-medium text-gray-700">
-                  Application Instructions
+                  Nomination Instructions
                 </label>
                 <textarea
                   id="instructions"
@@ -609,7 +609,7 @@ const AdminStudentScholarshipSettings: React.FC = () => {
                   rows={4}
                   required
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
-                  placeholder="Provide detailed instructions for applicants..."
+                  placeholder="Provide detailed instructions for nominators (Transportation Directors)..."
                 />
               </div>
             </div>

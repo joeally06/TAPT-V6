@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Mail, Phone, MapPin, User, Book, Award, CheckCircle, AlertCircle } from 'lucide-react';
+import { Mail, Phone, MapPin, User, Award, CheckCircle, AlertCircle, Briefcase, Building2 } from 'lucide-react';
 import { SecureForm } from '../components/forms/SecureForm';
 
 interface ScholarshipSettings {
@@ -15,35 +15,39 @@ interface ScholarshipSettings {
   is_active: boolean;
 }
 
+// Tennessee regions
+const TENNESSEE_REGIONS = ['East', 'Middle', 'West'] as const;
+type Region = typeof TENNESSEE_REGIONS[number];
+
 const StudentScholarshipApplication: React.FC = () => {
+  // Current year for graduation validation
+  const currentYear = new Date().getFullYear();
+
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    birthMonth: '',
-    birthDay: '',
-    birthYear: '',
-    gender: '',
-    isUsCitizen: '',
-    applicationStatus: '',
-    isFirstGen: '',
-    majorArea: '',
-    careerObjective: '',
-    highSchool: '',
-    schoolDistrict: '',
-    graduationYear: '',
-    gpa: '',
-    activities: '',
-    actYear: '',
-    actScore: '',
-    essay: '',
+    // Nominator Information (Required)
+    nominatorFirstName: '',
+    nominatorLastName: '',
+    nominatorTitle: '',
+    nominatorEmail: '',
+    nominatorPhone: '',
+    nominatorDistrict: '',
+    // Region (Required)
+    region: '' as Region | '',
+    // Student Information
+    studentFirstName: '',
+    studentLastName: '',
+    studentHighSchool: '',
+    studentGraduationYear: currentYear.toString(),
+    studentEmail: '', // Optional
+    studentPhone: '', // Optional
+    // Student Address
     streetAddress: '',
     streetAddress2: '',
     city: '',
-    state: '',
+    state: 'TN', // Default to Tennessee
     zipCode: '',
-    mobilePhone: '',
-    email: '',
-    signature: ''
+    // Essay
+    essay: ''
   });
 
 
@@ -57,7 +61,6 @@ const StudentScholarshipApplication: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isApplicationClosed, setIsApplicationClosed] = useState(false);
   const [wordCounts, setWordCounts] = useState({
-    careerObjective: 0,
     essay: 0
   });
 
@@ -67,17 +70,13 @@ const StudentScholarshipApplication: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Count words in career objective
-    const careerWords = formData.careerObjective.trim() ? formData.careerObjective.trim().split(/\s+/).length : 0;
-    
     // Count words in essay
     const essayWords = formData.essay.trim() ? formData.essay.trim().split(/\s+/).length : 0;
     
     setWordCounts({
-      careerObjective: careerWords,
       essay: essayWords
     });
-  }, [formData.careerObjective, formData.essay]);
+  }, [formData.essay]);
 
   const fetchScholarshipSettings = async () => {
     try {
@@ -136,18 +135,28 @@ const StudentScholarshipApplication: React.FC = () => {
     }
   };
 
-  const handleSecureSubmit = async (turnstileToken: string) => {
+  // SecureForm passes: (formData, isVerified, turnstileToken)
+  const handleSecureSubmit = async (_formData: any, _isVerified: boolean, turnstileToken?: string) => {
+    if (!turnstileToken) {
+      throw new Error('Security verification required. Please complete the captcha.');
+    }
+
     if (!scholarshipSettings?.is_active) {
-      throw new Error('Scholarship application is not currently available.');
+      throw new Error('Scholarship nominations are not currently available.');
     }
 
     if (isApplicationClosed) {
-      throw new Error('Application deadline has passed.');
+      throw new Error('Nomination deadline has passed.');
     }
 
     // Validate essay word count
     if (wordCounts.essay < 300 || wordCounts.essay > 500) {
-      throw new Error('Your essay must be between 300-500 words.');
+      throw new Error('Your nomination essay must be between 300-500 words.');
+    }
+
+    // Validate graduation year is current year
+    if (formData.studentGraduationYear !== currentYear.toString()) {
+      throw new Error(`Student must be graduating in ${currentYear} to be eligible.`);
     }
 
     try {
@@ -157,40 +166,33 @@ const StudentScholarshipApplication: React.FC = () => {
         throw new Error('Configuration error. Please contact support.');
       }
 
-      // Format birthdate
-      const birthdate = `${formData.birthYear}-${formData.birthMonth.padStart(2, '0')}-${formData.birthDay.padStart(2, '0')}`;
-
-      // Prepare the request payload
+      // Prepare the request payload (new nomination-based structure)
       const payload = {
-        fullName: {
-          first: formData.firstName,
-          last: formData.lastName
+        nominator: {
+          firstName: formData.nominatorFirstName.trim(),
+          lastName: formData.nominatorLastName.trim(),
+          title: formData.nominatorTitle.trim(),
+          email: formData.nominatorEmail.trim().toLowerCase(),
+          phone: formData.nominatorPhone.trim(),
+          district: formData.nominatorDistrict.trim()
         },
-        birthdate,
-        gender: formData.gender || null,
-        isUsCitizen: formData.isUsCitizen === 'Yes',
-        applicationStatus: formData.applicationStatus,
-        isFirstGen: formData.isFirstGen === 'Yes, I am the first among my parents or grandparents to attend college.',
-        majorArea: formData.majorArea,
-        careerObjective: formData.careerObjective,
-        highSchool: formData.highSchool,
-        schoolDistrict: formData.schoolDistrict,
-        graduationYear: formData.graduationYear,
-        gpa: formData.gpa,
-        activities: formData.activities,
-        actYear: formData.actYear,
-        actScore: formData.actScore,
-        essay: formData.essay,
-        homeAddress: {
-          addr_line1: formData.streetAddress,
-          addr_line2: formData.streetAddress2,
-          city: formData.city,
-          state: formData.state,
-          postal: formData.zipCode
+        region: formData.region,
+        student: {
+          firstName: formData.studentFirstName.trim(),
+          lastName: formData.studentLastName.trim(),
+          highSchool: formData.studentHighSchool.trim(),
+          graduationYear: formData.studentGraduationYear,
+          email: formData.studentEmail.trim() || undefined,
+          phone: formData.studentPhone.trim() || undefined,
+          homeAddress: {
+            addr_line1: formData.streetAddress.trim(),
+            addr_line2: formData.streetAddress2.trim() || undefined,
+            city: formData.city.trim(),
+            state: formData.state.trim(),
+            postal: formData.zipCode.trim()
+          }
         },
-        mobilePhone: formData.mobilePhone,
-        email: formData.email,
-        signature: formData.signature,
+        essay: formData.essay.trim(),
         turnstileToken
       };
 
@@ -217,47 +219,39 @@ const StudentScholarshipApplication: React.FC = () => {
       }
 
       if (!result.success) {
-        throw new Error(result.error || 'Application failed. Please try again.');
+        throw new Error(result.error || 'Nomination failed. Please try again.');
       }
 
       // ✅ Only show success message via formStatus
       setFormStatus({
         success: true,
-        message: 'Application submitted successfully! You will receive a confirmation email shortly.'
+        message: 'Nomination submitted successfully! The nominator will receive a confirmation email shortly.'
       });
       
       // Reset form
       setFormData({
-        firstName: '',
-        lastName: '',
-        birthMonth: '',
-        birthDay: '',
-        birthYear: '',
-        gender: '',
-        isUsCitizen: '',
-        applicationStatus: '',
-        isFirstGen: '',
-        majorArea: '',
-        careerObjective: '',
-        highSchool: '',
-        schoolDistrict: '',
-        graduationYear: '',
-        gpa: '',
-        activities: '',
-        actYear: '',
-        actScore: '',
-        essay: '',
+        nominatorFirstName: '',
+        nominatorLastName: '',
+        nominatorTitle: '',
+        nominatorEmail: '',
+        nominatorPhone: '',
+        nominatorDistrict: '',
+        region: '',
+        studentFirstName: '',
+        studentLastName: '',
+        studentHighSchool: '',
+        studentGraduationYear: currentYear.toString(),
+        studentEmail: '',
+        studentPhone: '',
         streetAddress: '',
         streetAddress2: '',
         city: '',
-        state: '',
+        state: 'TN',
         zipCode: '',
-        mobilePhone: '',
-        email: '',
-        signature: ''
+        essay: ''
       });
     } catch (error: any) {
-      console.error('Application error:', error);
+      console.error('Nomination error:', error);
       
       // Handle specific error types
       if (error.message?.includes('rate limit') || error.message?.includes('too many')) {
@@ -287,13 +281,14 @@ const StudentScholarshipApplication: React.FC = () => {
       <section className="bg-secondary text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-24">
           <div className="max-w-3xl">
-            <h1 className="text-4xl md:text-5xl font-bold mb-6 fade-in">{scholarshipSettings?.name || 'TAPT Scholarship Application'}</h1>
-            <p className="text-xl text-gray-200 mb-8 fade-in">Application Deadline: {scholarshipSettings?.application_deadline ? (() => {
+            <h1 className="text-4xl md:text-5xl font-bold mb-6 fade-in">{scholarshipSettings?.name || 'TAPT Student Scholarship Nomination'}</h1>
+            <p className="text-xl text-gray-200 mb-4 fade-in">Nomination Form for Transportation Directors</p>
+            <p className="text-lg text-gray-300 fade-in">Nomination Deadline: {scholarshipSettings?.application_deadline ? (() => {
               const deadlineStr = scholarshipSettings.application_deadline.includes('T') ? scholarshipSettings.application_deadline.split('T')[0] : scholarshipSettings.application_deadline;
               const [y, m, d] = deadlineStr.split('-').map(Number);
               const date = new Date(y, m - 1, d);
               return date.toLocaleDateString();
-            })() : 'May 15, 2025'}</p>
+            })() : 'TBD'}</p>
           </div>
         </div>
       </section>
@@ -302,12 +297,12 @@ const StudentScholarshipApplication: React.FC = () => {
       {!isApplicationClosed && scholarshipSettings?.is_active && (
         <section className="py-12 bg-gray-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            {/* Application Deadline - Prominent Display */}
+            {/* Nomination Deadline - Prominent Display */}
             <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-400 rounded-lg p-6 mb-8">
               <div className="flex items-center">
                 <AlertCircle className="h-8 w-8 text-yellow-600 mr-3 flex-shrink-0" />
                 <div>
-                  <h3 className="text-lg font-bold text-yellow-900 mb-1">Application Deadline</h3>
+                  <h3 className="text-lg font-bold text-yellow-900 mb-1">Nomination Deadline</h3>
                   <p className="text-2xl font-bold text-yellow-700">
                     {scholarshipSettings?.application_deadline ? (() => {
                       const deadlineStr = scholarshipSettings.application_deadline.includes('T') ? scholarshipSettings.application_deadline.split('T')[0] : scholarshipSettings.application_deadline;
@@ -319,7 +314,7 @@ const StudentScholarshipApplication: React.FC = () => {
                         month: 'long', 
                         day: 'numeric' 
                       });
-                    })() : 'May 15, 2025'}
+                    })() : 'TBD'}
                   </p>
                 </div>
               </div>
@@ -327,7 +322,15 @@ const StudentScholarshipApplication: React.FC = () => {
 
             <div className="bg-white rounded-lg shadow-lg overflow-hidden">
               <div className="p-8 md:p-10">
-                <h2 className="text-3xl font-bold text-secondary mb-6">{scholarshipSettings?.name || 'TAPT Scholarship Application'}</h2>
+                <h2 className="text-3xl font-bold text-secondary mb-6">{scholarshipSettings?.name || 'TAPT Student Scholarship Nomination'}</h2>
+                
+                <div className="mb-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-blue-800 mb-2">Who Can Submit Nominations?</h3>
+                  <p className="text-blue-700">
+                    This form is for <strong>Transportation Directors</strong> to nominate deserving students from their school district.
+                    Students must be graduating in {currentYear} to be eligible.
+                  </p>
+                </div>
                 
                 {scholarshipSettings?.description && (
                   <div className="mb-8">
@@ -345,31 +348,10 @@ const StudentScholarshipApplication: React.FC = () => {
                   
                   {scholarshipSettings?.instructions && (
                     <div className="bg-green-50 border border-green-200 rounded-lg p-6">
-                      <h3 className="text-lg font-semibold text-green-800 mb-2">Application Instructions</h3>
+                      <h3 className="text-lg font-semibold text-green-800 mb-2">Nomination Instructions</h3>
                       <p className="text-green-700">{scholarshipSettings.instructions}</p>
                     </div>
                   )}
-                </div>
-
-                {/* Application Deadline Notice */}
-                <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-                  <div className="flex items-start">
-                    <AlertCircle className="h-5 w-5 text-yellow-400" />
-                    <div className="ml-3">
-                      <h3 className="text-sm font-medium text-yellow-800">
-                        Application deadline approaching
-                      </h3>
-                      <p className="mt-1 text-sm text-yellow-700">
-                        Applications must be submitted by {(() => {
-                          if (!scholarshipSettings?.application_deadline) return '';
-                          const deadlineStr = scholarshipSettings.application_deadline.includes('T') ? scholarshipSettings.application_deadline.split('T')[0] : scholarshipSettings.application_deadline;
-                          const [y, m, d] = deadlineStr.split('-').map(Number);
-                          const date = new Date(y, m - 1, d);
-                          return date.toLocaleDateString();
-                        })()}
-                      </p>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
@@ -377,15 +359,15 @@ const StudentScholarshipApplication: React.FC = () => {
         </section>
       )}
 
-      {/* Application Form */}
+      {/* Nomination Form */}
       {isApplicationClosed || !scholarshipSettings?.is_active ? (
         <section className="py-16">
           <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="bg-white rounded-lg shadow-lg p-8 text-center">
               <Award className="h-16 w-16 text-primary mx-auto mb-6" />
-              <h2 className="text-2xl font-bold text-secondary mb-4">Scholarship Application has now closed</h2>
+              <h2 className="text-2xl font-bold text-secondary mb-4">Scholarship Nominations are Currently Closed</h2>
               <p className="text-gray-600">
-                Thank you for your interest in the TAPT Scholarship. The application period is currently closed. 
+                Thank you for your interest in the TAPT Student Scholarship. The nomination period is currently closed. 
                 Please check back later for future scholarship opportunities.
               </p>
               {error && (
@@ -417,13 +399,14 @@ const StudentScholarshipApplication: React.FC = () => {
             )}
 
             <SecureForm onSubmit={handleSecureSubmit} className="bg-white shadow-lg rounded-lg p-8">
-              {/* Personal Information */}
+              {/* Section I: Nominator Information */}
               <div className="mb-8">
-                <h2 className="text-xl font-semibold text-secondary mb-6">I. Personal Data</h2>
+                <h2 className="text-xl font-semibold text-secondary mb-2">I. Nominator Information</h2>
+                <p className="text-sm text-gray-600 mb-6">Transportation Director submitting this nomination</p>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                   <div>
-                    <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="nominatorFirstName" className="block text-sm font-medium text-gray-700 mb-1">
                       First Name <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
@@ -432,9 +415,9 @@ const StudentScholarshipApplication: React.FC = () => {
                       </div>
                       <input
                         type="text"
-                        id="firstName"
-                        name="firstName"
-                        value={formData.firstName}
+                        id="nominatorFirstName"
+                        name="nominatorFirstName"
+                        value={formData.nominatorFirstName}
                         onChange={handleChange}
                         required
                         className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
@@ -443,7 +426,7 @@ const StudentScholarshipApplication: React.FC = () => {
                   </div>
 
                   <div>
-                    <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="nominatorLastName" className="block text-sm font-medium text-gray-700 mb-1">
                       Last Name <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
@@ -452,9 +435,9 @@ const StudentScholarshipApplication: React.FC = () => {
                       </div>
                       <input
                         type="text"
-                        id="lastName"
-                        name="lastName"
-                        value={formData.lastName}
+                        id="nominatorLastName"
+                        name="nominatorLastName"
+                        value={formData.nominatorLastName}
                         onChange={handleChange}
                         required
                         className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
@@ -463,527 +446,242 @@ const StudentScholarshipApplication: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Birthdate <span className="text-red-500">*</span>
-                  </label>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <select
-                        id="birthMonth"
-                        name="birthMonth"
-                        value={formData.birthMonth}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  <div>
+                    <label htmlFor="nominatorTitle" className="block text-sm font-medium text-gray-700 mb-1">
+                      Title/Position <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Briefcase className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        type="text"
+                        id="nominatorTitle"
+                        name="nominatorTitle"
+                        value={formData.nominatorTitle}
                         onChange={handleChange}
                         required
-                        className="block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
-                      >
-                        <option value="">Month</option>
-                        <option value="01">January</option>
-                        <option value="02">February</option>
-                        <option value="03">March</option>
-                        <option value="04">April</option>
-                        <option value="05">May</option>
-                        <option value="06">June</option>
-                        <option value="07">July</option>
-                        <option value="08">August</option>
-                        <option value="09">September</option>
-                        <option value="10">October</option>
-                        <option value="11">November</option>
-                        <option value="12">December</option>
-                      </select>
+                        placeholder="e.g., Director of Transportation"
+                        className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
+                      />
                     </div>
-                    <div>
-                      <select
-                        id="birthDay"
-                        name="birthDay"
-                        value={formData.birthDay}
+                  </div>
+
+                  <div>
+                    <label htmlFor="nominatorDistrict" className="block text-sm font-medium text-gray-700 mb-1">
+                      School District <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Building2 className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        type="text"
+                        id="nominatorDistrict"
+                        name="nominatorDistrict"
+                        value={formData.nominatorDistrict}
                         onChange={handleChange}
                         required
-                        className="block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
-                      >
-                        <option value="">Day</option>
-                        {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
-                          <option key={day} value={day.toString().padStart(2, '0')}>
-                            {day}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <select
-                        id="birthYear"
-                        name="birthYear"
-                        value={formData.birthYear}
-                        onChange={handleChange}
-                        required
-                        className="block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
-                      >
-                        <option value="">Year</option>
-                        {Array.from({ length: 30 }, (_, i) => new Date().getFullYear() - 29 + i).map(year => (
-                          <option key={year} value={year.toString()}>
-                            {year}
-                          </option>
-                        ))}
-                      </select>
+                        className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
+                      />
                     </div>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Gender (Optional)
+                    <label htmlFor="nominatorEmail" className="block text-sm font-medium text-gray-700 mb-1">
+                      Email <span className="text-red-500">*</span>
                     </label>
-                    <div className="mt-2 space-x-6">
-                      <label className="inline-flex items-center">
-                        <input
-                          type="radio"
-                          name="gender"
-                          value="Male"
-                          checked={formData.gender === 'Male'}
-                          onChange={handleChange}
-                          className="h-4 w-4 text-primary focus:ring-primary border-gray-300"
-                        />
-                        <span className="ml-2 text-gray-700">Male</span>
-                      </label>
-                      <label className="inline-flex items-center">
-                        <input
-                          type="radio"
-                          name="gender"
-                          value="Female"
-                          checked={formData.gender === 'Female'}
-                          onChange={handleChange}
-                          className="h-4 w-4 text-primary focus:ring-primary border-gray-300"
-                        />
-                        <span className="ml-2 text-gray-700">Female</span>
-                      </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Mail className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        type="email"
+                        id="nominatorEmail"
+                        name="nominatorEmail"
+                        value={formData.nominatorEmail}
+                        onChange={handleChange}
+                        required
+                        placeholder="your.email@district.org"
+                        className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
+                      />
                     </div>
+                    <p className="mt-1 text-sm text-gray-500">Confirmation will be sent to this address</p>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Are you a US citizen? (Optional)
+                    <label htmlFor="nominatorPhone" className="block text-sm font-medium text-gray-700 mb-1">
+                      Phone <span className="text-red-500">*</span>
                     </label>
-                    <div className="mt-2 space-x-6">
-                      <label className="inline-flex items-center">
-                        <input
-                          type="radio"
-                          name="isUsCitizen"
-                          value="Yes"
-                          checked={formData.isUsCitizen === 'Yes'}
-                          onChange={handleChange}
-                          className="h-4 w-4 text-primary focus:ring-primary border-gray-300"
-                        />
-                        <span className="ml-2 text-gray-700">Yes</span>
-                      </label>
-                      <label className="inline-flex items-center">
-                        <input
-                          type="radio"
-                          name="isUsCitizen"
-                          value="No"
-                          checked={formData.isUsCitizen === 'No'}
-                          onChange={handleChange}
-                          className="h-4 w-4 text-primary focus:ring-primary border-gray-300"
-                        />
-                        <span className="ml-2 text-gray-700">No</span>
-                      </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Phone className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        type="tel"
+                        id="nominatorPhone"
+                        name="nominatorPhone"
+                        value={formData.nominatorPhone}
+                        onChange={handleChange}
+                        required
+                        placeholder="(123) 456-7890"
+                        className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
+                      />
                     </div>
                   </div>
                 </div>
 
+                {/* Region Selection */}
                 <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Please check your status at the time of application <span className="text-red-500">*</span>
+                  <label htmlFor="region" className="block text-sm font-medium text-gray-700 mb-1">
+                    Tennessee Region <span className="text-red-500">*</span>
                   </label>
-                  <div className="mt-2 space-y-2">
-                    <label className="flex items-start">
-                      <input
-                        type="radio"
-                        name="applicationStatus"
-                        value="I will graduate in May 2025"
-                        checked={formData.applicationStatus === 'I will graduate in May 2025'}
-                        onChange={handleChange}
-                        required
-                        className="h-4 w-4 mt-1 text-primary focus:ring-primary border-gray-300"
-                      />
-                      <span className="ml-2 text-gray-700">I will graduate in May 2025</span>
-                    </label>
-                    <label className="flex items-start">
-                      <input
-                        type="radio"
-                        name="applicationStatus"
-                        value="I will be an incoming freshman graduating high school prior to 2025"
-                        checked={formData.applicationStatus === 'I will be an incoming freshman graduating high school prior to 2025'}
-                        onChange={handleChange}
-                        required
-                        className="h-4 w-4 mt-1 text-primary focus:ring-primary border-gray-300"
-                      />
-                      <span className="ml-2 text-gray-700">I will be an incoming freshman graduating high school prior to 2025</span>
-                    </label>
-                    <label className="flex items-start">
-                      <input
-                        type="radio"
-                        name="applicationStatus"
-                        value="I have attended college but have less than 32 college credit hours"
-                        checked={formData.applicationStatus === 'I have attended college but have less than 32 college credit hours'}
-                        onChange={handleChange}
-                        required
-                        className="h-4 w-4 mt-1 text-primary focus:ring-primary border-gray-300"
-                      />
-                      <span className="ml-2 text-gray-700">I have attended college but have less than 32 college credit hours</span>
-                    </label>
-                    <label className="flex items-start">
-                      <input
-                        type="radio"
-                        name="applicationStatus"
-                        value="I have attended college but have at least 32 or more college credit hours"
-                        checked={formData.applicationStatus === 'I have attended college but have at least 32 or more college credit hours'}
-                        onChange={handleChange}
-                        required
-                        className="h-4 w-4 mt-1 text-primary focus:ring-primary border-gray-300"
-                      />
-                      <span className="ml-2 text-gray-700">I have attended college but have at least 32 or more college credit hours</span>
-                    </label>
-                    <label className="flex items-start">
-                      <input
-                        type="radio"
-                        name="applicationStatus"
-                        value="I am a GED graduate with no college credit hours"
-                        checked={formData.applicationStatus === 'I am a GED graduate with no college credit hours'}
-                        onChange={handleChange}
-                        required
-                        className="h-4 w-4 mt-1 text-primary focus:ring-primary border-gray-300"
-                      />
-                      <span className="ml-2 text-gray-700">I am a GED graduate with no college credit hours</span>
-                    </label>
-                  </div>
-                </div>
-
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Are you a first generation college student?
-                  </label>
-                  <div className="mt-2 space-y-2">
-                    <label className="flex items-start">
-                      <input
-                        type="radio"
-                        name="isFirstGen"
-                        value="Yes, I am the first among my parents or grandparents to attend college."
-                        checked={formData.isFirstGen === 'Yes, I am the first among my parents or grandparents to attend college.'}
-                        onChange={handleChange}
-                        className="h-4 w-4 mt-1 text-primary focus:ring-primary border-gray-300"
-                      />
-                      <span className="ml-2 text-gray-700">Yes, I am the first among my parents or grandparents to attend college.</span>
-                    </label>
-                    <label className="flex items-start">
-                      <input
-                        type="radio"
-                        name="isFirstGen"
-                        value="No, either my parents or grandparents have attended college."
-                        checked={formData.isFirstGen === 'No, either my parents or grandparents have attended college.'}
-                        onChange={handleChange}
-                        className="h-4 w-4 mt-1 text-primary focus:ring-primary border-gray-300"
-                      />
-                      <span className="ml-2 text-gray-700">No, either my parents or grandparents have attended college.</span>
-                    </label>
-                  </div>
-                </div>
-
-                <div className="mb-6">
-                  <label htmlFor="majorArea" className="block text-sm font-medium text-gray-700 mb-1">
-                    Major Area of Study
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Book className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <select
-                      id="majorArea"
-                      name="majorArea"
-                      value={formData.majorArea}
-                      onChange={handleChange}
-                      className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
-                    >
-                      <option value="">Please Select</option>
-                      <option value="Accounting (AS Degree)">Accounting (AS Degree)</option>
-                      <option value="Aerospace Technology (AAS Degree)">Aerospace Technology (AAS Degree)</option>
-                      <option value="Agricultural Science (AS Degree)">Agricultural Science (AS Degree)</option>
-                      <option value="Air Conditioning/Refrigeration (AAS Degree)">Air Conditioning/Refrigeration (AAS Degree)</option>
-                      <option value="Applied Technology (AAS Degree)">Applied Technology (AAS Degree)</option>
-                      <option value="Art (AS Degree)">Art (AS Degree)</option>
-                      <option value="Automation/Robotics (AAS Degree)">Automation/Robotics (AAS Degree)</option>
-                      <option value="Biological Science (AS Degree)">Biological Science (AS Degree)</option>
-                      <option value="Business (AS Degree)">Business (AS Degree)</option>
-                      <option value="Business Administration (AAS Degree)">Business Administration (AAS Degree)</option>
-                      <option value="Chemistry (AS Degree)">Chemistry (AS Degree)</option>
-                      <option value="Child Development (AAS Degree)">Child Development (AAS Degree)</option>
-                      <option value="Child Development (AS Degree)">Child Development (AS Degree)</option>
-                      <option value="Clinical Laboratory Technology (AAS Degree)">Clinical Laboratory Technology (AAS Degree)</option>
-                      <option value="Computer Graphics (AAS Degree)">Computer Graphics (AAS Degree)</option>
-                      <option value="Computer Information Systems (AAS Degree)">Computer Information Systems (AAS Degree)</option>
-                      <option value="Computer Information Systems (AS Degree)">Computer Information Systems (AS Degree)</option>
-                      <option value="Criminal Justice (AS Degree)">Criminal Justice (AS Degree)</option>
-                      <option value="Dental Assisting (AAS Degree)">Dental Assisting (AAS Degree)</option>
-                      <option value="Design Drafting Technology (AAS Degree)">Design Drafting Technology (AAS Degree)</option>
-                      <option value="Electrical Technology (AAS Degree)">Electrical Technology (AAS Degree)</option>
-                      <option value="Elementary Teacher Education (AS Degree)">Elementary Teacher Education (AS Degree)</option>
-                      <option value="Emergency Medical Services (AAS Degree)">Emergency Medical Services (AAS Degree)</option>
-                      <option value="English (AA Degree)">English (AA Degree)</option>
-                      <option value="Fire Services Management (AS Degree)">Fire Services Management (AS Degree)</option>
-                      <option value="General Education (AS Degree)">General Education (AS Degree)</option>
-                      <option value="Health & Physical Education (AS Degree)">Health & Physical Education (AS Degree)</option>
-                      <option value="Industrial Maintenance (AAS Degree)">Industrial Maintenance (AAS Degree)</option>
-                      <option value="Law/Pre-Law (AA Degree)">Law/Pre-Law (AA Degree)</option>
-                      <option value="Machine Tool Technology (AAS Degree)">Machine Tool Technology (AAS Degree)</option>
-                      <option value="Mathematics (AS Degree)">Mathematics (AS Degree)</option>
-                      <option value="Medicine/Pre-Medicine or Pre-Dentistry (AS Degree)">Medicine/Pre-Medicine or Pre-Dentistry (AS Degree)</option>
-                      <option value="Medicine/Pre-Veterinary Medicine (AS Degree)">Medicine/Pre-Veterinary Medicine (AS Degree)</option>
-                      <option value="Missile and Munitions Technology (AAS Degree)">Missile and Munitions Technology (AAS Degree)</option>
-                      <option value="Music Education (AS Degree)">Music Education (AS Degree)</option>
-                      <option value="Music Industry Communications (AAS Degree)">Music Industry Communications (AAS Degree)</option>
-                      <option value="Nursing/ADN (AAS Degree)">Nursing/ADN (AAS Degree)</option>
-                      <option value="Nursing/Pre-Nursing (AS Degree)">Nursing/Pre-Nursing (AS Degree)</option>
-                      <option value="Paramedic (AAS Degree)">Paramedic (AAS Degree)</option>
-                      <option value="Pharmacy/Pre-Pharmacy (AS Degree)">Pharmacy/Pre-Pharmacy (AS Degree)</option>
-                      <option value="Photography and Film Communications (AS Degree)">Photography and Film Communications (AS Degree)</option>
-                      <option value="Physical Therapist Assistant (AAS Degree)">Physical Therapist Assistant (AAS Degree)</option>
-                      <option value="Pre-Engineering (AS Degree)">Pre-Engineering (AS Degree)</option>
-                      <option value="Process Technology (AAS Degree)">Process Technology (AAS Degree)</option>
-                      <option value="Renewable Energy">Renewable Energy</option>
-                      <option value="Secondary Teacher Education (AS Degree)">Secondary Teacher Education (AS Degree)</option>
-                      <option value="Theater Arts (AS Degree)">Theater Arts (AS Degree)</option>
-                      <option value="Undecided">Undecided</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="mb-6">
-                  <label htmlFor="careerObjective" className="block text-sm font-medium text-gray-700 mb-1">
-                    What is your career objective?
-                  </label>
-                  <textarea
-                    id="careerObjective"
-                    name="careerObjective"
-                    value={formData.careerObjective}
+                  <select
+                    id="region"
+                    name="region"
+                    value={formData.region}
                     onChange={handleChange}
-                    rows={4}
-                    className="block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
-                  />
-                  <p className="mt-1 text-sm text-gray-500">
-                    {wordCounts.careerObjective}/300 words
-                  </p>
-                </div>
-              </div>
-
-              {/* High School Information */}
-              <div className="mb-8">
-                <h2 className="text-xl font-semibold text-secondary mb-6">II. High School Information</h2>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                  <div>
-                    <label htmlFor="highSchool" className="block text-sm font-medium text-gray-700 mb-1">
-                      High School Attended <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      id="highSchool"
-                      name="highSchool"
-                      value={formData.highSchool}
-                      onChange={handleChange}
-                      required
-                      className="block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="schoolDistrict" className="block text-sm font-medium text-gray-700 mb-1">
-                      Name of School District <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      id="schoolDistrict"
-                      name="schoolDistrict"
-                      value={formData.schoolDistrict}
-                      onChange={handleChange}
-                      required
-                      className="block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                  <div>
-                    <label htmlFor="graduationYear" className="block text-sm font-medium text-gray-700 mb-1">
-                      Year of High School Graduation or GED <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      id="graduationYear"
-                      name="graduationYear"
-                      value={formData.graduationYear}
-                      onChange={handleChange}
-                      required
-                      className="block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="gpa" className="block text-sm font-medium text-gray-700 mb-1">
-                      Most recent cumulative GPA
-                    </label>
-                    <input
-                      type="text"
-                      id="gpa"
-                      name="gpa"
-                      value={formData.gpa}
-                      onChange={handleChange}
-                      className="block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
-                    />
-                  </div>
-                </div>
-
-                <div className="mb-6">
-                  <label htmlFor="activities" className="block text-sm font-medium text-gray-700 mb-1">
-                    High School activities, community activities, volunteer work, honors, offices held
-                  </label>
-                  <textarea
-                    id="activities"
-                    name="activities"
-                    value={formData.activities}
-                    onChange={handleChange}
-                    rows={4}
-                    className="block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
-                  />
-                </div>
-              </div>
-
-              {/* ACT Information */}
-              <div className="mb-8">
-                <h2 className="text-xl font-semibold text-secondary mb-6">III. ACT Information</h2>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                  <div>
-                    <label htmlFor="actYear" className="block text-sm font-medium text-gray-700 mb-1">
-                      Year you took the ACT
-                    </label>
-                    <input
-                      type="text"
-                      id="actYear"
-                      name="actYear"
-                      value={formData.actYear}
-                      onChange={handleChange}
-                      className="block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="actScore" className="block text-sm font-medium text-gray-700 mb-1">
-                      ACT composite (overall) score
-                    </label>
-                    <input
-                      type="text"
-                      id="actScore"
-                      name="actScore"
-                      value={formData.actScore}
-                      onChange={handleChange}
-                      className="block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
-                    />
-                  </div>
-                </div>
-
-                <div className="bg-gray-50 p-4 rounded-md mb-6">
-                  <p className="text-sm text-gray-700">
-                    ACT scores are not required for scholarship eligibility. However, providing an ACT score can increase the likelihood of your selection as compared to other candidates.
-                  </p>
-                  <p className="text-sm text-gray-700 mt-2">
-                    All scholarship applicants reporting an ACT score will be asked to provide official verification.
-                  </p>
-                </div>
-              </div>
-
-              {/* Essay */}
-              <div className="mb-8">
-                <h2 className="text-xl font-semibold text-secondary mb-6">IV. Essay</h2>
-                
-                <div className="bg-yellow-50 p-4 rounded-md mb-6">
-                  <p className="text-sm text-gray-700">
-                    Your essay should be 300-500 words. You should address in your essay: your college goals and choice of major, 
-                    what you intend to do with your education, and why a scholarship is important to you. Include any academic and 
-                    non-academic accomplishments, personal characteristics, or experiences that make you uniquely worthy of scholarship consideration.
-                  </p>
-                </div>
-
-                <div className="mb-6">
-                  <label htmlFor="essay" className="block text-sm font-medium text-gray-700 mb-1">
-                    Essay <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    id="essay"
-                    name="essay"
-                    value={formData.essay}
-                    onChange={handleChange}
-                    rows={8}
                     required
                     className="block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
-                  />
-                  <p className={`mt-1 text-sm ${wordCounts.essay < 300 || wordCounts.essay > 500 ? 'text-red-500' : 'text-gray-500'}`}>
-                    {wordCounts.essay}/500 words {wordCounts.essay < 300 ? '(minimum 300 words required)' : wordCounts.essay > 500 ? '(maximum 500 words exceeded)' : ''}
-                  </p>
+                  >
+                    <option value="">Select Region</option>
+                    {TENNESSEE_REGIONS.map(region => (
+                      <option key={region} value={region}>{region} Tennessee</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
-              {/* Contact Information */}
+              {/* Section II: Student Information */}
               <div className="mb-8">
-                <h2 className="text-xl font-semibold text-secondary mb-6">V. Contact Information</h2>
+                <h2 className="text-xl font-semibold text-secondary mb-2">II. Student Information</h2>
+                <p className="text-sm text-gray-600 mb-6">Student being nominated for the scholarship</p>
                 
-                <div className="mb-6">
-                  <label htmlFor="mobilePhone" className="block text-sm font-medium text-gray-700 mb-1">
-                    Mobile Phone <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Phone className="h-5 w-5 text-gray-400" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  <div>
+                    <label htmlFor="studentFirstName" className="block text-sm font-medium text-gray-700 mb-1">
+                      First Name <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <User className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        type="text"
+                        id="studentFirstName"
+                        name="studentFirstName"
+                        value={formData.studentFirstName}
+                        onChange={handleChange}
+                        required
+                        className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
+                      />
                     </div>
-                    <input
-                      type="tel"
-                      id="mobilePhone"
-                      name="mobilePhone"
-                      value={formData.mobilePhone}
-                      onChange={handleChange}
-                      required
-                      placeholder="(123) 456-7890"
-                      className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
-                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="studentLastName" className="block text-sm font-medium text-gray-700 mb-1">
+                      Last Name <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <User className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        type="text"
+                        id="studentLastName"
+                        name="studentLastName"
+                        value={formData.studentLastName}
+                        onChange={handleChange}
+                        required
+                        className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="mb-6">
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                    Email <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Mail className="h-5 w-5 text-gray-400" />
-                    </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  <div>
+                    <label htmlFor="studentHighSchool" className="block text-sm font-medium text-gray-700 mb-1">
+                      High School <span className="text-red-500">*</span>
+                    </label>
                     <input
-                      type="email"
-                      id="email"
-                      name="email"
-                      value={formData.email}
+                      type="text"
+                      id="studentHighSchool"
+                      name="studentHighSchool"
+                      value={formData.studentHighSchool}
                       onChange={handleChange}
                       required
-                      placeholder="your.email@example.com"
-                      className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
+                      className="block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
                     />
                   </div>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Please indicate correct email as your confirmation for scholarship eligibility will be sent to this address.
-                  </p>
+
+                  <div>
+                    <label htmlFor="studentGraduationYear" className="block text-sm font-medium text-gray-700 mb-1">
+                      Graduation Year <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="studentGraduationYear"
+                      name="studentGraduationYear"
+                      value={formData.studentGraduationYear}
+                      onChange={handleChange}
+                      required
+                      className="block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
+                    >
+                      <option value={currentYear.toString()}>{currentYear}</option>
+                    </select>
+                    <p className="mt-1 text-sm text-gray-500">Student must be graduating in {currentYear} to be eligible</p>
+                  </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  <div>
+                    <label htmlFor="studentEmail" className="block text-sm font-medium text-gray-700 mb-1">
+                      Student Email <span className="text-gray-400">(Optional)</span>
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Mail className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        type="email"
+                        id="studentEmail"
+                        name="studentEmail"
+                        value={formData.studentEmail}
+                        onChange={handleChange}
+                        placeholder="student@email.com"
+                        className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="studentPhone" className="block text-sm font-medium text-gray-700 mb-1">
+                      Student Phone <span className="text-gray-400">(Optional)</span>
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Phone className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        type="tel"
+                        id="studentPhone"
+                        name="studentPhone"
+                        value={formData.studentPhone}
+                        onChange={handleChange}
+                        placeholder="(123) 456-7890"
+                        className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Student Address */}
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Home Address <span className="text-red-500">*</span>
+                    Student Home Address <span className="text-red-500">*</span>
                   </label>
                   <div className="grid grid-cols-1 gap-4">
                     <div className="relative">
@@ -1007,7 +705,7 @@ const StudentScholarshipApplication: React.FC = () => {
                       name="streetAddress2"
                       value={formData.streetAddress2}
                       onChange={handleChange}
-                      placeholder="Apartment, suite, unit, building, floor, etc."
+                      placeholder="Apartment, suite, unit, etc. (optional)"
                       className="block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
                     />
                     <div className="grid grid-cols-3 gap-4">
@@ -1052,31 +750,36 @@ const StudentScholarshipApplication: React.FC = () => {
                 </div>
               </div>
 
-              {/* Signature */}
+              {/* Section III: Nomination Essay */}
               <div className="mb-8">
-                <h2 className="text-xl font-semibold text-secondary mb-6">VI. Applicant's E-Signature</h2>
+                <h2 className="text-xl font-semibold text-secondary mb-2">III. Nomination Essay</h2>
+                <p className="text-sm text-gray-600 mb-6">Please provide a detailed recommendation for this student</p>
                 
-                <div className="bg-gray-50 p-4 rounded-md mb-6">
+                <div className="bg-yellow-50 p-4 rounded-md mb-6">
                   <p className="text-sm text-gray-700">
-                    By signing below, you are certifying that all information is correct and that you are the person completing this application. 
-                    When you press the submit button, you will receive an email confirmation that your application was received. 
-                    Please print for your records and retain as verification of your application.
+                    Your nomination essay should be <strong>300-500 words</strong>. Please describe why you are nominating this student, 
+                    including their character, achievements, involvement in transportation (if any), community contributions, and why 
+                    they would be a worthy recipient of the TAPT scholarship.
                   </p>
                 </div>
 
                 <div className="mb-6">
-                  <label htmlFor="signature" className="block text-sm font-medium text-gray-700 mb-1">
-                    Signature (Type your full name) <span className="text-red-500">*</span>
+                  <label htmlFor="essay" className="block text-sm font-medium text-gray-700 mb-1">
+                    Nomination Essay <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="text"
-                    id="signature"
-                    name="signature"
-                    value={formData.signature}
+                  <textarea
+                    id="essay"
+                    name="essay"
+                    value={formData.essay}
                     onChange={handleChange}
+                    rows={10}
                     required
+                    placeholder="Explain why this student deserves the TAPT scholarship..."
                     className="block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
                   />
+                  <p className={`mt-1 text-sm ${wordCounts.essay < 300 || wordCounts.essay > 500 ? 'text-red-500' : 'text-gray-500'}`}>
+                    {wordCounts.essay}/500 words {wordCounts.essay < 300 ? '(minimum 300 words required)' : wordCounts.essay > 500 ? '(maximum 500 words exceeded)' : ''}
+                  </p>
                 </div>
               </div>
 
@@ -1084,7 +787,8 @@ const StudentScholarshipApplication: React.FC = () => {
               <div className="mb-8">
                 <div className="bg-gray-50 p-4 rounded-md">
                   <p className="text-sm text-gray-700">
-                    TAPT is committed to equal opportunity in employment and education, and does not discriminate in any program or activity 
+                    By submitting this nomination, you certify that all information provided is accurate and that you are authorized 
+                    to nominate this student for the TAPT scholarship. TAPT is committed to equal opportunity and does not discriminate 
                     on the basis of race, color, religion, gender, age, national origin, disability, marital status, or any other protected class.
                   </p>
                 </div>
