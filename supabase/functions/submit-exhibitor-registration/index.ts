@@ -43,6 +43,31 @@ const sanitizeError = (error: any): string => {
   return error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.';
 };
 
+// Participant validation function
+const validateParticipants = (participants: any[]): void => {
+  if (!participants || !Array.isArray(participants)) return;
+  
+  // Limit to reasonable number (20 participants max)
+  if (participants.length > 20) {
+    throw new Error('Maximum 20 participants allowed per registration');
+  }
+
+  for (const p of participants) {
+    if (!p.firstName?.trim() || !p.lastName?.trim()) {
+      throw new Error('All participants must have a first and last name');
+    }
+    
+    // Validate field lengths for security
+    if (p.firstName.trim().length > 100 || p.lastName.trim().length > 100) {
+      throw new Error('Participant names must be under 100 characters');
+    }
+    
+    if (p.role && p.role.trim().length > 200) {
+      throw new Error('Participant role must be under 200 characters');
+    }
+  }
+};
+
 interface ExhibitorRegistration {
   businessName: string;
   firstName: string;
@@ -59,6 +84,11 @@ interface ExhibitorRegistration {
   productsDescription?: string;
   additionalComments?: string;
   turnstileToken: string;
+  participants?: Array<{
+    firstName: string;
+    lastName: string;
+    role?: string | null;
+  }>;
 }
 
 Deno.serve(async (req) => {
@@ -159,7 +189,8 @@ Deno.serve(async (req) => {
       poNumber: { type: 'string', required: false, maxLength: 100 },
       paypalTransactionId: { type: 'string', required: false, maxLength: 100 },
       paypalPayerEmail: { type: 'email', required: false },
-      turnstileToken: { type: 'token', required: true, maxLength: 2000 }
+      turnstileToken: { type: 'token', required: true, maxLength: 2000 },
+      participants: { type: 'array', required: false }
     };
 
     // Sanitize payload
@@ -343,6 +374,38 @@ Deno.serve(async (req) => {
 
     if (error) throw error;
 
+    // Insert participants if provided
+    const participants = payload.participants;
+    if (participants && Array.isArray(participants) && participants.length > 0) {
+      console.log(`📋 Processing ${participants.length} additional booth participants`);
+      
+      try {
+        // Validate participants before insertion
+        validateParticipants(participants);
+        
+        const participantsToInsert = participants.map((p: any) => ({
+          exhibitor_registration_id: data.id,
+          first_name: p.firstName.trim(),
+          last_name: p.lastName.trim(),
+          role: p.role?.trim() || null
+        }));
+
+        const { error: participantsError } = await supabaseAdmin
+          .from('exhibitor_participants')
+          .insert(participantsToInsert);
+
+        if (participantsError) {
+          console.error('⚠️ Error inserting participants:', participantsError);
+          // Log but don't fail - registration is the critical part
+        } else {
+          console.log(`✅ Successfully inserted ${participants.length} participants`);
+        }
+      } catch (participantError) {
+        console.error('⚠️ Participant validation/insertion error:', participantError);
+        // Log but don't fail the registration
+      }
+    }
+
     // Fetch site settings for remittance address
     console.log('⚙️ Fetching site settings...');
     const siteSettings = await fetchSettings(supabaseAdmin);
@@ -361,10 +424,12 @@ Deno.serve(async (req) => {
       boothSize: sanitizedData.boothRequirements || 'Standard',
       totalAmount: sanitizedData.exhibitorFee || 0,
       conferenceName: settings?.name || 'TAPT Conference',
-      conferenceDate: settings?.registration_start_date && settings?.registration_end_date
-        ? `${new Date(settings.registration_start_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - ${new Date(settings.registration_end_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
+      conferenceDate: settings?.start_date && settings?.end_date
+        ? `${new Date(settings.start_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - ${new Date(settings.end_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
         : 'TBD',
-      conferenceLocation: settings?.location || 'TBD',
+      conferenceLocation: settings?.venue && settings?.location 
+        ? `${settings.venue}, ${settings.location}` 
+        : (settings?.location || 'TBD'),
       paymentInstructions: settings?.payment_instructions || 'Payment instructions will be sent separately.',
       exhibitorOptions: sanitizedData.productsDescription ? [sanitizedData.productsDescription] : [],
       paymentMethod: sanitizedData.paymentMethod || '',
@@ -373,7 +438,17 @@ Deno.serve(async (req) => {
       paypalTransactionId: sanitizedData.paypalTransactionId,
       remittanceAddress: formatRemittanceAddressPlain(siteSettings),
       contactEmail: siteSettings.payment_contact_email,
-      contactPhone: siteSettings.payment_contact_phone
+      contactPhone: siteSettings.payment_contact_phone,
+      // Include booth participants in email
+      participants: participants && Array.isArray(participants) && participants.length > 0
+        ? participants
+          .filter((p: any) => p.firstName?.trim() && p.lastName?.trim())
+          .map((p: any) => ({
+            firstName: p.firstName.trim(),
+            lastName: p.lastName.trim(),
+            role: p.role?.trim() || null
+          }))
+        : []
     };
 
     // Send confirmation email to exhibitor

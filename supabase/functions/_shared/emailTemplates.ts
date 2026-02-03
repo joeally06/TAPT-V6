@@ -61,6 +61,11 @@ export interface ExhibitorRegistrationData {
   contactEmail?: string;
   contactPhone?: string;
   exhibitorOptions?: string[];
+  participants?: Array<{
+    firstName: string;
+    lastName: string;
+    role?: string | null;
+  }>;
 }
 
 /**
@@ -474,6 +479,21 @@ export function generateExhibitorConfirmationEmail(data: ExhibitorRegistrationDa
     `
     : '';
 
+  const participantsList = data.participants && data.participants.length > 0
+    ? `
+      <div class="info-section">
+        <h3 style="margin-top: 0;">Additional Booth Participants</h3>
+        <ul style="margin: 10px 0; padding-left: 20px;">
+          ${data.participants.map(p => `
+            <li style="margin: 5px 0;">
+              <strong>${p.firstName} ${p.lastName}</strong>${p.role ? ` - ${p.role}` : ''}
+            </li>
+          `).join('')}
+        </ul>
+      </div>
+    `
+    : '';
+
   return `
     <!DOCTYPE html>
     <html>
@@ -603,6 +623,8 @@ export function generateExhibitorConfirmationEmail(data: ExhibitorRegistrationDa
           
           ${optionsList}
           
+          ${participantsList}
+          
           ${data.paymentMethod ? `
             <div class="info-section">
               <h3 style="margin-top: 0;">Payment Information</h3>
@@ -680,6 +702,19 @@ export function generateExhibitorAdminNotification(data: ExhibitorRegistrationDa
       </ul>
     `
     : '<p style="margin: 10px 0;"><em>No additional options selected</em></p>';
+
+  const participantsList = data.participants && data.participants.length > 0
+    ? `
+      <h3 style="color: #1e3a8a; margin-top: 20px;">Additional Booth Participants (${data.participants.length}):</h3>
+      <ul style="margin: 10px 0; padding-left: 20px;">
+        ${data.participants.map(p => `
+          <li style="margin: 5px 0;">
+            <strong>${p.firstName} ${p.lastName}</strong>${p.role ? ` - ${p.role}` : ''}
+          </li>
+        `).join('')}
+      </ul>
+    `
+    : '';
 
   return `
     <!DOCTYPE html>
@@ -816,6 +851,8 @@ export function generateExhibitorAdminNotification(data: ExhibitorRegistrationDa
           </div>
           
           ${optionsList}
+          
+          ${participantsList}
           
           <div style="text-align: center; margin-top: 30px;">
             <a href="https://tapt.org/admin/exhibitor-registrations" class="button">

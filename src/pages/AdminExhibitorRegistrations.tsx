@@ -1,9 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Download, Search, ChevronDown, ChevronUp, Edit, Trash2, Eye } from 'lucide-react';
+import { Download, Search, ChevronDown, ChevronUp, Edit, Trash2, Eye, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import AdminLayout from '../components/AdminLayout';
+
+interface ExhibitorParticipant {
+  id: string;
+  first_name: string;
+  last_name: string;
+  role: string | null;
+  created_at: string;
+}
 
 interface ExhibitorRegistration {
   id: string;
@@ -31,6 +39,8 @@ interface ExhibitorRegistration {
   paypal_transaction_id: string | null;
   paypal_payer_email: string | null;
   payment_completed_at: string | null;
+  // Participants
+  participants?: ExhibitorParticipant[];
 }
 
 const PAGE_SIZE = 20;
@@ -73,7 +83,10 @@ const AdminExhibitorRegistrations: React.FC = () => {
       const to = from + PAGE_SIZE - 1;
       const { data, error, count } = await supabase
         .from('exhibitor_registrations')
-        .select('*', { count: 'exact' })
+        .select(`
+          *,
+          participants:exhibitor_participants(*)
+        `, { count: 'exact' })
         .order(sortField, { ascending: sortDirection === 'asc' })
         .range(from, to);
 
@@ -212,10 +225,16 @@ const AdminExhibitorRegistrations: React.FC = () => {
       'PO Number',
       'PayPal Transaction ID',
       'PayPal Payer Email',
-      'Payment Completed At'
+      'Payment Completed At',
+      'Additional Participants Count',
+      'Participant Names'
     ];
 
     const csvData = registrations.map(reg => {
+      const participantNames = reg.participants
+        ?.map(p => `${p.first_name} ${p.last_name}${p.role ? ` (${p.role})` : ''}`)
+        .join('; ') || '';
+        
       return [
         reg.business_name,
         `${reg.first_name} ${reg.last_name}`,
@@ -235,13 +254,15 @@ const AdminExhibitorRegistrations: React.FC = () => {
         reg.po_number || '',
         reg.paypal_transaction_id || '',
         reg.paypal_payer_email || '',
-        reg.payment_completed_at ? new Date(reg.payment_completed_at).toLocaleString() : ''
+        reg.payment_completed_at ? new Date(reg.payment_completed_at).toLocaleString() : '',
+        reg.participants?.length || 0,
+        participantNames
       ];
     });
 
     const csvContent = [
       headers.join(','),
-      ...csvData.map(row => row.map(cell => `"${cell}"`).join(','))
+      ...csvData.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -394,6 +415,12 @@ const AdminExhibitorRegistrations: React.FC = () => {
                         <SortIcon field="created_at" />
                       </div>
                     </th>
+                    <th 
+                      scope="col" 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Participants
+                    </th>
                     <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
                     </th>
@@ -418,6 +445,16 @@ const AdminExhibitorRegistrations: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {new Date(registration.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {registration.participants && registration.participants.length > 0 ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            <Users className="h-3 w-3 mr-1" />
+                            {registration.participants.length}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button
@@ -557,6 +594,31 @@ const AdminExhibitorRegistrations: React.FC = () => {
                   )}
                 </div>
               </div>
+              
+              {/* Booth Participants */}
+              {selectedRegistration.participants && selectedRegistration.participants.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="font-medium text-gray-700 mb-2">
+                    Additional Booth Participants ({selectedRegistration.participants.length})
+                  </h4>
+                  <div className="bg-gray-50 p-4 rounded-md">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {selectedRegistration.participants.map((participant, index) => (
+                        <div key={participant.id} className="bg-white p-3 rounded border border-gray-200">
+                          <p className="font-medium text-gray-900">
+                            {index + 1}. {participant.first_name} {participant.last_name}
+                          </p>
+                          {participant.role && (
+                            <p className="text-sm text-gray-600 mt-1">
+                              <span className="font-medium">Role:</span> {participant.role}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
               
               {/* Payment Information */}
               <div className="mb-6">

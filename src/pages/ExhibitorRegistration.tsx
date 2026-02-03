@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { Mail, Phone, MapPin, Building, User, AlertCircle, Briefcase, FileText, Calendar } from 'lucide-react';
+import { Mail, Phone, MapPin, Building, User, AlertCircle, Briefcase, FileText, Calendar, Plus, Trash2, Users } from 'lucide-react';
 import { SecureForm, SecureFormHandle } from '../components/forms/SecureForm';
 import { PaymentMethodSelector } from '../components/forms/PaymentMethodSelector';
 import { PayPalButton } from '../components/forms/PayPalButton';
@@ -39,6 +39,15 @@ const ExhibitorRegistration: React.FC = () => {
     productsDescription: '',
     additionalComments: ''
   });
+
+  // Participant interface and state
+  interface Participant {
+    id: string;
+    firstName: string;
+    lastName: string;
+    role: string;
+  }
+  const [participants, setParticipants] = useState<Participant[]>([]);
 
   // Payment state
   const [paymentMethod, setPaymentMethod] = useState<'po' | 'paypal' | null>(null);
@@ -104,6 +113,26 @@ const ExhibitorRegistration: React.FC = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // Participant management functions
+  const addParticipant = () => {
+    setParticipants([...participants, {
+      id: crypto.randomUUID(),
+      firstName: '',
+      lastName: '',
+      role: ''
+    }]);
+  };
+
+  const removeParticipant = (id: string) => {
+    setParticipants(participants.filter(p => p.id !== id));
+  };
+
+  const updateParticipant = (id: string, field: keyof Omit<Participant, 'id'>, value: string) => {
+    setParticipants(participants.map(p => 
+      p.id === id ? { ...p, [field]: value } : p
+    ));
+  };
+
   const handleSecureSubmit = async (data: any, isVerified: boolean, turnstileToken?: string) => {
     if (!exhibitorSettings?.is_active) {
       throw new Error('Registration is not currently available.');
@@ -158,7 +187,15 @@ const ExhibitorRegistration: React.FC = () => {
         poNumber: paymentMethod === 'po' ? poNumber : null,
         paypalTransactionId: paymentMethod === 'paypal' ? paypalDetails?.id : null,
         paypalPayerEmail: paymentMethod === 'paypal' ? paypalDetails?.payer?.email_address : null,
-        paymentStatus: paymentMethod === 'paypal' ? 'completed' : 'pending'
+        paymentStatus: paymentMethod === 'paypal' ? 'completed' : 'pending',
+        // Participants - filter out empty entries
+        participants: participants
+          .filter(p => p.firstName.trim() && p.lastName.trim())
+          .map(p => ({
+            firstName: p.firstName.trim(),
+            lastName: p.lastName.trim(),
+            role: p.role.trim() || null
+          }))
       };
 
       const response = await fetch(`${supabaseUrl}/functions/v1/submit-exhibitor-registration`, {
@@ -213,6 +250,9 @@ const ExhibitorRegistration: React.FC = () => {
         productsDescription: '',
         additionalComments: ''
       });
+
+      // Reset participants
+      setParticipants([]);
       
       // Reset payment state
       setPaymentMethod(null);
@@ -754,6 +794,113 @@ const ExhibitorRegistration: React.FC = () => {
                     />
                   </div>
                 </div>
+              </div>
+
+              {/* Additional Booth Participants Section */}
+              <div className="mb-8">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h2 className="text-xl font-semibold text-secondary">
+                      Additional Booth Participants
+                    </h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Add staff members who will be working at your booth (optional, no additional cost)
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addParticipant}
+                    className="inline-flex items-center px-4 py-2 border border-primary text-primary rounded-md hover:bg-primary hover:text-white transition-colors"
+                  >
+                    <Plus className="h-5 w-5 mr-2" />
+                    Add Participant
+                  </button>
+                </div>
+
+                {participants.length === 0 ? (
+                  <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                    <Users className="mx-auto h-12 w-12 text-gray-400" />
+                    <p className="mt-2 text-sm text-gray-600">
+                      No additional participants added. Click "Add Participant" to include booth staff.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {participants.map((participant, index) => (
+                      <div key={participant.id} className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                        <div className="flex justify-between items-start mb-4">
+                          <h3 className="text-lg font-medium text-gray-900">
+                            Participant {index + 1}
+                          </h3>
+                          <button
+                            type="button"
+                            onClick={() => removeParticipant(participant.id)}
+                            className="text-red-600 hover:text-red-800"
+                            title="Remove participant"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              First Name <span className="text-red-500">*</span>
+                            </label>
+                            <div className="relative">
+                              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <User className="h-5 w-5 text-gray-400" />
+                              </div>
+                              <input
+                                type="text"
+                                value={participant.firstName}
+                                onChange={(e) => updateParticipant(participant.id, 'firstName', e.target.value)}
+                                className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
+                                placeholder="First name"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Last Name <span className="text-red-500">*</span>
+                            </label>
+                            <div className="relative">
+                              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <User className="h-5 w-5 text-gray-400" />
+                              </div>
+                              <input
+                                type="text"
+                                value={participant.lastName}
+                                onChange={(e) => updateParticipant(participant.id, 'lastName', e.target.value)}
+                                className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
+                                placeholder="Last name"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Role/Title (Optional)
+                            </label>
+                            <div className="relative">
+                              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <Briefcase className="h-5 w-5 text-gray-400" />
+                              </div>
+                              <input
+                                type="text"
+                                value={participant.role}
+                                onChange={(e) => updateParticipant(participant.id, 'role', e.target.value)}
+                                className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
+                                placeholder="e.g., Sales Rep"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Payment Method Selection */}
