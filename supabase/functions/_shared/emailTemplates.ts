@@ -614,7 +614,7 @@ export function generateExhibitorConfirmationEmail(data: ExhibitorRegistrationDa
           <div class="info-section">
             <h3 style="margin-top: 0;">Booth Details</h3>
             <div class="info-row">
-              <span class="label">Booth Size:</span> ${data.boothSize}
+              <span class="label">Booth Requirements:</span> ${data.boothSize}
             </div>
             <div class="info-row">
               <span class="label">Total Amount:</span> <span class="total-amount">$${data.totalAmount.toFixed(2)}</span>
@@ -805,7 +805,7 @@ export function generateExhibitorAdminNotification(data: ExhibitorRegistrationDa
               <span class="label">Contact:</span> ${data.contactFirstName} ${data.contactLastName}
             </div>
             <div class="info-row">
-              <span class="label">Booth Size:</span> <strong>${data.boothSize}</strong>
+              <span class="label">Booth Requirements:</span> <strong>${data.boothSize}</strong>
             </div>
             <div class="info-row">
               <span class="label">Total Amount:</span> <span class="total-amount">$${data.totalAmount.toFixed(2)}</span>
@@ -915,11 +915,16 @@ export function generatePaymentReceiptEmail(data: PaymentReceiptData): string {
     : 'Exhibitor Registration';
 
   const organizationName = data.schoolDistrict || data.businessName || 'N/A';
-  const paymentDate = new Date(data.paymentCompletedAt).toLocaleDateString('en-US', {
+  
+  // Parse date and format for US Central timezone to avoid timezone shift issues
+  // The payment_completed_at is stored as UTC, so we format it explicitly for display
+  const paymentDateTime = new Date(data.paymentCompletedAt);
+  const paymentDate = paymentDateTime.toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
-    day: 'numeric'
+    day: 'numeric',
+    timeZone: 'America/Chicago' // Use Central Time for Tennessee
   });
 
   // Use provided settings or fallback to defaults

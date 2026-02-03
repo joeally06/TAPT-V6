@@ -1,10 +1,10 @@
 /**
  * Email Settings Page
- * Manage payment receipt email template variables
+ * Manage payment receipt email template variables and admin notification email
  */
 
 import React, { useState, useEffect } from 'react';
-import { fetchSettingsByCategory, updateSetting } from '@/lib/settings';
+import { fetchSettingsByCategory, updateSetting, getSetting, upsertSetting } from '@/lib/settings';
 import type { ParsedSetting } from '@/types/settings';
 import AdminLayout from '../components/AdminLayout';
 
@@ -21,11 +21,28 @@ export default function AdminPaymentSettings() {
 
   const loadSettings = async () => {
     try {
-      const data = await fetchSettingsByCategory('payment');
-      setSettings(data);
+      // Fetch payment settings
+      const paymentData = await fetchSettingsByCategory('payment');
+      
+      // Also fetch admin_notification_email setting
+      const adminEmailValue = await getSetting('admin_notification_email');
+      
+      // Combine payment settings with admin notification email
+      const allSettings: ParsedSetting[] = [
+        // Add admin notification email at the top
+        {
+          id: 'admin_notification_email',
+          key: 'admin_notification_email',
+          value: adminEmailValue || 'info@tapt.org',
+          updated_at: new Date().toISOString()
+        },
+        ...paymentData
+      ];
+      
+      setSettings(allSettings);
       
       const values: Record<string, string> = {};
-      data.forEach(s => values[s.key] = s.value);
+      allSettings.forEach(s => values[s.key] = s.value);
       setEditedValues(values);
     } catch (err: any) {
       setError(err.message || 'Failed to load settings');
@@ -40,7 +57,11 @@ export default function AdminPaymentSettings() {
       const changedKeys = settings.filter(s => hasChanges(s.key)).map(s => s.key);
       
       for (const key of changedKeys) {
-        const result = await updateSetting(key, editedValues[key]);
+        // Use upsert for admin_notification_email since it might not exist in DB yet
+        const result = key === 'admin_notification_email'
+          ? await upsertSetting(key, editedValues[key])
+          : await updateSetting(key, editedValues[key]);
+          
         if (result.error) {
           alert(`Error saving ${formatLabel(key)}: ${result.error}`);
           setSaving(false);
@@ -77,6 +98,11 @@ export default function AdminPaymentSettings() {
   };
 
   const formatLabel = (key: string): string => {
+    // Custom labels for specific keys
+    if (key === 'admin_notification_email') {
+      return 'Admin Notification Email (Registration Alerts)';
+    }
+    
     return key
       .replace('payment_', '')
       .replace(/_/g, ' ')
@@ -87,6 +113,14 @@ export default function AdminPaymentSettings() {
 
   const isMultiline = (key: string): boolean => {
     return key.includes('footer') || key.includes('subject');
+  };
+
+  const getSettingDescription = (key: string): string | null => {
+    const descriptions: Record<string, string> = {
+      'admin_notification_email': 'Email address where registration notifications will be sent. This is where you receive alerts about new conference, tech conference, and exhibitor registrations.',
+      'payment_contact_email': 'Email address shown in payment receipts for payment-related inquiries.',
+    };
+    return descriptions[key] || null;
   };
 
   if (loading) {
@@ -120,7 +154,7 @@ export default function AdminPaymentSettings() {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Email Template Settings</h1>
-          <p className="mt-1 text-gray-600">Configure payment receipt email variables</p>
+          <p className="mt-1 text-gray-600">Configure payment receipt email variables and notification recipients</p>
         </div>
 
       {settings.length === 0 ? (
@@ -142,14 +176,18 @@ export default function AdminPaymentSettings() {
               {settings.map((setting) => {
                 const changed = hasChanges(setting.key);
                 const optional = isOptional(setting.key);
+                const description = getSettingDescription(setting.key);
                 
                 return (
                   <tr key={setting.id} className={changed ? 'bg-yellow-50' : ''}>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-4">
                       <div className="text-sm font-medium text-gray-900">
                         {formatLabel(setting.key)}
                         {optional && <span className="ml-1 text-xs text-gray-500">(optional)</span>}
                       </div>
+                      {description && (
+                        <p className="mt-1 text-xs text-gray-500">{description}</p>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       {isMultiline(setting.key) ? (

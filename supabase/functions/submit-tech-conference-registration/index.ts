@@ -405,9 +405,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Send notification to admin(s)
-    const adminEmail = Deno.env.get('ADMIN_NOTIFICATION_EMAIL') || 'info@tapt.org';
-    console.log('📧 Sending admin notification email...');
+    // Send notification to admin(s) - use admin_notification_email from site settings
+    const adminEmail = settings.admin_notification_email || 'info@tapt.org';
+    console.log(`📧 Sending admin notification email to: ${adminEmail}...`);
     const adminEmailResult = await sendEmail({
       to: adminEmail,
       subject: `New Tech Conference Registration: ${sanitizedData.schoolDistrict} - ${emailData.conferenceName}`,

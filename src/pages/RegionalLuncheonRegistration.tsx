@@ -268,13 +268,17 @@ const RegionalLuncheonRegistration: React.FC = () => {
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Regional Luncheon Dates & Locations</h2>
           <div className="space-y-4">
             {settings.regional_dates && settings.regional_dates.length > 0 ? (
-              settings.regional_dates.map((luncheon, index) => (
+              settings.regional_dates.map((luncheon, index) => {
+                // Parse date string manually to avoid timezone conversion issues
+                const [year, month, day] = luncheon.date.split('-');
+                const displayDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                return (
                 <div key={index} className="flex items-start border-l-4 border-blue-500 pl-4 py-2">
                   <MapPin className="w-5 h-5 text-blue-600 mr-3 flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="font-semibold text-gray-900">{luncheon.region}</p>
                     <p className="text-gray-600">
-                      {new Date(luncheon.date).toLocaleDateString('en-US', { 
+                      {displayDate.toLocaleDateString('en-US', { 
                         year: 'numeric', 
                         month: 'long', 
                         day: 'numeric' 
@@ -285,7 +289,7 @@ const RegionalLuncheonRegistration: React.FC = () => {
                     )}
                   </div>
                 </div>
-              ))
+              );})
             ) : (
               <p className="text-gray-500 italic">Regional dates will be announced soon.</p>
             )}
@@ -440,15 +444,19 @@ const RegionalLuncheonRegistration: React.FC = () => {
                     required
                   >
                     <option value="">Select a region...</option>
-                    {settings.regional_dates && settings.regional_dates.map((luncheon, index) => (
+                    {settings.regional_dates && settings.regional_dates.map((luncheon, index) => {
+                      // Parse date string manually to avoid timezone conversion issues
+                      const [year, month, day] = luncheon.date.split('-');
+                      const displayDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                      return (
                       <option key={index} value={luncheon.region}>
-                        {luncheon.region} – {new Date(luncheon.date).toLocaleDateString('en-US', { 
+                        {luncheon.region} – {displayDate.toLocaleDateString('en-US', { 
                           month: 'long', 
                           day: 'numeric' 
                         })} at {luncheon.time}
                         {luncheon.venue ? ` (${luncheon.venue})` : ''}
                       </option>
-                    ))}
+                    );})}
                   </select>
                 </div>
 

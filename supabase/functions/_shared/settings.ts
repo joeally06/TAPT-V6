@@ -34,6 +34,8 @@ const DEFAULT_SETTINGS: SettingsMap = {
   site_support_email: 'support@tapt.org',
   site_support_phone: '(615) 555-0100',
   site_organization_name: 'Tennessee Association of Pupil Transportation',
+  // Admin notification emails - used for sending registration notifications
+  admin_notification_email: 'info@tapt.org',
 };
 
 /**
@@ -44,10 +46,11 @@ export async function fetchSettings(
   supabase: SupabaseClient
 ): Promise<SettingsMap> {
   try {
+    // Fetch payment settings and admin notification email
     const { data, error } = await supabase
       .from('site_settings')
       .select('setting_key, setting_value')
-      .like('setting_key', 'payment_%');
+      .or('setting_key.like.payment_%,setting_key.eq.admin_notification_email');
 
     if (error) {
       console.error('Error fetching settings:', error);

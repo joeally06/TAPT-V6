@@ -140,6 +140,43 @@ export async function updateSetting(
 }
 
 /**
+ * Insert or update a single setting (upsert)
+ * Use this when the setting might not exist yet
+ * Invalidates cache on success
+ */
+export async function upsertSetting(
+  key: string,
+  value: string
+): Promise<{ success: boolean; error?: string }> {
+  // Input validation and sanitization
+  const sanitizedValue = sanitizeSettingValue(value);
+  
+  if (!sanitizedValue) {
+    return { success: false, error: 'Value cannot be empty' };
+  }
+
+  const { error } = await supabase
+    .from('site_settings')
+    .upsert({ 
+      setting_key: key,
+      setting_value: sanitizedValue,
+      updated_at: new Date().toISOString()
+    }, {
+      onConflict: 'setting_key'
+    });
+
+  if (error) {
+    console.error('Error upserting setting:', error);
+    return { success: false, error: error.message };
+  }
+
+  // Clear cache to force refresh on next fetch
+  settingsCache.clear();
+
+  return { success: true };
+}
+
+/**
  * Sanitize setting values to prevent XSS
  * Removes HTML tags and script content
  */
