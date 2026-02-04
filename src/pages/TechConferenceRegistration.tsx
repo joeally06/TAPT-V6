@@ -5,6 +5,7 @@ import { SecureForm } from '../components/forms/SecureForm';
 import { PaymentMethodSelector } from '../components/forms/PaymentMethodSelector';
 import { PayPalButton } from '../components/forms/PayPalButton';
 import { PayPalOrderDetails } from '../config/paypal';
+import { SuccessModal } from '../components/ui/SuccessModal';
 
 interface Attendee {
   firstName: string;
@@ -70,6 +71,14 @@ const TechConferenceRegistration: React.FC = () => {
 
   const [isRegistrationClosed, setIsRegistrationClosed] = useState(false);
   const [showUnavailablePopup, setShowUnavailablePopup] = useState(false);
+
+  // Success modal state
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successModalContent, setSuccessModalContent] = useState({
+    title: 'Registration Complete!',
+    message: '',
+    subMessage: ''
+  });
 
   useEffect(() => {
     fetchConferenceSettings();
@@ -300,15 +309,21 @@ const TechConferenceRegistration: React.FC = () => {
         throw new Error(result.error || 'Registration failed. Please try again.');
       }
 
-      // Success
-      const successMessage = paymentMethod === 'paypal' 
-        ? 'Registration and payment completed successfully! You will receive a confirmation email shortly.'
-        : 'Registration submitted successfully! An invoice will be sent to your email.';
-      
-      setFormStatus({
-        success: true,
-        message: successMessage
+      // Success - Show modal instead of inline message
+      const isPayPal = paymentMethod === 'paypal';
+      setSuccessModalContent({
+        title: 'Registration Complete!',
+        message: isPayPal 
+          ? 'Your Tech Conference registration and payment have been successfully processed.'
+          : 'Your Tech Conference registration has been successfully submitted.',
+        subMessage: isPayPal
+          ? 'A confirmation email will be sent to your email address shortly.'
+          : 'An invoice will be sent to your email address. Please submit payment according to the instructions provided.'
       });
+      setShowSuccessModal(true);
+      
+      // Clear any inline status messages
+      setFormStatus({});
       
       // Reset form
       setFormData({
@@ -386,6 +401,15 @@ const TechConferenceRegistration: React.FC = () => {
 
   return (
     <div className="pt-16">
+      {/* Success Modal */}
+      <SuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        title={successModalContent.title}
+        message={successModalContent.message}
+        subMessage={successModalContent.subMessage}
+      />
+
       {/* Unavailable Popup */}
       {showUnavailablePopup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

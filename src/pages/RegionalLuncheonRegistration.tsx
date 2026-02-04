@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MapPin, Users, Building, User, Calendar, AlertCircle, CheckCircle, Mail, Check } from 'lucide-react';
 import { SecureForm } from '../components/forms/SecureForm';
 import { supabase } from '../lib/supabase';
+import { SuccessModal } from '../components/ui/SuccessModal';
 
 interface RegionalDate {
   region: string;
@@ -36,6 +37,14 @@ const RegionalLuncheonRegistration: React.FC = () => {
     success?: boolean;
     message?: string;
   }>({});
+
+  // Success modal state
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successModalContent, setSuccessModalContent] = useState({
+    title: 'Registration Complete!',
+    message: '',
+    subMessage: ''
+  });
 
   useEffect(() => {
     fetchSettings();
@@ -183,10 +192,17 @@ const RegionalLuncheonRegistration: React.FC = () => {
       }
 
       const regionCount = formData.selectedRegions.length;
-      setFormStatus({
-        success: true,
-        message: `Registration submitted successfully for ${regionCount} regional luncheon${regionCount > 1 ? 's' : ''}! A confirmation email has been sent to ${formData.email}.`
+      
+      // Success - Show modal instead of inline message
+      setSuccessModalContent({
+        title: 'Registration Complete!',
+        message: `You have successfully registered for ${regionCount} regional luncheon${regionCount > 1 ? 's' : ''}!`,
+        subMessage: `A confirmation email has been sent to ${formData.email}.`
       });
+      setShowSuccessModal(true);
+      
+      // Clear any inline status messages
+      setFormStatus({});
 
       // Reset form
       setFormData({
@@ -253,6 +269,15 @@ const RegionalLuncheonRegistration: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      {/* Success Modal */}
+      <SuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        title={successModalContent.title}
+        message={successModalContent.message}
+        subMessage={successModalContent.subMessage}
+      />
+
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Header */}
         <div className="text-center mb-12">

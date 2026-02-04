@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { User, Mail, Phone, Building, Clock, Award, Calendar } from 'lucide-react';
 import { SecureForm } from '../components/forms/SecureForm';
+import { SuccessModal } from '../components/ui/SuccessModal';
 
 interface HallOfFameSettings {
   id: string;
@@ -40,6 +41,14 @@ export const HallOfFameNomination: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isNominationPeriodOpen, setIsNominationPeriodOpen] = useState(false);
+
+  // Success modal state
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successModalContent, setSuccessModalContent] = useState({
+    title: 'Nomination Submitted!',
+    message: '',
+    subMessage: ''
+  });
 
   useEffect(() => {
     fetchSettings();
@@ -184,11 +193,16 @@ export const HallOfFameNomination: React.FC = () => {
         throw new Error(result?.error || `Server error (${response.status}). Please try again.`);
       }
 
-      // ✅ Only show success message via formStatus
-      setFormStatus({
-        success: true,
-        message: 'Nomination submitted successfully!'
+      // Success - Show modal instead of inline message
+      setSuccessModalContent({
+        title: 'Nomination Submitted!',
+        message: 'Your Hall of Fame nomination has been successfully received.',
+        subMessage: 'The selection committee will review all nominations. Thank you for recognizing excellence in pupil transportation.'
       });
+      setShowSuccessModal(true);
+      
+      // Clear any inline status messages
+      setFormStatus({});
 
       // Reset form
       setFormData({
@@ -258,6 +272,15 @@ export const HallOfFameNomination: React.FC = () => {
 
   return (
     <div className="pt-16">
+      {/* Success Modal */}
+      <SuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        title={successModalContent.title}
+        message={successModalContent.message}
+        subMessage={successModalContent.subMessage}
+      />
+
       <section className="bg-secondary text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-24">
           <div className="max-w-3xl">

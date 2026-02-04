@@ -5,6 +5,7 @@ import { SecureForm } from '../components/forms/SecureForm';
 import { PaymentMethodSelector } from '../components/forms/PaymentMethodSelector';
 import { PayPalButton } from '../components/forms/PayPalButton';
 import { PayPalOrderDetails } from '../config/paypal';
+import { SuccessModal } from '../components/ui/SuccessModal';
 
 interface Attendee {
   firstName: string;
@@ -69,6 +70,14 @@ const ConferenceRegistration: React.FC = () => {
   const [conferenceSettings, setConferenceSettings] = useState<ConferenceSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [isRegistrationClosed, setIsRegistrationClosed] = useState(false);
+
+  // Success modal state
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successModalContent, setSuccessModalContent] = useState({
+    title: 'Registration Complete!',
+    message: '',
+    subMessage: ''
+  });
 
   useEffect(() => {
     fetchConferenceSettings();
@@ -297,15 +306,21 @@ const ConferenceRegistration: React.FC = () => {
         throw new Error(result.error || 'Registration failed. Please try again.');
       }
 
-      // Success
-      const successMessage = paymentMethod === 'paypal' 
-        ? 'Registration and payment completed successfully! You will receive a confirmation email shortly.'
-        : 'Registration submitted successfully! An invoice will be sent to your email.';
-      
-      setFormStatus({
-        success: true,
-        message: successMessage
+      // Success - Show modal instead of inline message
+      const isPayPal = paymentMethod === 'paypal';
+      setSuccessModalContent({
+        title: 'Registration Complete!',
+        message: isPayPal 
+          ? 'Your registration and payment have been successfully processed.'
+          : 'Your registration has been successfully submitted.',
+        subMessage: isPayPal
+          ? 'A confirmation email will be sent to your email address shortly.'
+          : 'An invoice will be sent to your email address. Please submit payment according to the instructions provided.'
       });
+      setShowSuccessModal(true);
+      
+      // Clear any inline status messages
+      setFormStatus({});
       
       // Reset form
       setFormData({
@@ -383,6 +398,15 @@ const ConferenceRegistration: React.FC = () => {
 
   return (
     <div className="pt-16">
+      {/* Success Modal */}
+      <SuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        title={successModalContent.title}
+        message={successModalContent.message}
+        subMessage={successModalContent.subMessage}
+      />
+
       {/* Hero Section */}
       <section className="bg-secondary text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-24">
