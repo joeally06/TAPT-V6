@@ -85,7 +85,7 @@ export const Navbar = () => {
         { name: 'Nomination Form', path: '/hall-of-fame-nomination' }
       ]
     },
-    { name: 'Members', path: '/members' },
+    // { name: 'Members', path: '/members' }, // Hidden until page is finalized
     { name: 'Conference Gallery', path: '/conference-gallery' },
     { name: 'Resources', path: '/resources' },
     { 
