@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Download, Search, ChevronDown, ChevronUp, Edit, Trash2, Eye, Users } from 'lucide-react';
+import { Download, Search, ChevronDown, ChevronUp, Edit, Trash2, Eye, Users, Send, Loader2, Mail } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import AdminLayout from '../components/AdminLayout';
 
@@ -60,6 +60,8 @@ const AdminExhibitorRegistrations: React.FC = () => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [sortField, setSortField] = useState<keyof ExhibitorRegistration>('created_at');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [resendingEmail, setResendingEmail] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   useEffect(() => {
     if (!authLoading) {
@@ -200,6 +202,46 @@ const AdminExhibitorRegistrations: React.FC = () => {
     } catch (error: any) {
       console.error('Error deleting registration:', error);
       setError(`Failed to delete registration: ${error.message}`);
+    }
+  };
+
+  // Resend confirmation email
+  const handleResendEmail = async (registrationId: string) => {
+    setResendingEmail(true);
+    setEmailSent(false);
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert('You must be logged in to perform this action');
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resend-exhibitor-confirmation`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ registrationId }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to resend email');
+      }
+
+      setEmailSent(true);
+      setTimeout(() => setEmailSent(false), 3000);
+    } catch (error) {
+      console.error('Error resending email:', error);
+      alert(error instanceof Error ? error.message : 'Failed to resend confirmation email');
+    } finally {
+      setResendingEmail(false);
     }
   };
 
@@ -683,20 +725,54 @@ const AdminExhibitorRegistrations: React.FC = () => {
                 </div>
               </div>
               
-              <div className="flex justify-end space-x-3">
-                <button
-                  onClick={() => handleDeleteRegistration(selectedRegistration.id)}
-                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
-                >
-                  <Trash2 className="mr-2 h-5 w-5" />
-                  Delete Registration
-                </button>
-                <button
-                  onClick={() => setShowDetailsModal(false)}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                >
-                  Close
-                </button>
+              <div className="flex flex-col gap-3">
+                {emailSent && (
+                  <div className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-800 rounded-lg text-sm">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Confirmation email sent successfully!
+                  </div>
+                )}
+                <div className="flex justify-end space-x-3">
+                  <button
+                    onClick={() => handleResendEmail(selectedRegistration.id)}
+                    disabled={resendingEmail}
+                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {resendingEmail ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="mr-2 h-5 w-5" />
+                        Resend Confirmation
+                      </>
+                    )}
+                  </button>
+                  <a
+                    href={`mailto:${selectedRegistration.email}`}
+                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Mail className="mr-2 h-5 w-5" />
+                    New Email
+                  </a>
+                  <button
+                    onClick={() => handleDeleteRegistration(selectedRegistration.id)}
+                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
+                  >
+                    <Trash2 className="mr-2 h-5 w-5" />
+                    Delete Registration
+                  </button>
+                  <button
+                    onClick={() => setShowDetailsModal(false)}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Trash2, Search, Calendar, MapPin, Users, Building, User, RefreshCw, Mail } from 'lucide-react';
+import { Trash2, Search, Calendar, MapPin, Users, Building, User, RefreshCw, Mail, Eye, X, Send, Loader2 } from 'lucide-react';
 import AdminLayout from '../components/AdminLayout';
 
 interface RegionalLuncheonRegistration {
@@ -10,6 +10,7 @@ interface RegionalLuncheonRegistration {
   district_organization: string;
   number_of_attendees: number;
   preferred_region: string;
+  selected_regions?: string[];
   created_at: string;
 }
 
@@ -19,6 +20,9 @@ const AdminRegionalLuncheonRegistrations: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRegion, setFilterRegion] = useState<string>('all');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [viewRegistration, setViewRegistration] = useState<RegionalLuncheonRegistration | null>(null);
+  const [resendingEmail, setResendingEmail] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   const regions = ['West Region', 'Middle Region', 'Cookeville Region', 'Greeneville Region', 'East Region'];
 
@@ -102,8 +106,204 @@ const AdminRegionalLuncheonRegistrations: React.FC = () => {
     );
   }
 
+  // Get regions to display (use selected_regions if available, otherwise preferred_region)
+  const getDisplayRegions = (reg: RegionalLuncheonRegistration): string[] => {
+    if (reg.selected_regions && Array.isArray(reg.selected_regions) && reg.selected_regions.length > 0) {
+      return reg.selected_regions;
+    }
+    return reg.preferred_region ? [reg.preferred_region] : [];
+  };
+
+  // Resend confirmation email
+  const handleResendEmail = async (registrationId: string) => {
+    setResendingEmail(true);
+    setEmailSent(false);
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert('You must be logged in to perform this action');
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resend-regional-luncheon-confirmation`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ registrationId }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to resend email');
+      }
+
+      setEmailSent(true);
+      // Reset success message after 3 seconds
+      setTimeout(() => setEmailSent(false), 3000);
+    } catch (error) {
+      console.error('Error resending email:', error);
+      alert(error instanceof Error ? error.message : 'Failed to resend confirmation email');
+    } finally {
+      setResendingEmail(false);
+    }
+  };
+
   return (
     <AdminLayout>
+      {/* View Registration Modal */}
+      {viewRegistration && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-blue-600 rounded-t-lg">
+              <h3 className="text-xl font-bold text-white">Registration Details</h3>
+              <button
+                onClick={() => setViewRegistration(null)}
+                className="text-white hover:text-gray-200 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            {/* Modal Body */}
+            <div className="p-6 space-y-4">
+              {/* Name */}
+              <div className="flex items-start gap-3">
+                <User className="w-5 h-5 text-gray-400 mt-0.5" />
+                <div>
+                  <p className="text-sm text-gray-500">Name</p>
+                  <p className="text-gray-900 font-medium">{viewRegistration.name}</p>
+                </div>
+              </div>
+
+              {/* Email */}
+              <div className="flex items-start gap-3">
+                <Mail className="w-5 h-5 text-gray-400 mt-0.5" />
+                <div>
+                  <p className="text-sm text-gray-500">Email</p>
+                  <a 
+                    href={`mailto:${viewRegistration.email}`}
+                    className="text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    {viewRegistration.email}
+                  </a>
+                </div>
+              </div>
+
+              {/* Organization */}
+              <div className="flex items-start gap-3">
+                <Building className="w-5 h-5 text-gray-400 mt-0.5" />
+                <div>
+                  <p className="text-sm text-gray-500">District/Organization</p>
+                  <p className="text-gray-900 font-medium">{viewRegistration.district_organization}</p>
+                </div>
+              </div>
+
+              {/* Number of Attendees */}
+              <div className="flex items-start gap-3">
+                <Users className="w-5 h-5 text-gray-400 mt-0.5" />
+                <div>
+                  <p className="text-sm text-gray-500">Number of Attendees</p>
+                  <p className="text-gray-900 font-medium">{viewRegistration.number_of_attendees} {viewRegistration.number_of_attendees > 1 ? 'people' : 'person'}</p>
+                </div>
+              </div>
+
+              {/* Selected Regions */}
+              <div className="flex items-start gap-3">
+                <MapPin className="w-5 h-5 text-blue-600 mt-0.5" />
+                <div>
+                  <p className="text-sm text-gray-500">Registered Region(s)</p>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {getDisplayRegions(viewRegistration).map((region, idx) => (
+                      <span 
+                        key={idx}
+                        className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
+                      >
+                        {region}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Submitted Date */}
+              <div className="flex items-start gap-3">
+                <Calendar className="w-5 h-5 text-gray-400 mt-0.5" />
+                <div>
+                  <p className="text-sm text-gray-500">Submitted</p>
+                  <p className="text-gray-900 font-medium">
+                    {new Date(viewRegistration.created_at).toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </p>
+                </div>
+              </div>
+
+              {/* Registration ID */}
+              <div className="pt-4 border-t border-gray-200">
+                <p className="text-xs text-gray-400">Registration ID: {viewRegistration.id}</p>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex flex-col gap-3 p-6 border-t border-gray-200 bg-gray-50 rounded-b-lg">
+              {emailSent && (
+                <div className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-800 rounded-lg text-sm">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Confirmation email sent successfully!
+                </div>
+              )}
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => handleResendEmail(viewRegistration.id)}
+                  disabled={resendingEmail}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {resendingEmail ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      Resend Confirmation
+                    </>
+                  )}
+                </button>
+                <a
+                  href={`mailto:${viewRegistration.email}`}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                >
+                  <Mail className="w-4 h-4" />
+                  New Email
+                </a>
+                <button
+                  onClick={() => setViewRegistration(null)}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center">
@@ -280,9 +480,17 @@ const AdminRegionalLuncheonRegistrations: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <MapPin className="w-4 h-4 text-blue-600 mr-2" />
-                          <span className="text-sm text-gray-900">{reg.preferred_region}</span>
+                        <div className="flex items-center gap-1">
+                          <MapPin className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                          <div className="text-sm text-gray-900">
+                            {getDisplayRegions(reg).length > 1 ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {getDisplayRegions(reg).length} regions
+                              </span>
+                            ) : (
+                              reg.preferred_region
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -311,13 +519,22 @@ const AdminRegionalLuncheonRegistrations: React.FC = () => {
                             </button>
                           </div>
                         ) : (
-                          <button
-                            onClick={() => setConfirmDelete(reg.id)}
-                            className="text-red-600 hover:text-red-900"
-                            title="Delete registration"
-                          >
-                            <Trash2 className="w-4 h-4 inline" />
-                          </button>
+                          <div className="flex items-center justify-end gap-3">
+                            <button
+                              onClick={() => setViewRegistration(reg)}
+                              className="text-blue-600 hover:text-blue-900"
+                              title="View registration details"
+                            >
+                              <Eye className="w-4 h-4 inline" />
+                            </button>
+                            <button
+                              onClick={() => setConfirmDelete(reg.id)}
+                              className="text-red-600 hover:text-red-900"
+                              title="Delete registration"
+                            >
+                              <Trash2 className="w-4 h-4 inline" />
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -332,15 +549,24 @@ const AdminRegionalLuncheonRegistrations: React.FC = () => {
         <div className="bg-white rounded-lg shadow-md p-6">
           <button
             onClick={() => {
+              // Helper to escape CSV values that contain commas or quotes
+              const escapeCSV = (value: string | number): string => {
+                const str = String(value);
+                if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                  return `"${str.replace(/"/g, '""')}"`;
+                }
+                return str;
+              };
+
               const csv = [
-                ['Name', 'Email', 'District/Organization', 'Number of Attendees', 'Preferred Region', 'Submitted'],
+                ['Name', 'Email', 'District/Organization', 'Number of Attendees', 'Selected Regions', 'Submitted'],
                 ...filteredRegistrations.map(reg => [
-                  reg.name,
-                  reg.email,
-                  reg.district_organization,
+                  escapeCSV(reg.name),
+                  escapeCSV(reg.email),
+                  escapeCSV(reg.district_organization),
                   reg.number_of_attendees,
-                  reg.preferred_region,
-                  new Date(reg.created_at).toLocaleString()
+                  escapeCSV(getDisplayRegions(reg).join('; ')),
+                  escapeCSV(new Date(reg.created_at).toLocaleString())
                 ])
               ].map(row => row.join(',')).join('\n');
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Users, Building, User, Calendar, AlertCircle, CheckCircle, Mail } from 'lucide-react';
+import { MapPin, Users, Building, User, Calendar, AlertCircle, CheckCircle, Mail, Check } from 'lucide-react';
 import { SecureForm } from '../components/forms/SecureForm';
 import { supabase } from '../lib/supabase';
 
@@ -19,23 +19,16 @@ interface RegionalLuncheonSettings {
   is_active: boolean;
 }
 
-const regionalLuncheons = [
-  { id: 'West Region', name: 'West Region', date: 'April 2, 2026', time: '10:30 AM CST' },
-  { id: 'Middle Region', name: 'Middle Region', date: 'April 10, 2026', time: '10:30 AM CST' },
-  { id: 'Cookeville Region', name: 'Cookeville Region', date: 'April 17, 2026', time: '10:30 AM CST' },
-  { id: 'Greeneville Region', name: 'Greeneville Region', date: 'April 23, 2026', time: '10:30 AM EST' },
-  { id: 'East Region', name: 'East Region', date: 'April 24, 2026', time: '10:30 AM EST' },
-];
-
 const RegionalLuncheonRegistration: React.FC = () => {
   const [settings, setSettings] = useState<RegionalLuncheonSettings | null>(null);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     districtOrganization: '',
     numberOfAttendees: 1,
-    preferredRegion: '',
+    selectedRegions: [] as string[],
     eventId: ''
   });
 
@@ -81,7 +74,39 @@ const RegionalLuncheonRegistration: React.FC = () => {
     }));
   };
 
-  const handleSubmit = async (data: any, isVerified: boolean, turnstileToken?: string) => {
+  // Handle checkbox changes for region selection
+  const handleRegionToggle = (region: string) => {
+    setFormData(prev => {
+      const isSelected = prev.selectedRegions.includes(region);
+      return {
+        ...prev,
+        selectedRegions: isSelected
+          ? prev.selectedRegions.filter(r => r !== region)
+          : [...prev.selectedRegions, region]
+      };
+    });
+  };
+
+  // Handle "Select All" toggle
+  const handleSelectAll = () => {
+    if (!settings?.regional_dates) return;
+    
+    const allRegions = settings.regional_dates.map(r => r.region);
+    const allSelected = allRegions.every(r => formData.selectedRegions.includes(r));
+    
+    setFormData(prev => ({
+      ...prev,
+      selectedRegions: allSelected ? [] : allRegions
+    }));
+  };
+
+  // Helper to format date strings
+  const formatDate = (dateString: string): Date => {
+    const [year, month, day] = dateString.split('-');
+    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  };
+
+  const handleSubmit = async (_data: unknown, isVerified: boolean, turnstileToken?: string) => {
     if (!isVerified || !turnstileToken) {
       setFormStatus({
         success: false,
@@ -90,11 +115,20 @@ const RegionalLuncheonRegistration: React.FC = () => {
       return;
     }
 
-    // Validate form data
-    if (!formData.name || !formData.email || !formData.districtOrganization || !formData.preferredRegion) {
+    // Validate form data - check for required fields
+    if (!formData.name.trim() || !formData.email.trim() || !formData.districtOrganization.trim()) {
       setFormStatus({
         success: false,
         message: 'Please fill in all required fields.'
+      });
+      return;
+    }
+
+    // Validate at least one region is selected
+    if (formData.selectedRegions.length === 0) {
+      setFormStatus({
+        success: false,
+        message: 'Please select at least one region to attend.'
       });
       return;
     }
@@ -118,6 +152,7 @@ const RegionalLuncheonRegistration: React.FC = () => {
     }
 
     try {
+      setSubmitting(true);
       console.log('Submitting regional luncheon registration with data:', formData);
       
       const response = await fetch(
@@ -129,11 +164,11 @@ const RegionalLuncheonRegistration: React.FC = () => {
             'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
           },
           body: JSON.stringify({
-            name: formData.name,
-            email: formData.email,
-            districtOrganization: formData.districtOrganization,
+            name: formData.name.trim(),
+            email: formData.email.trim().toLowerCase(),
+            districtOrganization: formData.districtOrganization.trim(),
             numberOfAttendees: formData.numberOfAttendees,
-            preferredRegion: formData.preferredRegion,
+            selectedRegions: formData.selectedRegions,
             eventId: settings?.id || null,
             turnstileToken
           })
@@ -147,9 +182,10 @@ const RegionalLuncheonRegistration: React.FC = () => {
         throw new Error(result.error || result.message || 'Failed to submit registration');
       }
 
+      const regionCount = formData.selectedRegions.length;
       setFormStatus({
         success: true,
-        message: 'Registration submitted successfully! We look forward to seeing you at the regional luncheon.'
+        message: `Registration submitted successfully for ${regionCount} regional luncheon${regionCount > 1 ? 's' : ''}! A confirmation email has been sent to ${formData.email}.`
       });
 
       // Reset form
@@ -158,7 +194,8 @@ const RegionalLuncheonRegistration: React.FC = () => {
         email: '',
         districtOrganization: '',
         numberOfAttendees: 1,
-        preferredRegion: ''
+        selectedRegions: [],
+        eventId: settings?.id || ''
       });
       
     } catch (error) {
@@ -167,6 +204,8 @@ const RegionalLuncheonRegistration: React.FC = () => {
         success: false,
         message: error instanceof Error ? error.message : 'Failed to submit registration. Please try again.'
       });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -176,6 +215,10 @@ const RegionalLuncheonRegistration: React.FC = () => {
     : null;
   const now = new Date();
   const isRegistrationClosed = registrationDeadline ? now > registrationDeadline : false;
+
+  // Check if all regions are selected
+  const allRegions = settings?.regional_dates?.map(r => r.region) || [];
+  const allSelected = allRegions.length > 0 && allRegions.every(r => formData.selectedRegions.includes(r));
 
   if (loading) {
     return (
@@ -209,11 +252,7 @@ const RegionalLuncheonRegistration: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-{registrationDeadline?.toLocaleDateString('en-US', { 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
-                  })}e-50 via-white to-purple-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Header */}
         <div className="text-center mb-12">
@@ -247,16 +286,12 @@ const RegionalLuncheonRegistration: React.FC = () => {
               <div>
                 <h3 className="text-lg font-semibold text-yellow-800 mb-2">Registration Deadline</h3>
                 <p className="text-yellow-700">
-                  Please register by <strong>{settings?.registration_deadline ? (() => {
-                    const dateStr = settings.registration_deadline.split('T')[0];
-                    const [year, month, day] = dateStr.split('-');
-                    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-                    return date.toLocaleDateString('en-US', { 
+                  Please register by <strong>{settings?.registration_deadline ? 
+                    formatDate(settings.registration_deadline.split('T')[0]).toLocaleDateString('en-US', { 
                       year: 'numeric', 
                       month: 'long', 
                       day: 'numeric'
-                    });
-                  })() : ''}</strong> so we can plan for food and seating.
+                    }) : ''}</strong> so we can plan for food and seating.
                 </p>
               </div>
             </div>
@@ -269,9 +304,7 @@ const RegionalLuncheonRegistration: React.FC = () => {
           <div className="space-y-4">
             {settings.regional_dates && settings.regional_dates.length > 0 ? (
               settings.regional_dates.map((luncheon, index) => {
-                // Parse date string manually to avoid timezone conversion issues
-                const [year, month, day] = luncheon.date.split('-');
-                const displayDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                const displayDate = formatDate(luncheon.date);
                 return (
                 <div key={index} className="flex items-start border-l-4 border-blue-500 pl-4 py-2">
                   <MapPin className="w-5 h-5 text-blue-600 mr-3 flex-shrink-0 mt-0.5" />
@@ -315,6 +348,15 @@ const RegionalLuncheonRegistration: React.FC = () => {
             <div className="flex items-start mt-4">
               <CheckCircle className="w-6 h-6 text-blue-600 mr-3 flex-shrink-0 mt-0.5" />
               <div>
+                <p className="font-semibold text-gray-900">Attending Multiple Regions?</p>
+                <p className="text-gray-700">
+                  You can register for <strong>multiple regional luncheons</strong> in a single registration. Simply select all the regions you plan to attend below.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start mt-4">
+              <CheckCircle className="w-6 h-6 text-blue-600 mr-3 flex-shrink-0 mt-0.5" />
+              <div>
                 <p className="font-semibold text-gray-900">Why Attend?</p>
                 <ul className="list-disc list-inside text-gray-700 ml-1 space-y-1">
                   <li>Enjoy a great meal and fellowship</li>
@@ -350,7 +392,7 @@ const RegionalLuncheonRegistration: React.FC = () => {
               </div>
             )}
 
-            <SecureForm onSubmit={handleSubmit}>
+            <SecureForm onSubmit={handleSubmit} submitButtonText={submitting ? 'Submitting...' : 'Register'}>
               <div className="space-y-6">
                 {/* Name */}
                 <div>
@@ -367,6 +409,7 @@ const RegionalLuncheonRegistration: React.FC = () => {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="John Doe"
                     required
+                    disabled={submitting}
                   />
                 </div>
 
@@ -385,6 +428,7 @@ const RegionalLuncheonRegistration: React.FC = () => {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="john.doe@example.com"
                     required
+                    disabled={submitting}
                   />
                 </div>
 
@@ -403,6 +447,7 @@ const RegionalLuncheonRegistration: React.FC = () => {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Example School District"
                     required
+                    disabled={submitting}
                   />
                 </div>
 
@@ -419,45 +464,101 @@ const RegionalLuncheonRegistration: React.FC = () => {
                     onChange={handleInputChange}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
+                    disabled={submitting}
                   >
                     <option value={1}>1 Person</option>
                     <option value={2}>2 People</option>
                     <option value={3}>3 People</option>
                   </select>
                   <p className="text-sm text-gray-500 mt-1">
-                    Maximum of 3 team members per district/organization
+                    Maximum of 3 team members per district/organization (applies to each event)
                   </p>
                 </div>
 
-                {/* Preferred Region */}
+                {/* Region Selection - Multi-select with checkboxes */}
                 <div>
-                  <label htmlFor="preferredRegion" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     <MapPin className="inline w-4 h-4 mr-1" />
-                    Preferred Region *
+                    Select Region(s) to Attend *
                   </label>
-                  <select
-                    id="preferredRegion"
-                    name="preferredRegion"
-                    value={formData.preferredRegion}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  >
-                    <option value="">Select a region...</option>
+                  <p className="text-sm text-gray-500 mb-3">
+                    Select one or more regional luncheons you plan to attend.
+                  </p>
+                  
+                  {/* Select All Option */}
+                  <div className="mb-3">
+                    <button
+                      type="button"
+                      onClick={handleSelectAll}
+                      disabled={submitting}
+                      className={`inline-flex items-center px-4 py-2 rounded-lg border-2 transition-colors ${
+                        allSelected
+                          ? 'bg-blue-600 border-blue-600 text-white'
+                          : 'bg-white border-gray-300 text-gray-700 hover:border-blue-500'
+                      } ${submitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      {allSelected && <Check className="w-4 h-4 mr-2" />}
+                      {allSelected ? 'All Regions Selected' : 'Select All Regions'}
+                    </button>
+                  </div>
+
+                  {/* Individual Region Checkboxes */}
+                  <div className="space-y-3">
                     {settings.regional_dates && settings.regional_dates.map((luncheon, index) => {
-                      // Parse date string manually to avoid timezone conversion issues
-                      const [year, month, day] = luncheon.date.split('-');
-                      const displayDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                      const displayDate = formatDate(luncheon.date);
+                      const isSelected = formData.selectedRegions.includes(luncheon.region);
+                      
                       return (
-                      <option key={index} value={luncheon.region}>
-                        {luncheon.region} – {displayDate.toLocaleDateString('en-US', { 
-                          month: 'long', 
-                          day: 'numeric' 
-                        })} at {luncheon.time}
-                        {luncheon.venue ? ` (${luncheon.venue})` : ''}
-                      </option>
-                    );})}
-                  </select>
+                        <label
+                          key={index}
+                          className={`flex items-start p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                            isSelected
+                              ? 'bg-blue-50 border-blue-500'
+                              : 'bg-white border-gray-200 hover:border-blue-300'
+                          } ${submitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleRegionToggle(luncheon.region)}
+                            className="sr-only"
+                            disabled={submitting}
+                          />
+                          <div className={`flex-shrink-0 w-6 h-6 rounded border-2 mr-3 flex items-center justify-center ${
+                            isSelected
+                              ? 'bg-blue-600 border-blue-600'
+                              : 'bg-white border-gray-300'
+                          }`}>
+                            {isSelected && <Check className="w-4 h-4 text-white" />}
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-semibold text-gray-900">{luncheon.region}</p>
+                            <p className="text-sm text-gray-600">
+                              {displayDate.toLocaleDateString('en-US', { 
+                                weekday: 'long',
+                                month: 'long', 
+                                day: 'numeric',
+                                year: 'numeric'
+                              })} at {luncheon.time}
+                            </p>
+                            {luncheon.venue && (
+                              <p className="text-sm text-gray-500 italic">{luncheon.venue}</p>
+                            )}
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+
+                  {/* Selection Summary */}
+                  {formData.selectedRegions.length > 0 && (
+                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <p className="text-sm text-green-800">
+                        <CheckCircle className="inline w-4 h-4 mr-1" />
+                        <strong>{formData.selectedRegions.length}</strong> region{formData.selectedRegions.length > 1 ? 's' : ''} selected: {formData.selectedRegions.join(', ')}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <p className="text-sm text-gray-500 text-center">

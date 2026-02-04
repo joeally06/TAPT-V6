@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Download, Search, ChevronDown, ChevronUp, Edit, Trash2, Eye } from 'lucide-react';
+import { Download, Search, ChevronDown, ChevronUp, Edit, Trash2, Eye, Send, Loader2, Mail } from 'lucide-react';
 import ArchiveViewerModal from '../components/ArchiveViewerModal';
 import { useAuth } from '../context/AuthContext';
 import AdminLayout from '../components/AdminLayout';
@@ -50,6 +50,8 @@ const AdminTechConferenceRegistrations: React.FC = () => {
   const [selectedRegistration, setSelectedRegistration] = useState<TechConferenceRegistration | null>(null);
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [resendingEmail, setResendingEmail] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   useEffect(() => {
     if (!authLoading) {
@@ -120,6 +122,47 @@ const AdminTechConferenceRegistrations: React.FC = () => {
   const handleViewRegistration = (registration: TechConferenceRegistration) => {
     setSelectedRegistration(registration);
     setShowViewModal(true);
+    setEmailSent(false);
+  };
+
+  // Resend confirmation email
+  const handleResendEmail = async (registrationId: string) => {
+    setResendingEmail(true);
+    setEmailSent(false);
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert('You must be logged in to perform this action');
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resend-tech-conference-confirmation`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ registrationId }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to resend email');
+      }
+
+      setEmailSent(true);
+      setTimeout(() => setEmailSent(false), 3000);
+    } catch (error) {
+      console.error('Error resending email:', error);
+      alert(error instanceof Error ? error.message : 'Failed to resend confirmation email');
+    } finally {
+      setResendingEmail(false);
+    }
   };
 
   const handleClearTable = async () => {
@@ -564,13 +607,47 @@ const AdminTechConferenceRegistrations: React.FC = () => {
                 )}
               </div>
 
-              <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
-                <button
-                  onClick={() => setShowViewModal(false)}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
-                >
-                  Close
-                </button>
+              <div className="px-6 py-4 border-t border-gray-200 flex flex-col gap-3">
+                {emailSent && (
+                  <div className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-800 rounded-lg text-sm">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Confirmation email sent successfully!
+                  </div>
+                )}
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={() => handleResendEmail(selectedRegistration.id)}
+                    disabled={resendingEmail}
+                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {resendingEmail ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        Resend Confirmation
+                      </>
+                    )}
+                  </button>
+                  <a
+                    href={`mailto:${selectedRegistration.email}`}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
+                  >
+                    <Mail className="w-4 h-4" />
+                    New Email
+                  </a>
+                  <button
+                    onClick={() => setShowViewModal(false)}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           </div>

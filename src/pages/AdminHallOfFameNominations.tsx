@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Download, Search, ChevronDown, ChevronUp, Edit, Trash2, Eye } from 'lucide-react';
+import { Download, Search, ChevronDown, ChevronUp, Edit, Trash2, Eye, Send, Loader2, Mail } from 'lucide-react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { useAuth } from '../context/AuthContext';
@@ -42,6 +42,8 @@ export const AdminHallOfFameNominations: React.FC = () => {
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [resendingEmail, setResendingEmail] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   useEffect(() => {
     if (!authLoading) {
@@ -142,6 +144,37 @@ export const AdminHallOfFameNominations: React.FC = () => {
     } catch (error: any) {
       console.error('Error deleting nomination:', error);
       alert('Failed to delete nomination. Please try again.');
+    }
+  };
+
+  const handleResendEmail = async (nominationId: string) => {
+    setResendingEmail(true);
+    setEmailSent(false);
+    try {
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+      
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resend-hof-confirmation`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ nominationId })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to resend confirmation email');
+      }
+
+      setEmailSent(true);
+      setTimeout(() => setEmailSent(false), 5000);
+    } catch (error: any) {
+      console.error('Error resending email:', error);
+      alert(`Failed to resend email: ${error.message}`);
+    } finally {
+      setResendingEmail(false);
     }
   };
 
@@ -589,13 +622,47 @@ export const AdminHallOfFameNominations: React.FC = () => {
                 </div>
               </div>
 
-              <div className="mt-6 flex justify-end">
-                <button
-                  onClick={() => setShowDetailsModal(false)}
-                  className="bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200"
-                >
-                  Close
-                </button>
+              <div className="mt-6 flex flex-col gap-3">
+                {emailSent && (
+                  <div className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-800 rounded-lg text-sm">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Confirmation email sent successfully!
+                  </div>
+                )}
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={() => handleResendEmail(selectedNomination.id)}
+                    disabled={resendingEmail}
+                    className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {resendingEmail ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="mr-2 h-4 w-4" />
+                        Resend Confirmation
+                      </>
+                    )}
+                  </button>
+                  <a
+                    href={`mailto:${selectedNomination.supervisor_email}`}
+                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  >
+                    <Mail className="mr-2 h-4 w-4" />
+                    New Email
+                  </a>
+                  <button
+                    onClick={() => setShowDetailsModal(false)}
+                    className="bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           </div>

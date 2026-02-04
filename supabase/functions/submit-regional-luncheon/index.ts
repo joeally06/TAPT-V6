@@ -1,7 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2.39.3";
 import { sanitizeObject, type SanitizationRule } from '../_shared/sanitize.ts';
 import { sendEmail } from '../_shared/email.ts';
-import { generateRegionalLuncheonConfirmationEmail, type RegionalLuncheonRegistrationData } from '../_shared/emailTemplates.ts';
 
 const allowedOrigins = [
   'https://tapt.org',
@@ -15,6 +14,10 @@ const allowedOrigins = [
   'https://*.webcontainer-api.io',
   'http://*.webcontainer-api.io'
 ];
+
+// Valid regions - used for validation
+const VALID_REGIONS = ['West Region', 'Middle Region', 'Cookeville Region', 'Greeneville Region', 'East Region'];
+const MAX_REGIONS = 10; // Safety limit
 
 const securityHeaders = {
   'X-Content-Type-Options': 'nosniff',
@@ -124,17 +127,12 @@ Deno.serve(async (req) => {
 
     console.log('✅ Turnstile verification successful');
     
-    // Define sanitization schema
+    // Define sanitization schema for base fields (excluding selectedRegions which we validate separately)
     const registrationSchema: Record<string, SanitizationRule> = {
       name: { type: 'string', required: true, maxLength: 200 },
       email: { type: 'email', required: true, maxLength: 255 },
       districtOrganization: { type: 'string', required: true, maxLength: 200 },
       numberOfAttendees: { type: 'number', required: true, min: 1, max: 3 },
-      preferredRegion: { 
-        type: 'string', 
-        required: true, 
-        allowedValues: ['West Region', 'Middle Region', 'Cookeville Region', 'Greeneville Region', 'East Region'] 
-      },
       eventId: { type: 'string', required: false, maxLength: 100 }
     };
 
@@ -142,17 +140,106 @@ Deno.serve(async (req) => {
     const sanitizedData = sanitizeObject(body, registrationSchema);
     console.log('✅ Data sanitized:', { ...sanitizedData, email: sanitizedData.email ? '[REDACTED]' : undefined });
 
-    // Insert registration into database
-    const { data: registration, error: insertError } = await supabaseAdmin
+    // Validate selectedRegions array separately for security
+    const selectedRegions = body.selectedRegions;
+    if (!selectedRegions || !Array.isArray(selectedRegions) || selectedRegions.length === 0) {
+      console.error('❌ Invalid selectedRegions: must be a non-empty array');
+      return new Response(
+        JSON.stringify({ error: 'Please select at least one region to attend' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    // Limit max regions to prevent abuse
+    if (selectedRegions.length > MAX_REGIONS) {
+      console.error('❌ Too many regions selected:', selectedRegions.length);
+      return new Response(
+        JSON.stringify({ error: 'Too many regions selected' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    // Validate each region is a valid string and in allowed list
+    const validatedRegions: string[] = [];
+    for (const region of selectedRegions) {
+      if (typeof region !== 'string') {
+        console.error('❌ Invalid region type:', typeof region);
+        return new Response(
+          JSON.stringify({ error: 'Invalid region format' }),
+          { 
+            status: 400, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+      
+      const trimmedRegion = region.trim();
+      if (!VALID_REGIONS.includes(trimmedRegion)) {
+        console.error('❌ Invalid region value:', trimmedRegion);
+        return new Response(
+          JSON.stringify({ error: `Invalid region: ${trimmedRegion}` }),
+          { 
+            status: 400, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+      
+      // Avoid duplicates
+      if (!validatedRegions.includes(trimmedRegion)) {
+        validatedRegions.push(trimmedRegion);
+      }
+    }
+
+    console.log('✅ Validated regions:', validatedRegions);
+
+    // Check for existing registration with same email and event (prevent duplicates)
+    if (sanitizedData.eventId) {
+      const { data: existingRegistration, error: checkError } = await supabaseAdmin
+        .from('regional_luncheon_registrations')
+        .select('id, selected_regions, email')
+        .eq('email', sanitizedData.email)
+        .eq('event_id', sanitizedData.eventId)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('❌ Error checking for existing registration:', checkError);
+        // Continue with registration - don't block on check failure
+      } else if (existingRegistration) {
+        console.warn('⚠️ Duplicate registration attempt:', { email: '[REDACTED]', eventId: sanitizedData.eventId });
+        return new Response(
+          JSON.stringify({ 
+            error: 'You have already registered for this event. Please contact us if you need to update your registration.',
+            existingRegistrationId: existingRegistration.id
+          }),
+          { 
+            status: 409, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+    }
+
+    console.log(`📝 Creating single registration with ${validatedRegions.length} region(s)`);
+
+    // Insert SINGLE registration row with selected_regions as JSONB array
+    const { data: insertedRegistration, error: insertError } = await supabaseAdmin
       .from('regional_luncheon_registrations')
-      .insert([{
+      .insert({
         name: sanitizedData.name,
         email: sanitizedData.email,
         district_organization: sanitizedData.districtOrganization,
         number_of_attendees: sanitizedData.numberOfAttendees,
-        preferred_region: sanitizedData.preferredRegion,
+        selected_regions: validatedRegions,  // JSONB array of all selected regions
+        preferred_region: validatedRegions[0],  // Keep first region for backward compatibility
         event_id: sanitizedData.eventId || null
-      }])
+      })
       .select()
       .single();
 
@@ -170,7 +257,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log('✅ Registration saved successfully:', registration.id);
+    console.log(`✅ Successfully created registration ID: ${insertedRegistration.id} for ${validatedRegions.length} region(s)`);
 
     // Fetch event settings to get event details and regional dates
     let eventSettings = null;
@@ -190,50 +277,60 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Send confirmation email
+    // Send confirmation email with all registered regions
     try {
       console.log('📧 Preparing confirmation email...');
       
-      // Find the matching regional date info
-      let regionalDate = '';
-      let regionalTime = '';
-      let regionalVenue = '';
+      // Build regional info for email
+      const regionalInfoList: Array<{region: string, date: string, time: string, venue: string}> = [];
       
       if (eventSettings?.regional_dates) {
         const regionalDates = Array.isArray(eventSettings.regional_dates) 
           ? eventSettings.regional_dates 
           : [];
         
-        const matchingRegion = regionalDates.find(
-          (r: any) => r.region === sanitizedData.preferredRegion
-        );
-        
-        if (matchingRegion) {
-          regionalDate = matchingRegion.date || '';
-          regionalTime = matchingRegion.time || '';
-          regionalVenue = matchingRegion.venue || '';
-          console.log('📍 Found regional info:', { region: sanitizedData.preferredRegion, date: regionalDate });
+        for (const region of validatedRegions) {
+          const matchingRegion = regionalDates.find(
+            (r: any) => r.region === region
+          );
+          
+          if (matchingRegion) {
+            regionalInfoList.push({
+              region,
+              date: matchingRegion.date || '',
+              time: matchingRegion.time || '',
+              venue: matchingRegion.venue || ''
+            });
+          } else {
+            regionalInfoList.push({
+              region,
+              date: 'TBD',
+              time: 'TBD',
+              venue: 'TBD'
+            });
+          }
         }
       }
 
-      const emailData: RegionalLuncheonRegistrationData = {
+      const eventName = eventSettings?.event_name || 'TAPT Regional Luncheon';
+      const registrationDeadline = eventSettings?.registration_deadline || 'TBD';
+      
+      // Generate email HTML for multi-region registration
+      const emailHtml = generateMultiRegionConfirmationEmail({
         name: sanitizedData.name,
         email: sanitizedData.email,
         districtOrganization: sanitizedData.districtOrganization,
         numberOfAttendees: sanitizedData.numberOfAttendees,
-        preferredRegion: sanitizedData.preferredRegion,
-        eventName: eventSettings?.event_name || 'TAPT Regional Luncheon',
-        registrationDeadline: eventSettings?.registration_deadline || 'TBD',
-        regionalDate,
-        regionalTime,
-        regionalVenue
-      };
-
-      const emailHtml = generateRegionalLuncheonConfirmationEmail(emailData);
+        selectedRegions: validatedRegions,
+        regionalInfo: regionalInfoList,
+        eventName,
+        registrationDeadline,
+        registrationId: insertedRegistration.id
+      });
       
       await sendEmail({
         to: sanitizedData.email,
-        subject: `Registration Confirmed - ${emailData.eventName}`,
+        subject: `Registration Confirmed - ${eventName}${validatedRegions.length > 1 ? ` (${validatedRegions.length} events)` : ''}`,
         html: emailHtml
       });
 
@@ -247,8 +344,10 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true,
-        message: 'Registration submitted successfully!',
-        id: registration.id
+        message: `Registration submitted successfully for ${validatedRegions.length} regional luncheon${validatedRegions.length > 1 ? 's' : ''}!`,
+        registrationId: insertedRegistration.id,
+        registeredRegions: validatedRegions,
+        count: validatedRegions.length
       }),
       { 
         status: 200, 
@@ -276,3 +375,154 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+// Helper function to generate multi-region confirmation email
+interface MultiRegionEmailData {
+  name: string;
+  email: string;
+  districtOrganization: string;
+  numberOfAttendees: number;
+  selectedRegions: string[];
+  regionalInfo: Array<{region: string, date: string, time: string, venue: string}>;
+  eventName: string;
+  registrationDeadline: string;
+  registrationId: string;
+}
+
+function generateMultiRegionConfirmationEmail(data: MultiRegionEmailData): string {
+  const formatDateForDisplay = (dateStr: string): string => {
+    if (!dateStr || dateStr === 'TBD') return 'TBD';
+    try {
+      const [year, month, day] = dateStr.split('-');
+      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      return date.toLocaleDateString('en-US', { 
+        weekday: 'long',
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const regionCount = data.selectedRegions.length;
+  const isMultiple = regionCount > 1;
+
+  const regionalListHtml = data.regionalInfo.map(info => `
+    <tr>
+      <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">
+        <strong style="color: #1e40af;">${info.region}</strong><br>
+        <span style="color: #6b7280; font-size: 14px;">
+          ${formatDateForDisplay(info.date)} at ${info.time || 'TBD'}<br>
+          ${info.venue ? `<em>${info.venue}</em>` : 'Venue TBD'}
+        </span>
+      </td>
+    </tr>
+  `).join('');
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registration Confirmation</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" style="width: 100%; max-width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+          
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 30px 40px; border-radius: 8px 8px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: bold;">
+                Registration Confirmed! ✓
+              </h1>
+              <p style="margin: 10px 0 0 0; color: #bfdbfe; font-size: 16px;">
+                ${data.eventName}
+              </p>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding: 40px;">
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                Dear <strong>${data.name}</strong>,
+              </p>
+              <p style="margin: 0 0 30px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                Thank you for registering for the ${data.eventName}! ${isMultiple ? `You have successfully registered for <strong>${regionCount} regional luncheons</strong>.` : 'Your registration has been confirmed.'}
+              </p>
+
+              <!-- Registration Details -->
+              <div style="background-color: #f9fafb; border-radius: 8px; padding: 20px; margin-bottom: 30px;">
+                <h2 style="margin: 0 0 15px 0; color: #1f2937; font-size: 18px;">Registration Details</h2>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Name:</td>
+                    <td style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 500;">${data.name}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Organization:</td>
+                    <td style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 500;">${data.districtOrganization}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Attendees:</td>
+                    <td style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 500;">${data.numberOfAttendees} ${data.numberOfAttendees > 1 ? 'people' : 'person'}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Confirmation #:</td>
+                    <td style="padding: 8px 0; color: #1f2937; font-size: 12px; font-family: monospace;">${data.registrationId.substring(0, 8).toUpperCase()}</td>
+                  </tr>
+                </table>
+              </div>
+
+              <!-- Registered Events -->
+              <div style="margin-bottom: 30px;">
+                <h2 style="margin: 0 0 15px 0; color: #1f2937; font-size: 18px;">
+                  ${isMultiple ? 'Your Registered Events' : 'Event Details'}
+                </h2>
+                <table style="width: 100%; border-collapse: collapse; background-color: #eff6ff; border-radius: 8px;">
+                  ${regionalListHtml}
+                </table>
+              </div>
+
+              <!-- Important Notes -->
+              <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; border-radius: 0 8px 8px 0; margin-bottom: 30px;">
+                <h3 style="margin: 0 0 10px 0; color: #92400e; font-size: 14px;">Important Reminders</h3>
+                <ul style="margin: 0; padding-left: 20px; color: #92400e; font-size: 14px; line-height: 1.6;">
+                  <li>Please arrive 15 minutes early to check in</li>
+                  <li>Bring this email as confirmation</li>
+                  ${isMultiple ? '<li>Your registration applies to all events listed above</li>' : ''}
+                  <li>Contact us if you need to make changes</li>
+                </ul>
+              </div>
+
+              <p style="margin: 0; color: #374151; font-size: 16px; line-height: 1.6;">
+                We look forward to seeing you!
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 30px 40px; border-radius: 0 0 8px 8px; text-align: center;">
+              <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 14px;">
+                Tennessee Association of Pupil Transportation
+              </p>
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                If you have questions, please contact us at <a href="mailto:info@tapt.org" style="color: #3b82f6;">info@tapt.org</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+}
