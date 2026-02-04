@@ -83,6 +83,8 @@ export const Home: React.FC = () => {
           return '/hall-of-fame-nomination';
         case 'student-scholarship':
           return '/student-scholarship-application';
+        case 'regional-luncheon':
+          return '/regional-luncheon-registration';
         default:
           return `/events/${event.id}`;
       }
