@@ -394,7 +394,7 @@ export const Home: React.FC = () => {
       {/* Quick Links Section - Fixed Mobile Layout */}
       <section className="py-8 sm:py-12 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 gap-4 sm:gap-6 max-w-2xl mx-auto">
             <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 hover:shadow-lg transition-shadow border-t-4 border-primary">
               <div className="flex items-center mb-3 sm:mb-4">
                 <BookOpen className="h-6 sm:h-8 w-6 sm:w-8 text-primary flex-shrink-0" />
@@ -406,6 +406,7 @@ export const Home: React.FC = () => {
               </Link>
             </div>
             
+            {/* Membership card hidden until page is finalized
             <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 hover:shadow-lg transition-shadow border-t-4 border-primary">
               <div className="flex items-center mb-3 sm:mb-4">
                 <Users className="h-6 sm:h-8 w-6 sm:w-8 text-primary flex-shrink-0" />
@@ -416,6 +417,7 @@ export const Home: React.FC = () => {
                 Join Today <ArrowRight className="ml-1 h-4 w-4" />
               </Link>
             </div>
+            */}
           </div>
         </div>
       </section>
