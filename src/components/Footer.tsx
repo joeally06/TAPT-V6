@@ -112,7 +112,7 @@ export const Footer: React.FC = () => {
               <li><Link to="/resources" className="text-gray-100 hover:text-tapt-gold transition-colors">Resources</Link></li>
               <li><Link to="/news" className="text-gray-100 hover:text-tapt-gold transition-colors">News</Link></li>
               <li><Link to="/events" className="text-gray-100 hover:text-tapt-gold transition-colors">Events</Link></li>
-              <li><Link to="/members" className="text-gray-100 hover:text-tapt-gold transition-colors">Membership</Link></li>
+              {/* <li><Link to="/members" className="text-gray-100 hover:text-tapt-gold transition-colors">Membership</Link></li> */}
               <li><Link to="/contact" className="text-gray-100 hover:text-tapt-gold transition-colors">Contact Us</Link></li>
             </ul>
           </div>
