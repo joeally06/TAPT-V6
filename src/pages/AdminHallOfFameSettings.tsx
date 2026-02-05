@@ -15,6 +15,11 @@ interface HallOfFameSettings {
   nomination_instructions: string;
   eligibility_criteria: string;
   is_active: boolean;
+  // Dynamic year configuration
+  conference_year_1: number;
+  conference_year_2: number;
+  conference_year_3: number;
+  award_year: number;
 }
 
 export const AdminHallOfFameSettings: React.FC = () => {
@@ -38,7 +43,12 @@ export const AdminHallOfFameSettings: React.FC = () => {
     description: '',
     nomination_instructions: '',
     eligibility_criteria: '',
-    is_active: true
+    is_active: true,
+    // Default to next year cycle (current year - 3 through current year - 1 for attendance, current year for award)
+    conference_year_1: new Date().getFullYear() - 3,
+    conference_year_2: new Date().getFullYear() - 2,
+    conference_year_3: new Date().getFullYear() - 1,
+    award_year: new Date().getFullYear()
   });
 
   useEffect(() => {
@@ -85,7 +95,12 @@ export const AdminHallOfFameSettings: React.FC = () => {
         setSettings({
           ...data,
           start_date: data.start_date.split('T')[0],
-          end_date: data.end_date.split('T')[0]
+          end_date: data.end_date.split('T')[0],
+          // Ensure year fields have defaults if not set in database
+          conference_year_1: data.conference_year_1 ?? new Date().getFullYear() - 3,
+          conference_year_2: data.conference_year_2 ?? new Date().getFullYear() - 2,
+          conference_year_3: data.conference_year_3 ?? new Date().getFullYear() - 1,
+          award_year: data.award_year ?? new Date().getFullYear()
         });
       }
     } catch (error: any) {
@@ -126,11 +141,20 @@ export const AdminHallOfFameSettings: React.FC = () => {
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setSettings(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    const { name, value, type } = e.target;
+    
+    // Handle number inputs for year fields
+    if (type === 'number') {
+      setSettings(prev => ({
+        ...prev,
+        [name]: parseInt(value, 10) || 0
+      }));
+    } else {
+      setSettings(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -199,7 +223,11 @@ export const AdminHallOfFameSettings: React.FC = () => {
         description: '',
         nomination_instructions: '',
         eligibility_criteria: '',
-        is_active: true
+        is_active: true,
+        conference_year_1: new Date().getFullYear() - 3,
+        conference_year_2: new Date().getFullYear() - 2,
+        conference_year_3: new Date().getFullYear() - 1,
+        award_year: new Date().getFullYear()
       });
     } catch (error: any) {
       setError(`Failed to clear hall of fame settings: ${error.message}`);
@@ -538,55 +566,92 @@ export const AdminHallOfFameSettings: React.FC = () => {
               </div>
             </div>
 
-            {/* Additional Information */}
+            {/* Form Year Configuration */}
             <div>
-              <h2 className="text-xl font-bold text-secondary mb-4">Additional Information</h2>
+              <h2 className="text-xl font-bold text-secondary mb-4">Form Year Configuration</h2>
+              <p className="text-sm text-gray-600 mb-4">
+                Configure the years displayed in the nomination form. Districts must have attended the TAPT conference 
+                in all three specified years to be eligible.
+              </p>
               
-              <div>
-                <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-                  Description
-                </label>
-                <textarea
-                  id="description"
-                  name="description"
-                  value={settings.description}
-                  onChange={handleChange}
-                  rows={4}
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
-                  placeholder="Describe the Hall of Fame program and its significance..."
-                />
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <h3 className="text-sm font-semibold text-blue-800 mb-2">Conference Attendance Years</h3>
+                <p className="text-xs text-blue-700 mb-3">
+                  These three years appear in the nomination form under "Our district attended the TAPT conference in:"
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label htmlFor="conference_year_1" className="block text-sm font-medium text-gray-700">
+                      Year 1
+                    </label>
+                    <input
+                      type="number"
+                      id="conference_year_1"
+                      name="conference_year_1"
+                      value={settings.conference_year_1}
+                      onChange={handleChange}
+                      required
+                      min="2000"
+                      max="2100"
+                      className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="conference_year_2" className="block text-sm font-medium text-gray-700">
+                      Year 2
+                    </label>
+                    <input
+                      type="number"
+                      id="conference_year_2"
+                      name="conference_year_2"
+                      value={settings.conference_year_2}
+                      onChange={handleChange}
+                      required
+                      min="2000"
+                      max="2100"
+                      className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="conference_year_3" className="block text-sm font-medium text-gray-700">
+                      Year 3
+                    </label>
+                    <input
+                      type="number"
+                      id="conference_year_3"
+                      name="conference_year_3"
+                      value={settings.conference_year_3}
+                      onChange={handleChange}
+                      required
+                      min="2000"
+                      max="2100"
+                      className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div className="mt-6">
-                <label htmlFor="eligibility_criteria" className="block text-sm font-medium text-gray-700">
-                  Eligibility Criteria
-                </label>
-                <textarea
-                  id="eligibility_criteria"
-                  name="eligibility_criteria"
-                  value={settings.eligibility_criteria}
-                  onChange={handleChange}
-                  rows={4}
-                  required
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
-                  placeholder="List the requirements and criteria for Hall of Fame nominees..."
-                />
-              </div>
-
-              <div className="mt-6">
-                <label htmlFor="nomination_instructions" className="block text-sm font-medium text-gray-700">
-                  Nomination Instructions
-                </label>
-                <textarea
-                  id="nomination_instructions"
-                  name="nomination_instructions"
-                  value={settings.nomination_instructions}
-                  onChange={handleChange}
-                  rows={4}
-                  required
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
-                  placeholder="Provide detailed instructions for submitting nominations..."
-                />
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-amber-800 mb-2">Award Ceremony Year</h3>
+                <p className="text-xs text-amber-700 mb-3">
+                  This year appears in the acknowledgment: "The winner must attend the [year] TAPT Annual Conference"
+                </p>
+                <div className="max-w-xs">
+                  <label htmlFor="award_year" className="block text-sm font-medium text-gray-700">
+                    Award Year
+                  </label>
+                  <input
+                    type="number"
+                    id="award_year"
+                    name="award_year"
+                    value={settings.award_year}
+                    onChange={handleChange}
+                    required
+                    min="2000"
+                    max="2100"
+                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
+                  />
+                </div>
               </div>
             </div>
 

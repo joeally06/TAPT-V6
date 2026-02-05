@@ -9,6 +9,7 @@ interface SecureFormProps {
   className?: string;
   requireTurnstile?: boolean;
   disabled?: boolean;
+  submitButtonText?: string;
 }
 
 export interface SecureFormHandle {
@@ -20,7 +21,8 @@ export const SecureForm = forwardRef<SecureFormHandle, SecureFormProps>(({
   onSubmit,
   className = "",
   requireTurnstile = true,
-  disabled = false
+  disabled = false,
+  submitButtonText = "Submit"
 }, ref) => {
   const [turnstileToken, setTurnstileToken] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -181,7 +183,7 @@ export const SecureForm = forwardRef<SecureFormHandle, SecureFormProps>(({
             Processing...
           </span>
         ) : (
-          'Submit'
+          submitButtonText
         )}
       </button>
     </form>

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Download, Search, ChevronDown, ChevronUp, Edit, Trash2, Eye, Send, Loader2, Mail } from 'lucide-react';
+import { Download, Search, ChevronDown, ChevronUp, Edit, Trash2, Eye, Send, Loader2, Mail, CheckCircle, XCircle } from 'lucide-react';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { useAuth } from '../context/AuthContext';
 import AdminLayout from '../components/AdminLayout';
 
@@ -17,11 +17,31 @@ interface HallOfFameNomination {
   nominee_city: string;
   district: string;
   region: string;
+  grand_division?: string;
+  nominator_role?: string;
   nomination_reason: string;
   is_tapt_member: boolean;
   years_of_service: number;
   status: string;
   created_at: string;
+  // 2026 Attestation fields
+  clean_driving_record?: boolean;
+  district_is_tapt_member?: boolean;
+  // Dynamic year fields (stored with the nomination)
+  conference_year_1?: number;
+  conference_year_2?: number;
+  conference_year_3?: number;
+  district_attended_year_1?: boolean;
+  district_attended_year_2?: boolean;
+  district_attended_year_3?: boolean;
+  nominator_is_officially_listed?: boolean;
+  acknowledge_documentation?: boolean;
+  acknowledge_attendance?: boolean;
+  // Admin verification audit fields
+  admin_verified_by?: string;
+  admin_verified_at?: string;
+  // Rejection reason
+  rejection_reason?: string;
 }
 
 const PAGE_SIZE = 20;
@@ -40,10 +60,15 @@ export const AdminHallOfFameNominations: React.FC = () => {
   const [selectedNomination, setSelectedNomination] = useState<HallOfFameNomination | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+  const [adminVerified, setAdminVerified] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [showRejectionInput, setShowRejectionInput] = useState(false);
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [resendingEmail, setResendingEmail] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [resendingStatusEmail, setResendingStatusEmail] = useState(false);
+  const [statusEmailSent, setStatusEmailSent] = useState(false);
 
   useEffect(() => {
     if (!authLoading) {
@@ -97,25 +122,60 @@ export const AdminHallOfFameNominations: React.FC = () => {
   };
 
   const handleStatusUpdate = async (nominationId: string, newStatus: string) => {
+    // Require admin verification before approving
+    if (newStatus === 'approved' && !adminVerified) {
+      alert('You must verify that all attestations have been confirmed before approving this nomination.');
+      return;
+    }
+    
+    // Require rejection reason before rejecting
+    if (newStatus === 'rejected' && !rejectionReason.trim()) {
+      alert('Please provide a reason for rejecting this nomination.');
+      return;
+    }
+    
     setUpdatingStatus(nominationId);
     try {
+      // Get session token for authorization
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+      
       // Use Edge Function for secure status update
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-hof-nomination-status`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabase.auth.session()?.access_token}`
+          'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ id: nominationId, status: newStatus })
+        body: JSON.stringify({ 
+          id: nominationId, 
+          status: newStatus,
+          adminVerified: newStatus === 'approved' ? adminVerified : undefined,
+          rejectionReason: newStatus === 'rejected' ? rejectionReason.trim() : undefined
+        })
       });
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to update status');
       }
-      setNominations(prev => prev.map(nom => nom.id === nominationId ? { ...nom, status: newStatus } : nom));
+      
+      // Update local state with new status and verification/rejection info
+      const updatedNomination: Partial<HallOfFameNomination> = {
+        status: newStatus,
+        admin_verified_by: newStatus === 'approved' ? user?.id : undefined,
+        admin_verified_at: newStatus === 'approved' ? new Date().toISOString() : undefined,
+        rejection_reason: newStatus === 'rejected' ? rejectionReason.trim() : undefined
+      };
+      
+      setNominations(prev => prev.map(nom => 
+        nom.id === nominationId ? { ...nom, ...updatedNomination } : nom
+      ));
       if (selectedNomination?.id === nominationId) {
-        setSelectedNomination(prev => prev ? { ...prev, status: newStatus } : null);
+        setSelectedNomination(prev => prev ? { ...prev, ...updatedNomination } : null);
       }
+      
+      // Clear rejection reason after successful update
+      setRejectionReason('');
     } catch (error: any) {
       console.error('Error updating status:', error);
       alert(`Failed to update status: ${error.message}`);
@@ -127,12 +187,16 @@ export const AdminHallOfFameNominations: React.FC = () => {
   const handleDelete = async (nominationId: string) => {
     if (!confirm('Are you sure you want to delete this nomination?')) return;
     try {
+      // Get session token for authorization
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+      
       // Use Edge Function for secure deletion
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-hof-nomination`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabase.auth.session()?.access_token}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ id: nominationId })
       });
@@ -175,6 +239,37 @@ export const AdminHallOfFameNominations: React.FC = () => {
       alert(`Failed to resend email: ${error.message}`);
     } finally {
       setResendingEmail(false);
+    }
+  };
+
+  const handleResendStatusEmail = async (nominationId: string) => {
+    setResendingStatusEmail(true);
+    setStatusEmailSent(false);
+    try {
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+      
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resend-hof-status-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ nominationId })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to resend status email');
+      }
+
+      setStatusEmailSent(true);
+      setTimeout(() => setStatusEmailSent(false), 5000);
+    } catch (error: any) {
+      console.error('Error resending status email:', error);
+      alert(`Failed to resend status email: ${error.message}`);
+    } finally {
+      setResendingStatusEmail(false);
     }
   };
 
@@ -237,8 +332,8 @@ export const AdminHallOfFameNominations: React.FC = () => {
       nomination.status
     ]);
 
-    // Add the summary table
-    (doc as any).autoTable({
+    // Add the summary table using autoTable function
+    autoTable(doc, {
       head: [columns],
       body: data,
       startY: 40,
@@ -435,11 +530,11 @@ export const AdminHallOfFameNominations: React.FC = () => {
                     {[
                       { key: 'nominee_last_name', label: 'Nominee' },
                       { key: 'district', label: 'District' },
-                      { key: 'region', label: 'Region' },
-                      { key: 'years_of_service', label: 'Years of Service' },
-                      { key: 'is_tapt_member', label: 'TAPT Member' },
+                      { key: 'grand_division', label: 'Grand Division' },
+                      { key: 'years_of_service', label: 'Years' },
+                      { key: 'nominator_role', label: 'Nominator Role' },
                       { key: 'status', label: 'Status' },
-                      { key: 'created_at', label: 'Nomination Date' }
+                      { key: 'created_at', label: 'Date' }
                     ].map(({ key, label }) => (
                       <th
                         key={key}
@@ -465,41 +560,29 @@ export const AdminHallOfFameNominations: React.FC = () => {
                         <div className="text-sm font-medium text-gray-900">
                           {nomination.nominee_first_name} {nomination.nominee_last_name}
                         </div>
-                        <div className="text-sm text-gray-500">
-                          {nomination.nominee_city}
-                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {nomination.district}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {nomination.region}
+                        {nomination.grand_division || nomination.region}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {nomination.years_of_service}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          nomination.is_tapt_member
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          {nomination.is_tapt_member ? 'Yes' : 'No'}
-                        </span>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {nomination.nominator_role || 'N/A'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <select
-                          value={nomination.status}
-                          onChange={(e) => handleStatusUpdate(nomination.id, e.target.value)}
-                          disabled={updatingStatus === nomination.id}
-                          className={`text-sm rounded-md border-gray-300 focus:border-primary focus:ring-primary ${
-                            updatingStatus === nomination.id ? 'opacity-50 cursor-not-allowed' : ''
-                          }`}
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="approved">Approved</option>
-                          <option value="rejected">Rejected</option>
-                        </select>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          nomination.status === 'approved' 
+                            ? 'bg-green-100 text-green-800' 
+                            : nomination.status === 'rejected'
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {nomination.status === 'approved' ? '✓ Approved' : nomination.status === 'rejected' ? '✗ Rejected' : '⏳ Pending'}
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {new Date(nomination.created_at).toLocaleDateString()}
@@ -508,6 +591,9 @@ export const AdminHallOfFameNominations: React.FC = () => {
                         <button
                           onClick={() => {
                             setSelectedNomination(nomination);
+                            setAdminVerified(false); // Reset verification when opening new nomination
+                            setRejectionReason(''); // Reset rejection reason
+                            setShowRejectionInput(false); // Reset rejection input visibility
                             setShowDetailsModal(true);
                           }}
                           className="text-primary hover:text-primary/80 mr-3"
@@ -557,11 +643,16 @@ export const AdminHallOfFameNominations: React.FC = () => {
         {/* Details Modal */}
         {showDetailsModal && selectedNomination && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg max-w-2xl w-full p-6">
+            <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6">
               <div className="flex justify-between items-start mb-4">
                 <h3 className="text-xl font-bold text-secondary">Nomination Details</h3>
                 <button
-                  onClick={() => setShowDetailsModal(false)}
+                  onClick={() => {
+                    setShowDetailsModal(false);
+                    setAdminVerified(false);
+                    setRejectionReason('');
+                    setShowRejectionInput(false);
+                  }}
                   className="text-gray-400 hover:text-gray-500"
                 >
                   <span className="sr-only">Close</span>
@@ -581,44 +672,244 @@ export const AdminHallOfFameNominations: React.FC = () => {
                   <p className="mt-1">{selectedNomination.district}</p>
                 </div>
                 <div>
-                  <h4 className="font-medium text-gray-500">Region</h4>
-                  <p className="mt-1">{selectedNomination.region}</p>
+                  <h4 className="font-medium text-gray-500">Grand Division</h4>
+                  <p className="mt-1">{selectedNomination.grand_division || selectedNomination.region}</p>
                 </div>
                 <div>
                   <h4 className="font-medium text-gray-500">Years of Service</h4>
                   <p className="mt-1">{selectedNomination.years_of_service}</p>
                 </div>
                 <div>
-                  <h4 className="font-medium text-gray-500">TAPT Member</h4>
-                  <p className="mt-1">{selectedNomination.is_tapt_member ? 'Yes' : 'No'}</p>
+                  <h4 className="font-medium text-gray-500">Nominator Role</h4>
+                  <p className="mt-1">{selectedNomination.nominator_role || 'N/A'}</p>
                 </div>
                 <div>
                   <h4 className="font-medium text-gray-500">Status</h4>
-                  <select
-                    value={selectedNomination.status}
-                    onChange={(e) => handleStatusUpdate(selectedNomination.id, e.target.value)}
-                    disabled={updatingStatus === selectedNomination.id}
-                    className={`mt-1 block w-full rounded-md border-gray-300 focus:ring-primary focus:border-primary ${
-                      updatingStatus === selectedNomination.id ? 'opacity-50 cursor-not-allowed' : ''
-                    }`}
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="approved">Approved</option>
-                    <option value="rejected">Rejected</option>
-                  </select>
+                  {/* Show locked status for finalized decisions */}
+                  {(selectedNomination.status === 'approved' || selectedNomination.status === 'rejected') ? (
+                    <div className="mt-1">
+                      <span className={`inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium ${
+                        selectedNomination.status === 'approved' 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {selectedNomination.status === 'approved' ? '✓ Approved' : '✗ Rejected'}
+                      </span>
+                      <p className="mt-2 text-xs text-gray-500 flex items-center gap-1">
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        Decision is final and cannot be changed
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mt-1 flex gap-2">
+                      <button
+                        onClick={() => handleStatusUpdate(selectedNomination.id, 'approved')}
+                        disabled={updatingStatus === selectedNomination.id || !adminVerified}
+                        className={`inline-flex items-center px-4 py-2 rounded-md text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 ${
+                          (updatingStatus === selectedNomination.id || !adminVerified) ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                        title={!adminVerified ? 'You must verify attestations before approving' : ''}
+                      >
+                        {updatingStatus === selectedNomination.id ? (
+                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                        ) : (
+                          <svg className="-ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => setShowRejectionInput(true)}
+                        disabled={updatingStatus === selectedNomination.id}
+                        className={`inline-flex items-center px-4 py-2 rounded-md text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 ${
+                          updatingStatus === selectedNomination.id ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                      >
+                        <svg className="-ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Reject
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
+              {/* Rejection Reason Input - only show when Reject button is clicked */}
+              {selectedNomination.status === 'pending' && showRejectionInput && (
+                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <h4 className="font-medium text-red-800 mb-2">Rejection Reason (required)</h4>
+                  <textarea
+                    value={rejectionReason}
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                    placeholder="Enter the reason for rejecting this nomination..."
+                    rows={3}
+                    className="w-full rounded-md border-red-300 focus:ring-red-500 focus:border-red-500 text-sm"
+                  />
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      onClick={() => handleStatusUpdate(selectedNomination.id, 'rejected')}
+                      disabled={updatingStatus === selectedNomination.id || !rejectionReason.trim()}
+                      className={`inline-flex items-center px-4 py-2 rounded-md text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 ${
+                        (updatingStatus === selectedNomination.id || !rejectionReason.trim()) ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                    >
+                      {updatingStatus === selectedNomination.id ? (
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      ) : null}
+                      Confirm Rejection
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowRejectionInput(false);
+                        setRejectionReason('');
+                      }}
+                      className="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  {!rejectionReason.trim() && (
+                    <p className="mt-2 text-xs text-red-600">Please provide a reason for rejecting this nomination</p>
+                  )}
+                </div>
+              )}
+
+              {/* Display existing rejection reason for rejected nominations */}
+              {selectedNomination.status === 'rejected' && selectedNomination.rejection_reason && (
+                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <h4 className="font-medium text-red-800 mb-2">Rejection Reason</h4>
+                  <p className="text-red-700 text-sm whitespace-pre-wrap">{selectedNomination.rejection_reason}</p>
+                </div>
+              )}
+
               <div className="mt-6">
                 <h4 className="font-medium text-gray-500">Nomination Reason</h4>
-                <p className="mt-1 text-gray-700">{selectedNomination.nomination_reason}</p>
+                <p className="mt-1 text-gray-700 whitespace-pre-wrap">{selectedNomination.nomination_reason}</p>
               </div>
+
+              {/* 2026 Attestations Section */}
+              {(selectedNomination.clean_driving_record !== undefined) && (
+                <div className="mt-6 bg-gray-50 rounded-lg p-4">
+                  <h4 className="font-medium text-gray-700 mb-3">Attestations</h4>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="flex items-center gap-2">
+                      {selectedNomination.clean_driving_record ? 
+                        <CheckCircle className="h-4 w-4 text-green-600" /> : 
+                        <XCircle className="h-4 w-4 text-red-500" />}
+                      <span>Clean Driving Record</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {selectedNomination.district_is_tapt_member ? 
+                        <CheckCircle className="h-4 w-4 text-green-600" /> : 
+                        <XCircle className="h-4 w-4 text-red-500" />}
+                      <span>District TAPT Member</span>
+                    </div>
+                    {/* Dynamic year attestations - display the actual years that were attested to */}
+                    <div className="flex items-center gap-2">
+                      {selectedNomination.district_attended_year_1 ? 
+                        <CheckCircle className="h-4 w-4 text-green-600" /> : 
+                        <XCircle className="h-4 w-4 text-red-500" />}
+                      <span>Attended {selectedNomination.conference_year_1 || 'Year 1'} Conference</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {selectedNomination.district_attended_year_2 ? 
+                        <CheckCircle className="h-4 w-4 text-green-600" /> : 
+                        <XCircle className="h-4 w-4 text-red-500" />}
+                      <span>Attended {selectedNomination.conference_year_2 || 'Year 2'} Conference</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {selectedNomination.district_attended_year_3 ? 
+                        <CheckCircle className="h-4 w-4 text-green-600" /> : 
+                        <XCircle className="h-4 w-4 text-red-500" />}
+                      <span>Attended {selectedNomination.conference_year_3 || 'Year 3'} Conference</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {selectedNomination.nominator_is_officially_listed ? 
+                        <CheckCircle className="h-4 w-4 text-green-600" /> : 
+                        <XCircle className="h-4 w-4 text-red-500" />}
+                      <span>Officially Listed w/ TN DOE</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {selectedNomination.acknowledge_documentation ? 
+                        <CheckCircle className="h-4 w-4 text-green-600" /> : 
+                        <XCircle className="h-4 w-4 text-red-500" />}
+                      <span>Documentation Acknowledged</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {selectedNomination.acknowledge_attendance ? 
+                        <CheckCircle className="h-4 w-4 text-green-600" /> : 
+                        <XCircle className="h-4 w-4 text-red-500" />}
+                      <span>Attendance Acknowledged</span>
+                    </div>
+                  </div>
+                  
+                  {/* Admin Verification Checkbox */}
+                  {selectedNomination.status !== 'approved' && (
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <label className="flex items-start gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={adminVerified}
+                          onChange={(e) => {
+                            setAdminVerified(e.target.checked);
+                            // If checking admin verification, hide rejection input
+                            if (e.target.checked) {
+                              setShowRejectionInput(false);
+                              setRejectionReason('');
+                            }
+                          }}
+                          className="mt-1 h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                        />
+                        <span className="text-sm text-gray-700">
+                          <strong>Admin Verification:</strong> I have reviewed and verified that this nominee meets all the attestation requirements stated by the nominator. I confirm the nominee has a clean driving record, the district is a TAPT member, and the district has attended the required TAPT conferences.
+                        </span>
+                      </label>
+                      {!adminVerified && (
+                        <p className="mt-2 text-sm text-amber-600 flex items-center gap-1">
+                          <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                          You must verify attestations before approving this nomination
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Show verification audit info for approved nominations */}
+                  {selectedNomination.status === 'approved' && selectedNomination.admin_verified_at && (
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <div className="flex items-center gap-2 text-green-700 bg-green-50 p-3 rounded-lg">
+                        <CheckCircle className="h-5 w-5" />
+                        <div>
+                          <p className="font-medium">Verified and Approved</p>
+                          <p className="text-sm text-green-600">
+                            Verified on {new Date(selectedNomination.admin_verified_at).toLocaleDateString()} at {new Date(selectedNomination.admin_verified_at).toLocaleTimeString()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="mt-6">
                 <h4 className="font-medium text-gray-500">Nominated By</h4>
                 <div className="mt-2 bg-gray-50 rounded-lg p-4">
                   <p className="font-medium">{selectedNomination.supervisor_first_name} {selectedNomination.supervisor_last_name}</p>
                   <p className="text-gray-600">{selectedNomination.supervisor_email}</p>
+                  {selectedNomination.nominator_role && (
+                    <p className="text-gray-500 text-sm mt-1">{selectedNomination.nominator_role}</p>
+                  )}
                 </div>
               </div>
 
@@ -631,7 +922,15 @@ export const AdminHallOfFameNominations: React.FC = () => {
                     Confirmation email sent successfully!
                   </div>
                 )}
-                <div className="flex justify-end gap-3">
+                {statusEmailSent && (
+                  <div className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-800 rounded-lg text-sm">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    {selectedNomination.status === 'approved' ? 'Approval' : 'Rejection'} email sent successfully!
+                  </div>
+                )}
+                <div className="flex justify-end gap-3 flex-wrap">
                   <button
                     onClick={() => handleResendEmail(selectedNomination.id)}
                     disabled={resendingEmail}
@@ -649,6 +948,30 @@ export const AdminHallOfFameNominations: React.FC = () => {
                       </>
                     )}
                   </button>
+                  {/* Resend Approval/Rejection Email - only show for approved or rejected nominations */}
+                  {(selectedNomination.status === 'approved' || selectedNomination.status === 'rejected') && (
+                    <button
+                      onClick={() => handleResendStatusEmail(selectedNomination.id)}
+                      disabled={resendingStatusEmail}
+                      className={`inline-flex items-center px-4 py-2 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed ${
+                        selectedNomination.status === 'approved' 
+                          ? 'bg-emerald-600 hover:bg-emerald-700' 
+                          : 'bg-red-600 hover:bg-red-700'
+                      }`}
+                    >
+                      {resendingStatusEmail ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="mr-2 h-4 w-4" />
+                          Resend {selectedNomination.status === 'approved' ? 'Approval' : 'Rejection'}
+                        </>
+                      )}
+                    </button>
+                  )}
                   <a
                     href={`mailto:${selectedNomination.supervisor_email}`}
                     className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
@@ -657,7 +980,12 @@ export const AdminHallOfFameNominations: React.FC = () => {
                     New Email
                   </a>
                   <button
-                    onClick={() => setShowDetailsModal(false)}
+                    onClick={() => {
+                      setShowDetailsModal(false);
+                      setAdminVerified(false);
+                      setRejectionReason('');
+                      setStatusEmailSent(false);
+                    }}
                     className="bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200"
                   >
                     Close

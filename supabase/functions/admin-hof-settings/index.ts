@@ -135,7 +135,7 @@ Deno.serve(async (req) => {
       }
 
       // Validate required fields
-      const requiredFields = ['name', 'start_date', 'end_date', 'nomination_instructions', 'eligibility_criteria'];
+      const requiredFields = ['name', 'start_date', 'end_date'];
       for (const field of requiredFields) {
         if (!body[field]) {
           throw new Error(`Missing required field: ${field}`);
@@ -162,6 +162,11 @@ Deno.serve(async (req) => {
           nomination_instructions: body.nomination_instructions,
           eligibility_criteria: body.eligibility_criteria,
           is_active: true,
+          // Dynamic year configuration
+          conference_year_1: body.conference_year_1,
+          conference_year_2: body.conference_year_2,
+          conference_year_3: body.conference_year_3,
+          award_year: body.award_year,
           updated_at: new Date().toISOString()
         });
 

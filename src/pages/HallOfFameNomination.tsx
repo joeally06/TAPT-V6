@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { User, Mail, Phone, Building, Clock, Award, Calendar } from 'lucide-react';
+import { User, Mail, Phone, Building, Clock, Award, Calendar, AlertTriangle, CheckCircle } from 'lucide-react';
 import { SecureForm } from '../components/forms/SecureForm';
 import { SuccessModal } from '../components/ui/SuccessModal';
 
@@ -13,22 +13,56 @@ interface HallOfFameSettings {
   nomination_instructions: string;
   eligibility_criteria: string;
   is_active: boolean;
+  // Dynamic year configuration
+  conference_year_1: number;
+  conference_year_2: number;
+  conference_year_3: number;
+  award_year: number;
 }
+
+// Grand Divisions - one winner selected per division
+const GRAND_DIVISIONS = [
+  { value: '', label: 'Select Grand Division' },
+  { value: 'East Tennessee', label: 'East Tennessee' },
+  { value: 'Middle Tennessee', label: 'Middle Tennessee' },
+  { value: 'West Tennessee', label: 'West Tennessee' }
+];
+
+// Valid nominator roles per 2026 guidelines
+const NOMINATOR_ROLES = [
+  { value: '', label: 'Select Your Role' },
+  { value: 'Transportation Supervisor', label: 'Transportation Supervisor (Listed with TN DOE)' },
+  { value: 'Director of Schools', label: 'Director of Schools' }
+];
 
 export const HallOfFameNomination: React.FC = () => {
   const [formData, setFormData] = useState({
+    // Nominee Information
     nomineeFirstName: '',
     nomineeLastName: '',
     district: '',
+    grandDivision: '',
     yearsOfService: '',
-    isTaptMember: false,
+    
+    // Nominator Information
+    nominatorFirstName: '',
+    nominatorLastName: '',
+    nominatorRole: '',
+    nominatorEmail: '',
+    nominatorPhone: '',
+    
+    // Nomination Details
     nominationReason: '',
-    supervisorFirstName: '',
-    supervisorLastName: '',
-    supervisorEmail: '',
-    supervisorPhone: '',
-    nomineeCity: '',
-    region: ''
+    
+    // Required Attestations
+    cleanDrivingRecord: false,
+    districtIsTaptMember: false,
+    districtAttendedYear1: false,  // Dynamic year from settings
+    districtAttendedYear2: false,  // Dynamic year from settings
+    districtAttendedYear3: false,  // Dynamic year from settings
+    nominatorIsOfficiallyListed: false,
+    acknowledgeDocumentation: false,
+    acknowledgeAttendance: false
   });
 
 
@@ -127,7 +161,7 @@ export const HallOfFameNomination: React.FC = () => {
         ...prev,
         [name]: checked
       }));
-    } else if (name === 'supervisorPhone') {
+    } else if (name === 'nominatorPhone') {
       // Only allow numbers and limit to 10 digits
       const numbersOnly = value.replace(/\D/g, '').slice(0, 10);
       setFormData(prev => ({
@@ -142,13 +176,43 @@ export const HallOfFameNomination: React.FC = () => {
     }
   };
 
-  const handleSecureSubmit = async (turnstileToken: string) => {
+  // Validate that all required fields and attestations are complete
+  const isFormValid = () => {
+    return (
+      formData.nomineeFirstName.trim() &&
+      formData.nomineeLastName.trim() &&
+      formData.district.trim() &&
+      formData.grandDivision &&
+      formData.yearsOfService &&
+      formData.nominatorFirstName.trim() &&
+      formData.nominatorLastName.trim() &&
+      formData.nominatorRole &&
+      formData.nominatorEmail.trim() &&
+      formData.nominatorPhone.length === 10 &&
+      formData.nominationReason.trim() &&
+      formData.cleanDrivingRecord &&
+      formData.districtIsTaptMember &&
+      formData.districtAttendedYear1 &&
+      formData.districtAttendedYear2 &&
+      formData.districtAttendedYear3 &&
+      formData.nominatorIsOfficiallyListed &&
+      formData.acknowledgeDocumentation &&
+      formData.acknowledgeAttendance
+    );
+  };
+
+  // SecureForm passes: (formData, isVerified, turnstileToken)
+  const handleSecureSubmit = async (_formData: any, _isVerified: boolean, turnstileToken: string) => {
     if (!settings?.is_active) {
       throw new Error('Nominations are currently closed.');
     }
 
     if (!isNominationPeriodOpen) {
       throw new Error('The nomination period is not currently open.');
+    }
+
+    if (!isFormValid()) {
+      throw new Error('Please complete all required fields and attestations.');
     }
 
     try {
@@ -166,17 +230,37 @@ export const HallOfFameNomination: React.FC = () => {
             'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           },
           body: JSON.stringify({
+            // Nominee info
             nominee_first_name: formData.nomineeFirstName,
             nominee_last_name: formData.nomineeLastName,
             district: formData.district,
+            grand_division: formData.grandDivision,
             years_of_service: parseInt(formData.yearsOfService),
-            is_tapt_member: formData.isTaptMember,
+            
+            // Nominator info
+            nominator_first_name: formData.nominatorFirstName,
+            nominator_last_name: formData.nominatorLastName,
+            nominator_role: formData.nominatorRole,
+            nominator_email: formData.nominatorEmail,
+            nominator_phone: formData.nominatorPhone,
+            
+            // Nomination details
             nomination_reason: formData.nominationReason,
-            supervisor_first_name: formData.supervisorFirstName,
-            supervisor_last_name: formData.supervisorLastName,
-            supervisor_email: formData.supervisorEmail,
-            nominee_city: formData.nomineeCity,
-            region: formData.region,
+            
+            // Attestations - send with dynamic years from settings
+            clean_driving_record: formData.cleanDrivingRecord,
+            district_is_tapt_member: formData.districtIsTaptMember,
+            // Dynamic year attestations - include both the year value and the checked status
+            conference_year_1: settings.conference_year_1,
+            conference_year_2: settings.conference_year_2,
+            conference_year_3: settings.conference_year_3,
+            district_attended_year_1: formData.districtAttendedYear1,
+            district_attended_year_2: formData.districtAttendedYear2,
+            district_attended_year_3: formData.districtAttendedYear3,
+            nominator_is_officially_listed: formData.nominatorIsOfficiallyListed,
+            acknowledge_documentation: formData.acknowledgeDocumentation,
+            acknowledge_attendance: formData.acknowledgeAttendance,
+            
             turnstileToken
           }),
         }
@@ -193,15 +277,13 @@ export const HallOfFameNomination: React.FC = () => {
         throw new Error(result?.error || `Server error (${response.status}). Please try again.`);
       }
 
-      // Success - Show modal instead of inline message
+      // Success - Show modal
       setSuccessModalContent({
         title: 'Nomination Submitted!',
         message: 'Your Hall of Fame nomination has been successfully received.',
-        subMessage: 'The selection committee will review all nominations. Thank you for recognizing excellence in pupil transportation.'
+        subMessage: 'TAPT will contact you with documentation requirements. The nominee will not be considered a finalist until all documentation is received.'
       });
       setShowSuccessModal(true);
-      
-      // Clear any inline status messages
       setFormStatus({});
 
       // Reset form
@@ -209,20 +291,26 @@ export const HallOfFameNomination: React.FC = () => {
         nomineeFirstName: '',
         nomineeLastName: '',
         district: '',
+        grandDivision: '',
         yearsOfService: '',
-        isTaptMember: false,
+        nominatorFirstName: '',
+        nominatorLastName: '',
+        nominatorRole: '',
+        nominatorEmail: '',
+        nominatorPhone: '',
         nominationReason: '',
-        supervisorFirstName: '',
-        supervisorLastName: '',
-        supervisorEmail: '',
-        supervisorPhone: '',
-        nomineeCity: '',
-        region: ''
+        cleanDrivingRecord: false,
+        districtIsTaptMember: false,
+        districtAttendedYear1: false,
+        districtAttendedYear2: false,
+        districtAttendedYear3: false,
+        nominatorIsOfficiallyListed: false,
+        acknowledgeDocumentation: false,
+        acknowledgeAttendance: false
       });
     } catch (error: any) {
       console.error('Nomination error:', error);
       
-      // Handle specific error types
       if (error.message?.includes('rate limit') || error.message?.includes('too many')) {
         throw new Error('Too many requests. Please wait a moment and try again.');
       }
@@ -231,7 +319,6 @@ export const HallOfFameNomination: React.FC = () => {
         throw new Error('Network error. Please check your connection and try again.');
       }
       
-      // Re-throw with the original error message or a generic one
       throw new Error(error.message || 'An unexpected error occurred. Please try again.');
     }
   };
@@ -285,7 +372,6 @@ export const HallOfFameNomination: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-24">
           <div className="max-w-3xl">
             <h1 className="text-4xl md:text-5xl font-bold mb-6 fade-in">{settings.name}</h1>
-            <p className="text-xl text-gray-200 mb-8 fade-in">{settings.description}</p>
           </div>
         </div>
       </section>
@@ -305,19 +391,19 @@ export const HallOfFameNomination: React.FC = () => {
             </div>
           </div>
 
-          {settings.nomination_instructions && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
-              <h3 className="text-lg font-semibold text-blue-800 mb-2">Nomination Instructions</h3>
-              <p className="text-blue-700">{settings.nomination_instructions}</p>
+          {/* Important Notice - Who Can Submit */}
+          <div className="bg-amber-50 border border-amber-300 rounded-lg p-6 mb-8">
+            <div className="flex items-start">
+              <AlertTriangle className="h-6 w-6 text-amber-600 mr-3 mt-0.5 flex-shrink-0" />
+              <div>
+                <h3 className="text-lg font-semibold text-amber-900 mb-2">Who Can Submit a Nomination?</h3>
+                <p className="text-amber-800 text-sm">
+                  Only the <strong>Transportation Supervisor officially listed with the Tennessee Department of Education</strong> or 
+                  the <strong>Director of Schools</strong> may submit a nomination. Self-nominations and third-party nominations will not be accepted.
+                </p>
+              </div>
             </div>
-          )}
-
-          {settings.eligibility_criteria && (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-8">
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">Eligibility Criteria</h3>
-              <p className="text-gray-700">{settings.eligibility_criteria}</p>
-            </div>
-          )}
+          </div>
 
           {formStatus.message && (
             <div className={`mb-8 p-4 rounded-md ${formStatus.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
@@ -346,155 +432,205 @@ export const HallOfFameNomination: React.FC = () => {
             </div>
           )}
 
-          <SecureForm onSubmit={handleSecureSubmit} className="bg-white shadow-lg rounded-lg p-8">
-            {/* Nominee Information */}
+          <SecureForm onSubmit={handleSecureSubmit} className="bg-white shadow-lg rounded-lg p-8" submitButtonText="Submit Nomination">
+            {/* Section 1: Nominee Information */}
             <div className="mb-8">
-              <h2 className="text-2xl font-bold text-secondary mb-6">Nominee Information</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">
+                Nominee Information
+              </h2>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* First Name */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="nomineeFirstName" className="block text-sm font-medium text-gray-700 mb-1">
                     First Name <span className="text-red-500">*</span>
                   </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <User className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <input
-                      type="text"
-                      id="nomineeFirstName"
-                      name="nomineeFirstName"
-                      value={formData.nomineeFirstName}
-                      onChange={handleChange}
-                      required
-                      className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    id="nomineeFirstName"
+                    name="nomineeFirstName"
+                    value={formData.nomineeFirstName}
+                    onChange={handleChange}
+                    required
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  />
                 </div>
 
-                {/* Last Name */}
                 <div>
                   <label htmlFor="nomineeLastName" className="block text-sm font-medium text-gray-700 mb-1">
                     Last Name <span className="text-red-500">*</span>
                   </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <User className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <input
-                      type="text"
-                      id="nomineeLastName"
-                      name="nomineeLastName"
-                      value={formData.nomineeLastName}
-                      onChange={handleChange}
-                      required
-                      className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    id="nomineeLastName"
+                    name="nomineeLastName"
+                    value={formData.nomineeLastName}
+                    onChange={handleChange}
+                    required
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  />
                 </div>
+              </div>
 
-                {/* District */}
+              <div className="mt-4">
+                <label htmlFor="district" className="block text-sm font-medium text-gray-700 mb-1">
+                  School District <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  id="district"
+                  name="district"
+                  value={formData.district}
+                  onChange={handleChange}
+                  required
+                  placeholder="e.g., Knox County Schools"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                 <div>
-                  <label htmlFor="district" className="block text-sm font-medium text-gray-700 mb-1">
-                    School District/Organization <span className="text-red-500">*</span>
+                  <label htmlFor="grandDivision" className="block text-sm font-medium text-gray-700 mb-1">
+                    Grand Division <span className="text-red-500">*</span>
                   </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Building className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <input
-                      type="text"
-                      id="district"
-                      name="district"
-                      value={formData.district}
-                      onChange={handleChange}
-                      required
-                      className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
-                    />
-                  </div>
+                  <select
+                    id="grandDivision"
+                    name="grandDivision"
+                    value={formData.grandDivision}
+                    onChange={handleChange}
+                    required
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  >
+                    {GRAND_DIVISIONS.map(division => (
+                      <option key={division.value} value={division.value}>
+                        {division.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">One winner selected per division</p>
                 </div>
 
-                {/* Years of Service */}
                 <div>
                   <label htmlFor="yearsOfService" className="block text-sm font-medium text-gray-700 mb-1">
                     Years of Service <span className="text-red-500">*</span>
                   </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Clock className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <input
-                      type="number"
-                      id="yearsOfService"
-                      name="yearsOfService"
-                      value={formData.yearsOfService}
-                      onChange={handleChange}
-                      required
-                      min="0"
-                      className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
-                    />
-                  </div>
+                  <input
+                    type="number"
+                    id="yearsOfService"
+                    name="yearsOfService"
+                    value={formData.yearsOfService}
+                    onChange={handleChange}
+                    required
+                    min="1"
+                    max="60"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Must be verified by district</p>
                 </div>
+              </div>
+            </div>
 
-                {/* City */}
+            {/* Section 2: Nominator Information */}
+            <div className="mb-8">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">
+                Nominator Information
+              </h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="nomineeCity" className="block text-sm font-medium text-gray-700 mb-1">
-                    City <span className="text-red-500">*</span>
+                  <label htmlFor="nominatorFirstName" className="block text-sm font-medium text-gray-700 mb-1">
+                    Your First Name <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
-                    id="nomineeCity"
-                    name="nomineeCity"
-                    value={formData.nomineeCity}
+                    id="nominatorFirstName"
+                    name="nominatorFirstName"
+                    value={formData.nominatorFirstName}
                     onChange={handleChange}
                     required
-                    className="block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
 
-                {/* Region */}
                 <div>
-                  <label htmlFor="region" className="block text-sm font-medium text-gray-700 mb-1">
-                    Region <span className="text-red-500">*</span>
+                  <label htmlFor="nominatorLastName" className="block text-sm font-medium text-gray-700 mb-1">
+                    Your Last Name <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    id="region"
-                    name="region"
-                    value={formData.region}
+                  <input
+                    type="text"
+                    id="nominatorLastName"
+                    name="nominatorLastName"
+                    value={formData.nominatorLastName}
                     onChange={handleChange}
                     required
-                    className="block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
-                  >
-                    <option value="">Select Region</option>
-                    <option value="East">East Tennessee</option>
-                    <option value="Middle">Middle Tennessee</option>
-                    <option value="West">West Tennessee</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* TAPT Member */}
-              <div className="mt-6">
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="isTaptMember"
-                    name="isTaptMember"
-                    checked={formData.isTaptMember}
-                    onChange={handleChange}
-                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
-                  <label htmlFor="isTaptMember" className="ml-2 block text-sm text-gray-700">
-                    TAPT Member
-                  </label>
                 </div>
               </div>
 
-              {/* Nomination Reason */}
-              <div className="mt-6">
+              <div className="mt-4">
+                <label htmlFor="nominatorRole" className="block text-sm font-medium text-gray-700 mb-1">
+                  Your Role <span className="text-red-500">*</span>
+                </label>
+                <select
+                  id="nominatorRole"
+                  name="nominatorRole"
+                  value={formData.nominatorRole}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                  {NOMINATOR_ROLES.map(role => (
+                    <option key={role.value} value={role.value}>
+                      {role.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div>
+                  <label htmlFor="nominatorEmail" className="block text-sm font-medium text-gray-700 mb-1">
+                    Your Email <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    id="nominatorEmail"
+                    name="nominatorEmail"
+                    value={formData.nominatorEmail}
+                    onChange={handleChange}
+                    required
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="nominatorPhone" className="block text-sm font-medium text-gray-700 mb-1">
+                    Your Phone <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    id="nominatorPhone"
+                    name="nominatorPhone"
+                    value={formData.nominatorPhone}
+                    onChange={handleChange}
+                    required
+                    placeholder="10 digits"
+                    maxLength={10}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Section 3: Nomination Reason */}
+            <div className="mb-8">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">
+                Nomination Statement
+              </h2>
+              
+              <div>
                 <label htmlFor="nominationReason" className="block text-sm font-medium text-gray-700 mb-1">
-                  Reason for Nomination (max 500 characters) <span className="text-red-500">*</span>
+                  Why should this driver be inducted into the Hall of Fame? <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   id="nominationReason"
@@ -502,113 +638,160 @@ export const HallOfFameNomination: React.FC = () => {
                   value={formData.nominationReason}
                   onChange={handleChange}
                   required
-                  maxLength={500}
-                  rows={4}
-                  className="block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
-                  placeholder="Please provide a brief description of why this person deserves to be nominated (max 500 characters)..."
+                  rows={5}
+                  maxLength={2000}
+                  placeholder="Describe their service, professionalism, commitment to student safety, and why they exemplify the highest standards of pupil transportation..."
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
-                <p className="mt-1 text-sm text-gray-500">
-                  {formData.nominationReason.length}/500 characters
+                <p className="text-xs text-gray-500 mt-1">{formData.nominationReason.length}/2000 characters</p>
+              </div>
+            </div>
+
+            {/* Section 4: Required Attestations */}
+            <div className="mb-8">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">
+                Required Attestations
+              </h2>
+              <p className="text-sm text-gray-600 mb-4">
+                All boxes must be checked to submit this nomination.
+              </p>
+
+              <div className="space-y-4 bg-gray-50 rounded-lg p-4">
+                {/* Nominee Attestations */}
+                <div className="pb-4 border-b border-gray-200">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Nominee Eligibility</h3>
+                  
+                  <label className="flex items-start cursor-pointer">
+                    <input
+                      type="checkbox"
+                      name="cleanDrivingRecord"
+                      checked={formData.cleanDrivingRecord}
+                      onChange={handleChange}
+                      className="mt-1 h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                    />
+                    <span className="ml-3 text-sm text-gray-700">
+                      I attest that the nominee has a <strong>clean driving record</strong>. <span className="text-red-500">*</span>
+                    </span>
+                  </label>
+                </div>
+
+                {/* District Attestations */}
+                <div className="pb-4 border-b border-gray-200">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">District Eligibility</h3>
+                  
+                  <label className="flex items-start mb-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      name="districtIsTaptMember"
+                      checked={formData.districtIsTaptMember}
+                      onChange={handleChange}
+                      className="mt-1 h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                    />
+                    <span className="ml-3 text-sm text-gray-700">
+                      Our school district is an <strong>active TAPT General Member</strong>. <span className="text-red-500">*</span>
+                    </span>
+                  </label>
+
+                  <p className="text-sm text-gray-600 mb-2 ml-7">Our district attended TAPT Annual Conference in:</p>
+                  
+                  <div className="ml-7 space-y-2">
+                    <label className="flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        name="districtAttendedYear1"
+                        checked={formData.districtAttendedYear1}
+                        onChange={handleChange}
+                        className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                      />
+                      <span className="ml-3 text-sm text-gray-700">{settings?.conference_year_1 || '____'} <span className="text-red-500">*</span></span>
+                    </label>
+                    
+                    <label className="flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        name="districtAttendedYear2"
+                        checked={formData.districtAttendedYear2}
+                        onChange={handleChange}
+                        className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                      />
+                      <span className="ml-3 text-sm text-gray-700">{settings?.conference_year_2 || '____'} <span className="text-red-500">*</span></span>
+                    </label>
+                    
+                    <label className="flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        name="districtAttendedYear3"
+                        checked={formData.districtAttendedYear3}
+                        onChange={handleChange}
+                        className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                      />
+                      <span className="ml-3 text-sm text-gray-700">{settings?.conference_year_3 || '____'} <span className="text-red-500">*</span></span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Nominator Attestations */}
+                <div className="pb-4 border-b border-gray-200">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Nominator Authorization</h3>
+                  
+                  <label className="flex items-start cursor-pointer">
+                    <input
+                      type="checkbox"
+                      name="nominatorIsOfficiallyListed"
+                      checked={formData.nominatorIsOfficiallyListed}
+                      onChange={handleChange}
+                      className="mt-1 h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                    />
+                    <span className="ml-3 text-sm text-gray-700">
+                      I am the <strong>Transportation Supervisor officially listed with the Tennessee Department of Education</strong> or 
+                      the <strong>Director of Schools</strong> for this district. <span className="text-red-500">*</span>
+                    </span>
+                  </label>
+                </div>
+
+                {/* Acknowledgments */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Acknowledgments</h3>
+                  
+                  <label className="flex items-start mb-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      name="acknowledgeDocumentation"
+                      checked={formData.acknowledgeDocumentation}
+                      onChange={handleChange}
+                      className="mt-1 h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                    />
+                    <span className="ml-3 text-sm text-gray-700">
+                      I understand that TAPT will contact me with <strong>required documentation</strong> after submission, 
+                      and the nominee will not be considered a finalist until all documentation is received. <span className="text-red-500">*</span>
+                    </span>
+                  </label>
+
+                  <label className="flex items-start cursor-pointer">
+                    <input
+                      type="checkbox"
+                      name="acknowledgeAttendance"
+                      checked={formData.acknowledgeAttendance}
+                      onChange={handleChange}
+                      className="mt-1 h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                    />
+                    <span className="ml-3 text-sm text-gray-700">
+                      I understand that if selected, the winner <strong>must attend the {settings?.award_year || '____'} TAPT Annual Conference</strong> in person 
+                      to receive the award at the President's Awards Dinner. <span className="text-red-500">*</span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Validation message - SecureForm provides the submit button */}
+            {!isFormValid() && (
+              <div className="mt-6">
+                <p className="text-sm text-gray-500 text-center">
+                  Please complete all required fields and attestations
                 </p>
               </div>
-            </div>
-
-            {/* Nominator Information */}
-            <div>
-              <h2 className="text-2xl font-bold text-secondary mb-6">Nominator Information</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* First Name */}
-                <div>
-                  <label htmlFor="supervisorFirstName" className="block text-sm font-medium text-gray-700 mb-1">
-                    First Name <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <User className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <input
-                      type="text"
-                      id="supervisorFirstName"
-                      name="supervisorFirstName"
-                      value={formData.supervisorFirstName}
-                      onChange={handleChange}
-                      required
-                      className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
-                    />
-                  </div>
-                </div>
-
-                {/* Last Name */}
-                <div>
-                  <label htmlFor="supervisorLastName" className="block text-sm font-medium text-gray-700 mb-1">
-                    Last Name <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <User className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <input
-                      type="text"
-                      id="supervisorLastName"
-                      name="supervisorLastName"
-                      value={formData.supervisorLastName}
-                      onChange={handleChange}
-                      required
-                      className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
-                    />
-                  </div>
-                </div>
-
-                {/* Email */}
-                <div>
-                  <label htmlFor="supervisorEmail" className="block text-sm font-medium text-gray-700 mb-1">
-                    Email <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Mail className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <input
-                      type="email"
-                      id="supervisorEmail"
-                      name="supervisorEmail"
-                      value={formData.supervisorEmail}
-                      onChange={handleChange}
-                      required
-                      className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
-                    />
-                  </div>
-                </div>
-
-                {/* Phone */}
-                <div>
-                  <label htmlFor="supervisorPhone" className="block text-sm font-medium text-gray-700 mb-1">
-                    Phone <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Phone className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <input
-                      type="tel"
-                      id="supervisorPhone"
-                      name="supervisorPhone"
-                      value={formData.supervisorPhone}
-                      onChange={handleChange}
-                      required
-                      pattern="[0-9]{10}"
-                      maxLength={10}
-                      placeholder="1234567890"
-                      title="Please enter a valid 10-digit phone number"
-                      className="pl-10 block w-full shadow-sm focus:ring-primary focus:border-primary rounded-md border-gray-300"
-                    />
-                  </div>
-                  <p className="mt-1 text-sm text-gray-500">Enter 10 digits without spaces or special characters</p>
-                </div>
-              </div>
-            </div>
-
+            )}
           </SecureForm>
         </div>
       </section>
