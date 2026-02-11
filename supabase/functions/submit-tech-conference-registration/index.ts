@@ -239,6 +239,80 @@ Deno.serve(async (req) => {
     }
 
     // Insert main registration with sanitized data
+    // =========================================================================
+    // Fetch conference settings to get meal config & validate amounts server-side
+    // =========================================================================
+    const { data: confSettings, error: confSettingsError } = await supabaseAdmin
+      .from('tech_conference_settings')
+      .select('*')
+      .eq('id', sanitizedData.conferenceId)
+      .single();
+
+    if (confSettingsError || !confSettings) {
+      console.error('Failed to fetch conference settings:', confSettingsError);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Conference not found or no longer available.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!confSettings.is_active) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Registration is currently closed.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // =========================================================================
+    // Process and validate meal selections (server-side authority)
+    // =========================================================================
+    const mealPrice: number = confSettings.meal_price ?? 40.00;
+    const mealsAvailable: Array<{ id: string; label: string; enabled: boolean }> = confSettings.meals_available || [];
+    const enabledMealIds = mealsAvailable.filter((m: { enabled: boolean }) => m.enabled).map((m: { id: string }) => m.id);
+
+    const allMealsSelected = body.allMealsSelected === true;
+    let validatedMealSelections: string[] = [];
+
+    if (allMealsSelected) {
+      // "Attend all meals" — select every enabled meal
+      validatedMealSelections = [...enabledMealIds];
+    } else if (Array.isArray(body.mealSelections)) {
+      // Validate each selected meal ID
+      for (const mealId of body.mealSelections) {
+        if (typeof mealId !== 'string' || mealId.length > 100) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'Invalid meal selection format.' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        if (!enabledMealIds.includes(mealId)) {
+          return new Response(
+            JSON.stringify({ success: false, error: `Meal "${mealId}" is not available for selection.` }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+      // Deduplicate
+      validatedMealSelections = [...new Set(body.mealSelections as string[])];
+    }
+
+    // Build meal objects with labels for storage
+    const mealSelectionsWithLabels = validatedMealSelections.map(mealId => {
+      const meal = mealsAvailable.find((m: { id: string }) => m.id === mealId);
+      return { id: mealId, label: meal?.label || mealId, price: mealPrice };
+    });
+
+    // Server-authoritative price calculation (never trust client-provided totals)
+    const registrationFee: number = confSettings.fee ?? 0;
+    const attendeeCount: number = sanitizedData.totalAttendees || 1;
+    const mealTotal = validatedMealSelections.length * mealPrice * attendeeCount;
+    const serverCalculatedRegistrationTotal = attendeeCount * registrationFee;
+    const serverCalculatedGrandTotal = serverCalculatedRegistrationTotal + mealTotal;
+
+    console.log(`🍽️ Meals: ${validatedMealSelections.length} meals × $${mealPrice} × ${attendeeCount} attendees = $${mealTotal}`);
+    console.log(`💰 Registration: ${attendeeCount} × $${registrationFee} = $${serverCalculatedRegistrationTotal}`);
+    console.log(`💰 Grand total (server): $${serverCalculatedGrandTotal}`);
+
     const { data: registration, error: regError } = await supabaseAdmin
       .from('tech_conference_registrations')
       .insert([{
@@ -264,7 +338,12 @@ Deno.serve(async (req) => {
         
         // Registration details
         total_attendees: sanitizedData.totalAttendees,
-        total_amount: sanitizedData.totalAmount,
+        total_amount: serverCalculatedGrandTotal,
+        
+        // Meal selections
+        meal_selections: mealSelectionsWithLabels,
+        meal_total: mealTotal,
+        all_meals_selected: allMealsSelected,
         
         // Payment fields
         payment_method: sanitizedData.paymentMethod,
@@ -295,12 +374,8 @@ Deno.serve(async (req) => {
       if (attendeesError) throw attendeesError;
     }
 
-    // Get tech conference details for email
-    const { data: conferenceDetails } = await supabaseAdmin
-      .from('tech_conference_settings')
-      .select('name, start_date, end_date, location, venue, payment_instructions')
-      .limit(1)
-      .single();
+    // Use already-fetched confSettings for email (no need to re-query)
+    const conferenceDetails = confSettings;
 
     // Fetch site settings for remittance address
     console.log('⚙️ Fetching site settings...');
@@ -318,7 +393,7 @@ Deno.serve(async (req) => {
       state: sanitizedData.state || '',
       zipCode: sanitizedData.zipCode || '',
       totalAttendees: sanitizedData.totalAttendees || 0,
-      totalAmount: sanitizedData.totalAmount || 0,
+      totalAmount: serverCalculatedGrandTotal,
       conferenceName: conferenceDetails?.name || 'TAPT Tech Conference',
       conferenceDate: conferenceDetails 
         ? `${new Date(conferenceDetails.start_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - ${new Date(conferenceDetails.end_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}` 
@@ -339,7 +414,13 @@ Deno.serve(async (req) => {
       billingFirstName: sanitizedData.billingFirstName || '',
       billingLastName: sanitizedData.billingLastName || '',
       billingEmail: sanitizedData.billingEmail || '',
-      registrantIsAttendee: sanitizedData.registrantIsAttendee ?? true
+      registrantIsAttendee: sanitizedData.registrantIsAttendee ?? true,
+      // Meal ticket data
+      mealSelections: mealSelectionsWithLabels,
+      mealTotal: mealTotal,
+      mealPrice: mealPrice,
+      allMealsSelected: allMealsSelected,
+      registrationSubtotal: serverCalculatedRegistrationTotal
     };
 
     // Determine email recipients based on registrant type

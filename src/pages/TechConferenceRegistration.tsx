@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { Mail, Phone, MapPin, DollarSign, Building, User, Users, Calendar, AlertCircle, X } from 'lucide-react';
 import { SecureForm } from '../components/forms/SecureForm';
@@ -6,6 +6,8 @@ import { PaymentMethodSelector } from '../components/forms/PaymentMethodSelector
 import { PayPalButton } from '../components/forms/PayPalButton';
 import { PayPalOrderDetails } from '../config/paypal';
 import { SuccessModal } from '../components/ui/SuccessModal';
+import { MealTicketSelection } from '../components/forms/MealTicketSelection';
+import type { MealOption } from '../components/forms/MealTicketSelection';
 
 interface Attendee {
   firstName: string;
@@ -25,6 +27,8 @@ interface TechConferenceSettings {
   payment_instructions: string;
   description: string;
   is_active: boolean;
+  meal_price?: number;
+  meals_available?: MealOption[];
 }
 
 const TechConferenceRegistration: React.FC = () => {
@@ -60,6 +64,10 @@ const TechConferenceRegistration: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'po' | 'paypal' | null>(null);
   const [poNumber, setPoNumber] = useState('');
   const [paypalDetails, setPaypalDetails] = useState<PayPalOrderDetails | null>(null);
+
+  // Meal selection state
+  const [selectedMeals, setSelectedMeals] = useState<string[]>([]);
+  const [allMealsSelected, setAllMealsSelected] = useState(false);
 
   const [formStatus, setFormStatus] = useState<{
     success?: boolean;
@@ -126,7 +134,33 @@ const TechConferenceRegistration: React.FC = () => {
   };
 
   const registrationFee = conferenceSettings?.fee ?? 250.00;
-  const totalAmount = formData.totalAttendees * registrationFee;
+  const mealPrice = conferenceSettings?.meal_price ?? 40.00;
+  const mealsAvailable: MealOption[] = conferenceSettings?.meals_available ?? [];
+  const enabledMeals = useMemo(() => mealsAvailable.filter(m => m.enabled), [mealsAvailable]);
+
+  const registrationSubtotal = formData.totalAttendees * registrationFee;
+  const mealTotal = selectedMeals.length * mealPrice * formData.totalAttendees;
+  const totalAmount = registrationSubtotal + mealTotal;
+
+  // Meal handlers
+  const handleMealToggle = useCallback((mealId: string) => {
+    setSelectedMeals(prev => {
+      if (prev.includes(mealId)) {
+        return prev.filter(id => id !== mealId);
+      }
+      return [...prev, mealId];
+    });
+    setAllMealsSelected(false);
+  }, []);
+
+  const handleAllMealsToggle = useCallback((selectAll: boolean) => {
+    setAllMealsSelected(selectAll);
+    if (selectAll) {
+      setSelectedMeals(enabledMeals.map(m => m.id));
+    } else {
+      setSelectedMeals([]);
+    }
+  }, [enabledMeals]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -277,7 +311,11 @@ const TechConferenceRegistration: React.FC = () => {
         poNumber: paymentMethod === 'po' ? poNumber : null,
         paypalTransactionId: paymentMethod === 'paypal' ? paypalDetails?.id : null,
         paypalPayerEmail: paymentMethod === 'paypal' ? paypalDetails?.payer?.email_address : null,
-        paymentStatus: paymentMethod === 'paypal' ? 'completed' : 'pending'
+        paymentStatus: paymentMethod === 'paypal' ? 'completed' : 'pending',
+        
+        // Meal selections
+        mealSelections: selectedMeals,
+        allMealsSelected
       };
 
       const response = await fetch(`${supabaseUrl}/functions/v1/submit-tech-conference-registration`, {
@@ -349,6 +387,10 @@ const TechConferenceRegistration: React.FC = () => {
       setPaymentMethod(null);
       setPoNumber('');
       setPaypalDetails(null);
+      
+      // Reset meal state
+      setSelectedMeals([]);
+      setAllMealsSelected(false);
 
     } catch (error: any) {
       console.error('Registration error:', error);
@@ -530,6 +572,22 @@ const TechConferenceRegistration: React.FC = () => {
                           <p>${registrationFee.toFixed(2)} per attendee</p>
                         </div>
                       </li>
+                      {enabledMeals.length > 0 && (
+                        <li className="flex items-start">
+                          <span className="flex-shrink-0 h-6 w-6 text-primary mr-2">
+                            🍽️
+                          </span>
+                          <div>
+                            <span className="font-medium">Meal Tickets:</span>
+                            <p>${mealPrice.toFixed(2)} per meal per person</p>
+                            <ul className="mt-1 text-sm text-gray-600 list-disc list-inside">
+                              {enabledMeals.map(meal => (
+                                <li key={meal.id}>{meal.label} — ${mealPrice.toFixed(2)}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        </li>
+                      )}
                       <li className="flex items-start">
                         <span className="flex-shrink-0 h-6 w-6 text-primary mr-2">
                           <Mail className="h-6 w-6" />
@@ -979,9 +1037,43 @@ const TechConferenceRegistration: React.FC = () => {
                   <p className="mt-2 text-sm text-gray-500">Registration fee: ${registrationFee.toFixed(2)} per attendee</p>
                   <div className="mt-4 p-4 bg-gray-50 rounded-md">
                     <div className="flex justify-between items-center">
-                      <span className="font-medium">Total Amount:</span>
-                      <span className="text-xl font-bold text-primary">${totalAmount.toFixed(2)}</span>
+                      <span className="font-medium">Registration Subtotal:</span>
+                      <span className="text-lg font-bold text-gray-700">${registrationSubtotal.toFixed(2)}</span>
                     </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Meal Ticket Selection */}
+              {enabledMeals.length > 0 && (
+                <div className="mb-8">
+                  <MealTicketSelection
+                    mealsAvailable={mealsAvailable}
+                    mealPrice={mealPrice}
+                    selectedMeals={selectedMeals}
+                    allMealsSelected={allMealsSelected}
+                    onMealToggle={handleMealToggle}
+                    onAllMealsToggle={handleAllMealsToggle}
+                  />
+                </div>
+              )}
+
+              {/* Grand Total */}
+              <div className="mb-8 p-5 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-sm text-gray-600">
+                    <span>Registration ({formData.totalAttendees} attendee{formData.totalAttendees !== 1 ? 's' : ''} × ${registrationFee.toFixed(2)}):</span>
+                    <span>${registrationSubtotal.toFixed(2)}</span>
+                  </div>
+                  {selectedMeals.length > 0 && (
+                    <div className="flex justify-between items-center text-sm text-gray-600">
+                      <span>Meals ({selectedMeals.length} meal{selectedMeals.length !== 1 ? 's' : ''} × ${mealPrice.toFixed(2)} × {formData.totalAttendees} attendee{formData.totalAttendees !== 1 ? 's' : ''}):</span>
+                      <span>${mealTotal.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center pt-2 border-t border-blue-300">
+                    <span className="text-lg font-bold text-primary">Total Amount:</span>
+                    <span className="text-2xl font-bold text-primary">${totalAmount.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
@@ -1051,7 +1143,7 @@ const TechConferenceRegistration: React.FC = () => {
                   <div className="mt-6">
                     <PayPalButton
                       amount={totalAmount}
-                      description={`Tech Conference Registration - ${formData.totalAttendees} attendee(s)`}
+                      description={`Tech Conference Registration - ${formData.totalAttendees} attendee(s)${selectedMeals.length > 0 ? ` + ${selectedMeals.length} meal(s)` : ''}`}
                       onSuccess={handlePayPalSuccess}
                       onError={handlePayPalError}
                       onCancel={handlePayPalCancel}

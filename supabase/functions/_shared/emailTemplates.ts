@@ -35,6 +35,12 @@ export interface ConferenceRegistrationData {
   billingLastName?: string;
   billingEmail?: string;
   registrantIsAttendee?: boolean;
+  // Meal ticket data
+  mealSelections?: Array<{ id: string; label: string; price: number }>;
+  mealTotal?: number;
+  mealPrice?: number;
+  allMealsSelected?: boolean;
+  registrationSubtotal?: number;
 }
 
 export interface ExhibitorRegistrationData {
@@ -222,7 +228,31 @@ export function generateConferenceConfirmationEmail(data: ConferenceRegistration
             <div class="info-row">
               <span class="label">Total Attendees:</span> ${data.totalAttendees}
             </div>
+            ${data.registrationSubtotal !== undefined ? `
             <div class="info-row">
+              <span class="label">Registration Fee:</span> $${data.registrationSubtotal.toFixed(2)}
+            </div>
+            ` : ''}
+            ${data.mealSelections && data.mealSelections.length > 0 ? `
+            <div class="info-row">
+              <span class="label">Meal Tickets:</span> ${data.allMealsSelected ? '(All Meals Package)' : `${data.mealSelections.length} meal(s) selected`}
+            </div>
+            <div style="margin: 8px 0 8px 140px;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                ${data.mealSelections.map(meal => `
+                  <tr>
+                    <td style="padding: 4px 0; color: #374151;">🍽️ ${meal.label}</td>
+                    <td style="padding: 4px 0; text-align: right; color: #374151;">$${meal.price.toFixed(2)}</td>
+                  </tr>
+                `).join('')}
+                <tr style="border-top: 1px solid #d1d5db;">
+                  <td style="padding: 6px 0; font-weight: 600; color: #1e3a8a;">Meal Total</td>
+                  <td style="padding: 6px 0; text-align: right; font-weight: 600; color: #1e3a8a;">$${(data.mealTotal || 0).toFixed(2)}</td>
+                </tr>
+              </table>
+            </div>
+            ` : ''}
+            <div class="info-row" style="border-top: 2px solid #1e3a8a; padding-top: 10px; margin-top: 10px;">
               <span class="label">Total Amount:</span> <span class="total-amount">$${data.totalAmount.toFixed(2)}</span>
             </div>
           </div>
@@ -407,7 +437,21 @@ export function generateConferenceAdminNotification(data: ConferenceRegistration
             <div class="info-row">
               <span class="label">Total Attendees:</span> <strong>${data.totalAttendees}</strong>
             </div>
+            ${data.registrationSubtotal !== undefined ? `
             <div class="info-row">
+              <span class="label">Registration Fee:</span> $${data.registrationSubtotal.toFixed(2)}
+            </div>
+            ` : ''}
+            ${data.mealSelections && data.mealSelections.length > 0 ? `
+            <div class="info-row">
+              <span class="label">Meals Selected:</span> ${data.mealSelections.length} meal(s)${data.allMealsSelected ? ' (All Meals)' : ''}
+            </div>
+            <div style="margin: 4px 0 4px 140px; font-size: 14px; color: #374151;">
+              ${data.mealSelections.map(m => `🍽️ ${m.label} — $${m.price.toFixed(2)}`).join('<br>')}
+              <div style="margin-top: 4px; font-weight: 600; color: #1e3a8a;">Meal Total: $${(data.mealTotal || 0).toFixed(2)}</div>
+            </div>
+            ` : ''}
+            <div class="info-row" style="border-top: 2px solid #1e3a8a; padding-top: 8px; margin-top: 8px;">
               <span class="label">Total Amount:</span> <span class="total-amount">$${data.totalAmount.toFixed(2)}</span>
             </div>
             ${data.paymentMethod ? `

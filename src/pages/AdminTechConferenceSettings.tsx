@@ -6,6 +6,12 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import { useAuth } from '../context/AuthContext';
 import AdminLayout from '../components/AdminLayout';
 
+interface MealOption {
+  id: string;
+  label: string;
+  enabled: boolean;
+}
+
 interface TechConferenceSettings {
   id: string;
   name: string;
@@ -18,6 +24,8 @@ interface TechConferenceSettings {
   payment_instructions: string;
   description: string;
   is_active: boolean;
+  meal_price: number;
+  meals_available: MealOption[];
 }
 
 export const AdminTechConferenceSettings: React.FC = () => {
@@ -44,7 +52,15 @@ export const AdminTechConferenceSettings: React.FC = () => {
     fee: 250.00,
     payment_instructions: '',
     description: '',
-    is_active: true
+    is_active: true,
+    meal_price: 40.00,
+    meals_available: [
+      { id: 'wednesday_dinner', label: 'Wednesday Dinner', enabled: true },
+      { id: 'thursday_breakfast', label: 'Thursday Breakfast', enabled: true },
+      { id: 'thursday_lunch', label: 'Thursday Lunch', enabled: true },
+      { id: 'thursday_dinner', label: 'Thursday Dinner', enabled: true },
+      { id: 'friday_breakfast', label: 'Friday Breakfast', enabled: true }
+    ]
   });
 
   useEffect(() => {
@@ -93,7 +109,15 @@ export const AdminTechConferenceSettings: React.FC = () => {
           start_date: data.start_date.split('T')[0],
           end_date: data.end_date.split('T')[0],
           registration_end_date: data.registration_end_date.split('T')[0],
-          is_active: data.is_active
+          is_active: data.is_active,
+          meal_price: data.meal_price ?? 40.00,
+          meals_available: data.meals_available ?? [
+            { id: 'wednesday_dinner', label: 'Wednesday Dinner', enabled: true },
+            { id: 'thursday_breakfast', label: 'Thursday Breakfast', enabled: true },
+            { id: 'thursday_lunch', label: 'Thursday Lunch', enabled: true },
+            { id: 'thursday_dinner', label: 'Thursday Dinner', enabled: true },
+            { id: 'friday_breakfast', label: 'Friday Breakfast', enabled: true }
+          ]
         });
       }
     } catch (error: any) {
@@ -139,6 +163,46 @@ export const AdminTechConferenceSettings: React.FC = () => {
     setSettings(prev => ({
       ...prev,
       [name]: type === 'number' ? parseFloat(value) : value
+    }));
+  };
+
+  // Meal settings handlers
+  const [newMealLabel, setNewMealLabel] = useState('');
+
+  const handleMealPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSettings(prev => ({
+      ...prev,
+      meal_price: parseFloat(e.target.value) || 0
+    }));
+  };
+
+  const handleToggleMeal = (mealId: string) => {
+    setSettings(prev => ({
+      ...prev,
+      meals_available: prev.meals_available.map(meal =>
+        meal.id === mealId ? { ...meal, enabled: !meal.enabled } : meal
+      )
+    }));
+  };
+
+  const handleAddMeal = () => {
+    if (!newMealLabel.trim()) return;
+    const id = newMealLabel.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+    if (settings.meals_available.some(m => m.id === id)) {
+      setError('A meal with this name already exists');
+      return;
+    }
+    setSettings(prev => ({
+      ...prev,
+      meals_available: [...prev.meals_available, { id, label: newMealLabel.trim(), enabled: true }]
+    }));
+    setNewMealLabel('');
+  };
+
+  const handleRemoveMeal = (mealId: string) => {
+    setSettings(prev => ({
+      ...prev,
+      meals_available: prev.meals_available.filter(m => m.id !== mealId)
     }));
   };
 
@@ -231,7 +295,15 @@ export const AdminTechConferenceSettings: React.FC = () => {
         fee: 250.00,
         payment_instructions: '',
         description: '',
-        is_active: true
+        is_active: true,
+        meal_price: 40.00,
+        meals_available: [
+          { id: 'wednesday_dinner', label: 'Wednesday Dinner', enabled: true },
+          { id: 'thursday_breakfast', label: 'Thursday Breakfast', enabled: true },
+          { id: 'thursday_lunch', label: 'Thursday Lunch', enabled: true },
+          { id: 'thursday_dinner', label: 'Thursday Dinner', enabled: true },
+          { id: 'friday_breakfast', label: 'Friday Breakfast', enabled: true }
+        ]
       });
     } catch (error: any) {
       setError(`Failed to clear tech conference settings: ${error.message}`);
@@ -699,6 +771,122 @@ export const AdminTechConferenceSettings: React.FC = () => {
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
                   placeholder="Provide detailed payment instructions..."
                 />
+              </div>
+            </div>
+
+            {/* Meal Ticket Settings */}
+            <div>
+              <h2 className="text-xl font-bold text-secondary mb-4">🍽️ Meal Ticket Settings</h2>
+              <p className="text-sm text-gray-600 mb-4">Configure available meals and pricing for conference registrants.</p>
+
+              {/* Meal Price */}
+              <div className="mb-6">
+                <label htmlFor="meal_price" className="block text-sm font-medium text-gray-700">
+                  Price Per Meal ($)
+                </label>
+                <div className="mt-1 relative rounded-md shadow-sm max-w-xs">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <DollarSign className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="number"
+                    id="meal_price"
+                    name="meal_price"
+                    value={settings.meal_price}
+                    onChange={handleMealPriceChange}
+                    min="0"
+                    step="0.01"
+                    className="pl-10 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
+                  />
+                </div>
+                <p className="text-sm text-gray-500 mt-1">This price applies to all meals uniformly.</p>
+              </div>
+
+              {/* Available Meals */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Available Meals
+                </label>
+                <div className="space-y-2">
+                  {settings.meals_available.map((meal) => (
+                    <div
+                      key={meal.id}
+                      className={`flex items-center justify-between p-3 border rounded-lg ${
+                        meal.enabled ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={meal.enabled}
+                          onChange={() => handleToggleMeal(meal.id)}
+                          className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                        />
+                        <div>
+                          <span className={`font-medium ${
+                            meal.enabled ? 'text-green-900' : 'text-gray-500 line-through'
+                          }`}>
+                            {meal.label}
+                          </span>
+                          <span className="block text-xs text-gray-500">ID: {meal.id}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-gray-600">
+                          ${settings.meal_price.toFixed(2)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMeal(meal.id)}
+                          className="text-red-500 hover:text-red-700 text-sm px-2 py-1"
+                          title="Remove meal"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Add New Meal */}
+              <div className="flex items-end gap-2 mb-4">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Add New Meal
+                  </label>
+                  <input
+                    type="text"
+                    value={newMealLabel}
+                    onChange={(e) => setNewMealLabel(e.target.value)}
+                    placeholder="e.g., Saturday Brunch"
+                    className="w-full border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddMeal();
+                      }
+                    }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddMeal}
+                  className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
+                >
+                  Add
+                </button>
+              </div>
+
+              {/* Meal Summary */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <p className="text-sm text-gray-700">
+                  <strong>{settings.meals_available.filter(m => m.enabled).length}</strong> of{' '}
+                  {settings.meals_available.length} meals enabled
+                  {settings.meals_available.filter(m => m.enabled).length > 0 && (
+                    <> — All meals package: <strong>${(settings.meals_available.filter(m => m.enabled).length * settings.meal_price).toFixed(2)}</strong></>
+                  )}
+                </p>
               </div>
             </div>
 

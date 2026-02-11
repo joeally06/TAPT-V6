@@ -2,6 +2,9 @@ import { createClient } from "npm:@supabase/supabase-js@2.39.3";
 
 const allowedOrigins = [
   'https://tapt.org',
+  'https://www.tapt.org',
+  'https://tntapt.com',
+  'https://www.tntapt.com',
   'https://admin.tapt.org',
   'http://localhost:5173',
   'https://localhost:5173',
@@ -69,14 +72,11 @@ Deno.serve(async (req) => {
       throw new Error('Invalid JWT');
     }
 
-    // Verify user is admin
-    const { data: userData, error: roleError } = await supabaseAdmin
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .single();
+    // Verify user is admin via RPC to avoid RLS recursion
+    const { data: userRole, error: roleError } = await supabaseAdmin
+      .rpc('get_user_role', { user_id: user.id });
 
-    if (roleError || !userData || userData.role !== 'admin') {
+    if (roleError || userRole !== 'admin') {
       throw new Error('Unauthorized - Admin access required');
     }
 
@@ -105,28 +105,85 @@ Deno.serve(async (req) => {
         throw new Error('Registration end date must be before or on the conference start date');
       }
 
+      // Validate meal_price if provided
+      let mealPrice: number | undefined;
+      if (body.meal_price !== undefined) {
+        mealPrice = parseFloat(body.meal_price);
+        if (isNaN(mealPrice) || mealPrice < 0) {
+          throw new Error('Meal price must be a non-negative number');
+        }
+      }
+
+      // Validate meals_available if provided
+      if (body.meals_available !== undefined) {
+        if (!Array.isArray(body.meals_available)) {
+          throw new Error('meals_available must be an array');
+        }
+        // Enforce max 20 meals to prevent abuse
+        if (body.meals_available.length > 20) {
+          throw new Error('Maximum of 20 meals allowed');
+        }
+        const seenIds = new Set<string>();
+        for (const meal of body.meals_available) {
+          if (!meal.id || typeof meal.id !== 'string' || meal.id.length > 100) {
+            throw new Error('Each meal must have a valid string id (max 100 chars)');
+          }
+          if (!meal.label || typeof meal.label !== 'string' || meal.label.length > 200) {
+            throw new Error('Each meal must have a valid string label (max 200 chars)');
+          }
+          if (typeof meal.enabled !== 'boolean') {
+            throw new Error('Each meal must have a boolean enabled field');
+          }
+          // Sanitize: only allow alphanumeric + underscores in IDs
+          if (!/^[a-z0-9_]+$/.test(meal.id)) {
+            throw new Error('Meal IDs must contain only lowercase letters, numbers, and underscores');
+          }
+          if (seenIds.has(meal.id)) {
+            throw new Error(`Duplicate meal ID: ${meal.id}`);
+          }
+          seenIds.add(meal.id);
+        }
+      }
+
+      // Build upsert data
+      const upsertData: Record<string, unknown> = {
+        id: body.id,
+        name: body.name,
+        start_date: body.start_date,
+        end_date: body.end_date,
+        registration_end_date: body.registration_end_date,
+        location: body.location,
+        venue: body.venue,
+        fee: body.fee,
+        payment_instructions: body.payment_instructions,
+        description: body.description,
+        is_active: true,
+        updated_at: new Date().toISOString()
+      };
+
+      // Include meal fields if provided
+      if (mealPrice !== undefined) {
+        upsertData.meal_price = mealPrice;
+      }
+      if (body.meals_available !== undefined) {
+        // Store only sanitized fields
+        upsertData.meals_available = body.meals_available.map((m: { id: string; label: string; enabled: boolean }) => ({
+          id: m.id,
+          label: m.label,
+          enabled: m.enabled
+        }));
+      }
+
       // Update tech conference settings
       const { error: upsertError } = await supabaseAdmin
         .from('tech_conference_settings')
-        .upsert({
-          id: body.id,
-          name: body.name,
-          start_date: body.start_date,
-          end_date: body.end_date,
-          registration_end_date: body.registration_end_date,
-          location: body.location,
-          venue: body.venue,
-          fee: body.fee,
-          payment_instructions: body.payment_instructions,
-          description: body.description,
-          is_active: true,
-          updated_at: new Date().toISOString()
-        });
+        .upsert(upsertData);
 
       if (upsertError) {
         throw upsertError;
       }
 
+      console.log('✅ Tech conference settings saved successfully (including meal config)');
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
