@@ -189,9 +189,9 @@ Deno.serve(async (req) => {
       console.error('❌ Validation error:', error);
       return createErrorResponse(
         error instanceof Error ? error.message : 'Validation failed',
+        requestId,
         400,
-        corsHeaders,
-        requestId
+        corsHeaders
       );
     }
 
@@ -288,7 +288,8 @@ Deno.serve(async (req) => {
         created_at: data.created_at
       },
       requestId,
-      200
+      200,
+      corsHeaders
     );
 
   } catch (error) {
@@ -296,7 +297,8 @@ Deno.serve(async (req) => {
     return createErrorResponse(
       sanitizeError(error),
       requestId,
-      400
+      400,
+      corsHeaders
     );
   }
 });

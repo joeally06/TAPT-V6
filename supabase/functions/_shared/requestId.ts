@@ -54,7 +54,8 @@ export function addRequestIdToResponse(
 export function createSuccessResponse(
   data: any,
   requestId: string,
-  status: number = 200
+  status: number = 200,
+  extraHeaders: Record<string, string> = {}
 ): Response {
   return new Response(
     JSON.stringify({
@@ -66,6 +67,7 @@ export function createSuccessResponse(
     {
       status,
       headers: {
+        ...extraHeaders,
         'Content-Type': 'application/json',
         'X-Request-ID': requestId
       }
@@ -84,7 +86,8 @@ export function createSuccessResponse(
 export function createErrorResponse(
   error: string | Error,
   requestId: string,
-  status: number = 500
+  status: number = 500,
+  extraHeaders: Record<string, string> = {}
 ): Response {
   const errorMessage = error instanceof Error ? error.message : error;
   
@@ -98,6 +101,7 @@ export function createErrorResponse(
     {
       status,
       headers: {
+        ...extraHeaders,
         'Content-Type': 'application/json',
         'X-Request-ID': requestId
       }
