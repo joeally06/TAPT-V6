@@ -25,6 +25,11 @@ interface TechConferenceRegistration {
   created_at: string;
   attendees?: TechConferenceAttendee[];
   // Payment fields
+  // Meal fields
+  meal_selections: Array<{ id: string; label: string; price: number }> | null;
+  meal_total: number | null;
+  all_meals_selected: boolean | null;
+  // Payment fields
   payment_method: string | null;
   payment_status: string | null;
   po_number: string | null;
@@ -211,6 +216,7 @@ const AdminTechConferenceRegistrations: React.FC = () => {
       'Email',
       'Phone',
       'Total Attendees',
+      'Meal Tickets',
       'Total Amount',
       'Additional Attendees',
       'Payment Method',
@@ -233,6 +239,7 @@ const AdminTechConferenceRegistrations: React.FC = () => {
         reg.email,
         reg.phone,
         reg.total_attendees,
+        reg.meal_selections ? reg.meal_selections.length : 0,
         `$${reg.total_amount.toFixed(2)}`,
         additionalAttendees,
         reg.payment_method || '',
@@ -537,6 +544,10 @@ const AdminTechConferenceRegistrations: React.FC = () => {
                     <div>
                       <dt className="text-sm font-medium text-gray-500">Total Attendees</dt>
                       <dd className="mt-1 text-sm text-gray-900">{selectedRegistration.total_attendees}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Meal Tickets</dt>
+                      <dd className="mt-1 text-sm text-gray-900">{selectedRegistration.meal_selections ? selectedRegistration.meal_selections.length : 0}</dd>
                     </div>
                     <div>
                       <dt className="text-sm font-medium text-gray-500">Total Amount</dt>

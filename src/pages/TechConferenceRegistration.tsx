@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Mail, Phone, MapPin, DollarSign, Building, User, Users, Calendar, AlertCircle, X } from 'lucide-react';
 import { SecureForm } from '../components/forms/SecureForm';
+import type { SecureFormHandle } from '../components/forms/SecureForm';
 import { PaymentMethodSelector } from '../components/forms/PaymentMethodSelector';
 import { PayPalButton } from '../components/forms/PayPalButton';
 import { PayPalOrderDetails } from '../config/paypal';
@@ -32,6 +33,7 @@ interface TechConferenceSettings {
 }
 
 const TechConferenceRegistration: React.FC = () => {
+  const secureFormRef = useRef<SecureFormHandle>(null);
   const [formData, setFormData] = useState({
     // Registration type flag
     registrantIsAttendee: true,
@@ -411,9 +413,17 @@ const TechConferenceRegistration: React.FC = () => {
   const handlePayPalSuccess = (details: PayPalOrderDetails) => {
     console.log('✅ PayPal payment successful:', details);
     setPaypalDetails(details);
+    
+    // Reset Turnstile to get a fresh token for form submission
+    // The previous token may have expired during the PayPal payment flow (tokens expire after 5 minutes)
+    if (secureFormRef.current) {
+      console.log('🔒 Resetting Turnstile after PayPal payment to get fresh token');
+      secureFormRef.current.resetTurnstile();
+    }
+    
     setFormStatus({
       success: true,
-      message: 'Payment completed! Please fill out the form above and click Register to complete your registration.'
+      message: 'Payment completed! Please complete the security verification below and click Register to finish your registration.'
     });
   };
 
@@ -645,7 +655,7 @@ const TechConferenceRegistration: React.FC = () => {
               </div>
             )}
 
-            <SecureForm onSubmit={handleSecureSubmit} className="bg-white shadow-lg rounded-lg p-8">
+            <SecureForm ref={secureFormRef} onSubmit={handleSecureSubmit} className="bg-white shadow-lg rounded-lg p-8">
               {/* Registration Type Selection */}
               <div className="mb-8">
                 <h2 className="text-xl font-semibold text-secondary mb-4">Registration Type</h2>
@@ -1133,7 +1143,17 @@ const TechConferenceRegistration: React.FC = () => {
                 <h2 className="text-xl font-semibold text-secondary mb-6">Payment Method</h2>
                 <PaymentMethodSelector
                   selectedMethod={paymentMethod}
-                  onMethodChange={setPaymentMethod}
+                  onMethodChange={(method) => {
+                    setPaymentMethod(method);
+                    // Reset PayPal details when switching methods
+                    if (method !== 'paypal') {
+                      setPaypalDetails(null);
+                    }
+                    // Reset Turnstile to ensure a fresh token after payment method selection
+                    if (secureFormRef.current) {
+                      secureFormRef.current.resetTurnstile();
+                    }
+                  }}
                   poNumber={poNumber}
                   onPoNumberChange={setPoNumber}
                   amount={totalAmount}
