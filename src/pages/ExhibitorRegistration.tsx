@@ -4,7 +4,7 @@ import { Mail, Phone, MapPin, Building, User, AlertCircle, Briefcase, FileText, 
 import { SecureForm, SecureFormHandle } from '../components/forms/SecureForm';
 import { PaymentMethodSelector } from '../components/forms/PaymentMethodSelector';
 import { PayPalButton } from '../components/forms/PayPalButton';
-import { PayPalOrderDetails } from '../config/paypal';
+import { PayPalOrderDetails, getPayPalTransactionId } from '../config/paypal';
 import { SuccessModal } from '../components/ui/SuccessModal';
 
 interface ExhibitorSettings {
@@ -194,7 +194,7 @@ const ExhibitorRegistration: React.FC = () => {
         // Payment fields
         paymentMethod,
         poNumber: paymentMethod === 'po' ? poNumber : null,
-        paypalTransactionId: paymentMethod === 'paypal' ? paypalDetails?.id : null,
+        paypalTransactionId: paymentMethod === 'paypal' && paypalDetails ? getPayPalTransactionId(paypalDetails) : null,
         paypalPayerEmail: paymentMethod === 'paypal' ? paypalDetails?.payer?.email_address : null,
         paymentStatus: paymentMethod === 'paypal' ? 'completed' : 'pending',
         // Participants - filter out empty entries

@@ -5,7 +5,7 @@ import { SecureForm } from '../components/forms/SecureForm';
 import type { SecureFormHandle } from '../components/forms/SecureForm';
 import { PaymentMethodSelector } from '../components/forms/PaymentMethodSelector';
 import { PayPalButton } from '../components/forms/PayPalButton';
-import { PayPalOrderDetails } from '../config/paypal';
+import { PayPalOrderDetails, getPayPalTransactionId } from '../config/paypal';
 import { SuccessModal } from '../components/ui/SuccessModal';
 
 interface Attendee {
@@ -279,7 +279,7 @@ const ConferenceRegistration: React.FC = () => {
         // Payment fields
         paymentMethod,
         poNumber: paymentMethod === 'po' ? poNumber : null,
-        paypalTransactionId: paymentMethod === 'paypal' ? paypalDetails?.id : null,
+        paypalTransactionId: paymentMethod === 'paypal' && paypalDetails ? getPayPalTransactionId(paypalDetails) : null,
         paypalPayerEmail: paymentMethod === 'paypal' ? paypalDetails?.payer?.email_address : null,
         paymentStatus: paymentMethod === 'paypal' ? 'completed' : 'pending'
       };
@@ -1064,7 +1064,7 @@ const ConferenceRegistration: React.FC = () => {
                       </svg>
                       <div>
                         <p className="font-semibold text-green-800">Payment Successful!</p>
-                        <p className="text-sm text-green-700">Transaction ID: {paypalDetails.id}</p>
+                        <p className="text-sm text-green-700">Transaction ID: {getPayPalTransactionId(paypalDetails)}</p>
                         <p className="text-sm text-green-700 mt-1">Click "Submit" below to complete your registration.</p>
                       </div>
                     </div>

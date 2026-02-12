@@ -5,7 +5,7 @@ import { SecureForm } from '../components/forms/SecureForm';
 import type { SecureFormHandle } from '../components/forms/SecureForm';
 import { PaymentMethodSelector } from '../components/forms/PaymentMethodSelector';
 import { PayPalButton } from '../components/forms/PayPalButton';
-import { PayPalOrderDetails } from '../config/paypal';
+import { PayPalOrderDetails, getPayPalTransactionId } from '../config/paypal';
 import { SuccessModal } from '../components/ui/SuccessModal';
 import { MealTicketSelection } from '../components/forms/MealTicketSelection';
 import type { MealOption } from '../components/forms/MealTicketSelection';
@@ -311,7 +311,7 @@ const TechConferenceRegistration: React.FC = () => {
         // Payment fields
         paymentMethod,
         poNumber: paymentMethod === 'po' ? poNumber : null,
-        paypalTransactionId: paymentMethod === 'paypal' ? paypalDetails?.id : null,
+        paypalTransactionId: paymentMethod === 'paypal' && paypalDetails ? getPayPalTransactionId(paypalDetails) : null,
         paypalPayerEmail: paymentMethod === 'paypal' ? paypalDetails?.payer?.email_address : null,
         paymentStatus: paymentMethod === 'paypal' ? 'completed' : 'pending',
         
@@ -1179,7 +1179,7 @@ const TechConferenceRegistration: React.FC = () => {
                       </svg>
                       <div>
                         <p className="text-sm font-medium text-green-800">Payment Completed!</p>
-                        <p className="text-sm text-green-700 mt-1">Transaction ID: {paypalDetails.id}</p>
+                        <p className="text-sm text-green-700 mt-1">Transaction ID: {getPayPalTransactionId(paypalDetails)}</p>
                         <p className="text-sm text-green-700">Click "Submit" below to complete your registration.</p>
                       </div>
                     </div>

@@ -52,7 +52,32 @@ export interface PayPalOrderDetails {
       currency_code?: string;
       value?: string;
     };
+    payments?: {
+      captures?: Array<{
+        id: string;
+        status: string;
+        amount?: {
+          currency_code?: string;
+          value?: string;
+        };
+      }>;
+    };
   }>;
   create_time?: string;
   update_time?: string;
 }
+
+/**
+ * Extract the actual PayPal capture transaction ID from order details.
+ * PayPal returns an Order ID in details.id, but the real transaction ID
+ * (visible in PayPal dashboard) is in the capture object.
+ */
+export const getPayPalTransactionId = (details: PayPalOrderDetails): string => {
+  const captureId = details.purchase_units?.[0]?.payments?.captures?.[0]?.id;
+  if (captureId) {
+    return captureId;
+  }
+  // Fallback to order ID if capture ID is not available
+  console.warn('⚠️ PayPal capture ID not found, falling back to order ID:', details.id);
+  return details.id;
+};
