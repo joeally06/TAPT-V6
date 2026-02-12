@@ -938,7 +938,7 @@ const ExhibitorRegistration: React.FC = () => {
                   amount={exhibitorSettings?.fee || 0}
                 />
                 
-                {paymentMethod === 'paypal' && (
+                {paymentMethod === 'paypal' && !paypalDetails && (
                   <div className="mt-6">
                     <PayPalButton
                       amount={exhibitorSettings?.fee || 0}
@@ -947,6 +947,22 @@ const ExhibitorRegistration: React.FC = () => {
                       onError={handlePayPalError}
                       onCancel={handlePayPalCancel}
                     />
+                  </div>
+                )}
+
+                {/* PayPal Success Message */}
+                {paymentMethod === 'paypal' && paypalDetails && (
+                  <div className="mt-6 p-4 bg-green-50 border-2 border-green-200 rounded-lg">
+                    <div className="flex items-center">
+                      <svg className="w-6 h-6 text-green-600 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      <div>
+                        <p className="font-semibold text-green-800">Payment Successful!</p>
+                        <p className="text-sm text-green-700">Transaction ID: {getPayPalTransactionId(paypalDetails)}</p>
+                        <p className="text-sm text-green-700 mt-1">Click "Register" below to complete your registration.</p>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

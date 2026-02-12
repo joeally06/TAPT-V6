@@ -228,6 +228,20 @@ const ConferenceRegistration: React.FC = () => {
       }
     }
 
+    // Validate additional attendee fields
+    if (formData.additionalAttendees.length > 0) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      for (let i = 0; i < formData.additionalAttendees.length; i++) {
+        const attendee = formData.additionalAttendees[i];
+        if (!attendee.firstName.trim() || !attendee.lastName.trim() || !attendee.email.trim()) {
+          throw new Error(`Please fill in all fields for additional attendee ${i + 1}.`);
+        }
+        if (!emailRegex.test(attendee.email.trim())) {
+          throw new Error(`Please enter a valid email address for additional attendee ${i + 1} (${attendee.firstName} ${attendee.lastName}).`);
+        }
+      }
+    }
+
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       if (!supabaseUrl) {
