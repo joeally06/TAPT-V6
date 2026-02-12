@@ -33,6 +33,8 @@ export function PayPalButton({
   const [error, setError] = useState<string | null>(null);
   const [paymentComplete, setPaymentComplete] = useState(false);
   const buttonsRenderedRef = useRef(false);
+  // Synchronous guard to prevent duplicate captures (React state is async)
+  const captureInProgressRef = useRef(false);
 
   // Track if component is mounted
   useEffect(() => {
@@ -109,6 +111,10 @@ export function PayPalButton({
         
         const buttons = window.paypal.Buttons({
           createOrder: (data: any, actions: any) => {
+            if (captureInProgressRef.current) {
+              console.warn('⚠️ PayPal order creation blocked - capture already in progress');
+              return Promise.reject(new Error('Payment already in progress'));
+            }
             console.log('💳 Creating PayPal order...');
             return actions.order.create({
               purchase_units: [{
@@ -124,6 +130,13 @@ export function PayPalButton({
             });
           },
           onApprove: async (data: any, actions: any) => {
+            // Synchronous guard: prevent duplicate captures
+            if (captureInProgressRef.current) {
+              console.warn('⚠️ Duplicate PayPal capture blocked - already processing');
+              return;
+            }
+            captureInProgressRef.current = true;
+            
             try {
               console.log('✅ Payment approved, capturing order...');
               const details = await actions.order.capture();
@@ -134,6 +147,7 @@ export function PayPalButton({
               onSuccess(details);
             } catch (captureError) {
               console.error('❌ Error capturing payment:', captureError);
+              captureInProgressRef.current = false;
               onError(captureError);
             }
           },
