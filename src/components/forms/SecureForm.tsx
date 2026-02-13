@@ -29,7 +29,9 @@ export const SecureForm = forwardRef<SecureFormHandle, SecureFormProps>(({
   const [turnstileError, setTurnstileError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isVerified, setIsVerified] = useState(false);
+  const [isExpired, setIsExpired] = useState(false);
   const turnstileResetRef = useRef<(() => void) | null>(null);
+  const expireTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Expose reset method to parent
   useImperativeHandle(ref, () => ({
@@ -40,6 +42,12 @@ export const SecureForm = forwardRef<SecureFormHandle, SecureFormProps>(({
         setTurnstileToken('');
         setIsVerified(false);
         setTurnstileError(null);
+        setIsExpired(false);
+      }
+      // Clear any pending auto-reset timer
+      if (expireTimerRef.current) {
+        clearTimeout(expireTimerRef.current);
+        expireTimerRef.current = null;
       }
     }
   }));
@@ -54,12 +62,34 @@ export const SecureForm = forwardRef<SecureFormHandle, SecureFormProps>(({
     setTurnstileToken(token);
     setTurnstileError(null);
     setIsVerified(false); // Will verify on submit
+    setIsExpired(false);
   }, []);
 
   const handleTurnstileError = useCallback((error: string) => {
     setTurnstileError(error);
     setTurnstileToken('');
     setIsVerified(false);
+  }, []);
+
+  const handleTurnstileExpire = useCallback(() => {
+    console.log('🔒 SecureForm: Turnstile token expired, auto-resetting...');
+    setTurnstileToken('');
+    setIsVerified(false);
+    setTurnstileError(null);
+    setIsExpired(true);
+
+    // Auto-reset the widget after a short delay so the user sees the message
+    // Clear any existing timer to prevent stacking
+    if (expireTimerRef.current) {
+      clearTimeout(expireTimerRef.current);
+    }
+    expireTimerRef.current = setTimeout(() => {
+      if (turnstileResetRef.current) {
+        console.log('🔒 SecureForm: Auto-resetting Turnstile widget after expiration');
+        turnstileResetRef.current();
+      }
+      expireTimerRef.current = null;
+    }, 1000);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -75,7 +105,11 @@ export const SecureForm = forwardRef<SecureFormHandle, SecureFormProps>(({
 
     if (requireTurnstile && !turnstileToken) {
       console.log('🔒 SecureForm: No turnstile token available for submission');
-      setTurnstileError('Please complete the security verification');
+      if (isExpired) {
+        setTurnstileError('Your security verification expired. Please wait for it to refresh, then try again.');
+      } else {
+        setTurnstileError('Please complete the security verification');
+      }
       return;
     }
 
@@ -85,6 +119,7 @@ export const SecureForm = forwardRef<SecureFormHandle, SecureFormProps>(({
     setIsSubmitting(true);
     setTurnstileError(null);
     setSubmitError(null);
+    setIsExpired(false);
 
     try {
       let verified = false;
@@ -111,6 +146,7 @@ export const SecureForm = forwardRef<SecureFormHandle, SecureFormProps>(({
       // Reset form state on success
       setTurnstileToken('');
       setIsVerified(false);
+      setIsExpired(false);
       
       // Reset the Turnstile widget to get a fresh token for the next submission
       if (turnstileResetRef.current) {
@@ -148,17 +184,53 @@ export const SecureForm = forwardRef<SecureFormHandle, SecureFormProps>(({
             siteKey={getTurnstileSiteKey()}
             onVerify={handleTurnstileVerify}
             onError={handleTurnstileError}
+            onExpire={handleTurnstileExpire}
             onResetReady={handleTurnstileReset}
             className="mb-4"
           />
           
+          {/* Token expired — friendly amber message with auto-reset notice */}
+          {isExpired && !turnstileToken && !turnstileError && (
+            <div className="text-amber-800 text-sm bg-amber-50 p-3 rounded border border-amber-300">
+              <div className="flex items-start">
+                <svg className="h-5 w-5 text-amber-500 mr-2 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                <div>
+                  <p className="font-medium">Security verification expired</p>
+                  <p className="mt-1">This can happen when the page is open for a while. A new verification is loading automatically — please wait a moment, then you can submit your form.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {turnstileError && (
-            <div className="text-red-600 text-sm bg-red-50 p-2 rounded border border-red-200">
-              🔒 {turnstileError}
+            <div className="text-red-600 text-sm bg-red-50 p-3 rounded border border-red-200">
+              <div className="flex items-start">
+                <span className="mr-2 flex-shrink-0" aria-hidden="true">🔒</span>
+                <div>
+                  <p>{turnstileError}</p>
+                  {isExpired && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (turnstileResetRef.current) {
+                          turnstileResetRef.current();
+                          setTurnstileError(null);
+                          setIsExpired(false);
+                        }
+                      }}
+                      className="mt-2 text-red-700 underline hover:text-red-900 font-medium"
+                    >
+                      Click here to refresh verification
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           )}
           
-          {!turnstileToken && !turnstileError && (
+          {!turnstileToken && !turnstileError && !isExpired && (
             <div className="text-yellow-700 text-sm bg-yellow-50 p-2 rounded border border-yellow-200">
               🔒 Waiting for security verification to complete...
             </div>

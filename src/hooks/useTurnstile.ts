@@ -33,7 +33,8 @@ interface UseTurnstileReturn {
 
 export const useTurnstile = (
   onVerify: (token: string) => void,
-  onError?: (error: string) => void
+  onError?: (error: string) => void,
+  onExpire?: () => void
 ): UseTurnstileReturn => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [widgetId, setWidgetId] = useState<string>('');
@@ -101,9 +102,18 @@ export const useTurnstile = (
             onError?.(errorMsg);
           },
           'expired-callback': () => {
-            const errorMsg = 'Turnstile token expired';
-            setError(errorMsg);
-            onError?.(errorMsg);
+            console.log('🔒 Turnstile token expired');
+            // Use dedicated expiry handler instead of error path
+            // This allows SecureForm to show a friendly message and auto-reset
+            if (onExpire) {
+              setError(null);
+              onExpire();
+            } else {
+              // Fallback: treat as error if no expiry handler provided
+              const errorMsg = 'Turnstile token expired';
+              setError(errorMsg);
+              onError?.(errorMsg);
+            }
           },
           'timeout-callback': () => {
             const errorMsg = 'Turnstile verification timed out';
@@ -132,7 +142,7 @@ export const useTurnstile = (
         }
       }
     };
-  }, [isLoaded, onVerify, onError, error]);
+  }, [isLoaded, onVerify, onError, onExpire, error]);
 
   const reset = () => {
     if (widgetId && window.turnstile) {

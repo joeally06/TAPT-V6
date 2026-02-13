@@ -5,6 +5,7 @@ interface TurnstileProps {
   siteKey: string;
   onVerify: (token: string) => void;
   onError?: (error: string) => void;
+  onExpire?: () => void;
   onResetReady?: (resetFn: () => void) => void;
   className?: string;
 }
@@ -13,10 +14,11 @@ export const Turnstile: React.FC<TurnstileProps> = ({
   siteKey, 
   onVerify, 
   onError,
+  onExpire,
   onResetReady,
   className = "" 
 }) => {
-  const { containerRef, reset, isLoaded, error } = useTurnstile(onVerify, onError);
+  const { containerRef, reset, isLoaded, error } = useTurnstile(onVerify, onError, onExpire);
 
   // Expose reset function to parent
   useEffect(() => {
