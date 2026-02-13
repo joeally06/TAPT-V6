@@ -36,6 +36,19 @@ export function PayPalButton({
   // Synchronous guard to prevent duplicate captures (React state is async)
   const captureInProgressRef = useRef(false);
 
+  // Callback refs to avoid stale closures in PayPal button callbacks.
+  // PayPal buttons are rendered once; these refs ensure we always call
+  // the latest callback the parent provides without re-rendering buttons.
+  const onSuccessRef = useRef(onSuccess);
+  const onErrorRef = useRef(onError);
+  const onCancelRef = useRef(onCancel);
+  useEffect(() => { onSuccessRef.current = onSuccess; }, [onSuccess]);
+  useEffect(() => { onErrorRef.current = onError; }, [onError]);
+  useEffect(() => { onCancelRef.current = onCancel; }, [onCancel]);
+
+  // Track the amount buttons were rendered with so we can re-render if it changes
+  const renderedAmountRef = useRef<number>(0);
+
   // Track if component is mounted
   useEffect(() => {
     return () => {
@@ -93,18 +106,25 @@ export function PayPalButton({
     document.body.appendChild(script);
 
     // Don't remove the script on unmount - it should stay loaded
-  }, [currency, onError]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currency]);
 
   // Render PayPal buttons
   useEffect(() => {
     // Don't render buttons if payment is already complete
-    if (paymentComplete || buttonsRenderedRef.current) {
+    if (paymentComplete) {
+      return;
+    }
+
+    // Skip if buttons already rendered with the same amount
+    if (buttonsRenderedRef.current && renderedAmountRef.current === amount) {
       return;
     }
 
     if (sdkReady && paypalRef.current && !disabled && !error && window.paypal) {
-      // Clear any existing buttons
+      // Clear any existing buttons (needed for re-render on amount change)
       paypalRef.current.innerHTML = '';
+      buttonsRenderedRef.current = false;
 
       try {
         console.log('🔧 Rendering PayPal Buttons for amount:', amount);
@@ -144,21 +164,21 @@ export function PayPalButton({
               
               // Mark payment as complete to prevent re-rendering
               setPaymentComplete(true);
-              onSuccess(details);
+              onSuccessRef.current(details);
             } catch (captureError) {
               console.error('❌ Error capturing payment:', captureError);
               captureInProgressRef.current = false;
-              onError(captureError);
+              onErrorRef.current(captureError);
             }
           },
           onError: (err: any) => {
             console.error('❌ PayPal error:', err);
-            onError(err);
+            onErrorRef.current(err);
           },
           onCancel: (data: any) => {
             console.log('⚠️ Payment cancelled by user');
-            if (onCancel) {
-              onCancel();
+            if (onCancelRef.current) {
+              onCancelRef.current();
             }
           },
           style: {
@@ -173,8 +193,9 @@ export function PayPalButton({
         // Render if container exists
         if (paypalRef.current) {
           buttons.render(paypalRef.current).then(() => {
-            console.log('✅ PayPal Buttons rendered');
+            console.log('✅ PayPal Buttons rendered for amount:', amount);
             buttonsRenderedRef.current = true;
+            renderedAmountRef.current = amount;
           }).catch((renderErr: any) => {
             console.error('❌ PayPal render promise error:', renderErr);
           });
@@ -182,10 +203,12 @@ export function PayPalButton({
       } catch (renderError) {
         console.error('❌ PayPal Buttons render error:', renderError);
         setError('Failed to render payment buttons. Please refresh and try again.');
-        onError(renderError);
+        onErrorRef.current(renderError);
       }
     }
-  }, [sdkReady, amount, currency, description, onSuccess, onError, onCancel, disabled, error, paymentComplete]);
+    // Callback props excluded — accessed via refs to avoid stale closures
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sdkReady, amount, currency, description, disabled, error, paymentComplete]);
 
   if (loading) {
     return (

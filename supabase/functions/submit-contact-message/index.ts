@@ -8,6 +8,7 @@ import {
   createEdgeRequestContext
 } from "../_shared/requestId.ts";
 import { sanitizeObject, type SanitizationRule } from '../_shared/sanitize.ts';
+import { sendEmail } from '../_shared/email.ts';
 
 const allowedOrigins = [
   'https://tapt.org',
@@ -263,6 +264,63 @@ Deno.serve(async (req) => {
       .single();
 
     if (error) throw error;
+
+    // Send notification email to board chair
+    try {
+      const emailHtml = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background-color: #1e3a5f; color: white; padding: 20px; text-align: center;">
+            <h1 style="margin: 0; font-size: 24px;">New Contact Form Submission</h1>
+          </div>
+          <div style="padding: 20px; background-color: #f9f9f9;">
+            <p style="color: #333;">A new message has been submitted through the TAPT website contact form.</p>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+              <tr>
+                <td style="padding: 10px; border-bottom: 1px solid #ddd; font-weight: bold; color: #1e3a5f; width: 140px;">Name:</td>
+                <td style="padding: 10px; border-bottom: 1px solid #ddd; color: #333;">${sanitizedData.name}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px; border-bottom: 1px solid #ddd; font-weight: bold; color: #1e3a5f;">Email:</td>
+                <td style="padding: 10px; border-bottom: 1px solid #ddd; color: #333;"><a href="mailto:${sanitizedData.email}">${sanitizedData.email}</a></td>
+              </tr>
+              ${sanitizedData.phone ? `<tr>
+                <td style="padding: 10px; border-bottom: 1px solid #ddd; font-weight: bold; color: #1e3a5f;">Phone:</td>
+                <td style="padding: 10px; border-bottom: 1px solid #ddd; color: #333;">${sanitizedData.phone}</td>
+              </tr>` : ''}
+              ${sanitizedData.district ? `<tr>
+                <td style="padding: 10px; border-bottom: 1px solid #ddd; font-weight: bold; color: #1e3a5f;">District/Org:</td>
+                <td style="padding: 10px; border-bottom: 1px solid #ddd; color: #333;">${sanitizedData.district}</td>
+              </tr>` : ''}
+              <tr>
+                <td style="padding: 10px; border-bottom: 1px solid #ddd; font-weight: bold; color: #1e3a5f; vertical-align: top;">Message:</td>
+                <td style="padding: 10px; border-bottom: 1px solid #ddd; color: #333; white-space: pre-wrap;">${sanitizedData.message}</td>
+              </tr>
+            </table>
+            <p style="margin-top: 20px; color: #666; font-size: 13px;">Submitted on ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Chicago' })} CST</p>
+            <p style="margin-top: 10px; color: #666; font-size: 13px;">You can reply directly to this person at <a href="mailto:${sanitizedData.email}">${sanitizedData.email}</a></p>
+          </div>
+          <div style="background-color: #1e3a5f; color: white; padding: 15px; text-align: center; font-size: 12px;">
+            <p style="margin: 0;">Tennessee Association of Pupil Transportation</p>
+            <p style="margin: 5px 0 0;">This is an automated notification from the TAPT website.</p>
+          </div>
+        </div>
+      `;
+
+      const emailResult = await sendEmail({
+        to: 'coxd@loudoncounty.org',
+        subject: `New Contact Message from ${sanitizedData.name}`,
+        html: emailHtml
+      });
+
+      if (emailResult.success) {
+        logWithRequestId(requestId, '✅ Notification email sent to coxd@loudoncounty.org');
+      } else {
+        logErrorWithRequestId(requestId, '⚠️ Failed to send notification email', emailResult.error);
+      }
+    } catch (emailError) {
+      // Log email error but don't fail the submission
+      logErrorWithRequestId(requestId, '⚠️ Failed to send notification email', emailError);
+    }
 
     // Log the action
     try {

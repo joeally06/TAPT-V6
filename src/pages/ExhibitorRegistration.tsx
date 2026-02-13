@@ -122,6 +122,24 @@ const ExhibitorRegistration: React.FC = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // Validate required fields before allowing PayPal payment
+  // This prevents users from paying before filling out the form
+  const getFormValidationErrors = (): string[] => {
+    const errors: string[] = [];
+    if (!formData.businessName.trim()) errors.push('Business Name');
+    if (!formData.firstName.trim()) errors.push('First Name');
+    if (!formData.lastName.trim()) errors.push('Last Name');
+    if (!formData.streetAddress.trim()) errors.push('Street Address');
+    if (!formData.city.trim()) errors.push('City');
+    if (!formData.state) errors.push('State');
+    if (!formData.zipCode.trim()) errors.push('ZIP Code');
+    if (!formData.email.trim()) errors.push('Email');
+    if (!formData.phone.trim()) errors.push('Phone');
+    return errors;
+  };
+
+  const formValidationErrors = getFormValidationErrors();
+
   // Participant management functions
   const addParticipant = () => {
     setParticipants([...participants, {
@@ -932,21 +950,69 @@ const ExhibitorRegistration: React.FC = () => {
                 <h2 className="text-xl font-semibold text-secondary mb-6">Payment Method</h2>
                 <PaymentMethodSelector
                   selectedMethod={paymentMethod}
-                  onMethodChange={setPaymentMethod}
+                  onMethodChange={(method) => {
+                    setPaymentMethod(method);
+                    // Reset PayPal details when switching methods
+                    if (method !== 'paypal') {
+                      setPaypalDetails(null);
+                    }
+                    // Reset Turnstile to ensure a fresh token after payment method selection
+                    if (formRef.current) {
+                      formRef.current.resetTurnstile();
+                    }
+                  }}
                   poNumber={poNumber}
                   onPoNumberChange={setPoNumber}
                   amount={exhibitorSettings?.fee || 0}
                 />
+
+                {/* Missing fields warning for PO/Check */}
+                {paymentMethod === 'po' && formValidationErrors.length > 0 && (
+                  <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div className="flex items-start">
+                      <AlertCircle className="h-5 w-5 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-yellow-800">
+                          Please fill in the following required fields before submitting:
+                        </p>
+                        <ul className="mt-2 text-sm text-yellow-700 list-disc list-inside">
+                          {formValidationErrors.map((err, i) => (
+                            <li key={i}>{err}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 
                 {paymentMethod === 'paypal' && !paypalDetails && (
                   <div className="mt-6">
-                    <PayPalButton
-                      amount={exhibitorSettings?.fee || 0}
-                      description={`Exhibitor Registration - ${formData.businessName || 'Booth'}`}
-                      onSuccess={handlePayPalSuccess}
-                      onError={handlePayPalError}
-                      onCancel={handlePayPalCancel}
-                    />
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Complete Payment</h3>
+                    {formValidationErrors.length > 0 ? (
+                      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <div className="flex items-start">
+                          <AlertCircle className="h-5 w-5 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-medium text-yellow-800">
+                              Please fill in the following required fields before proceeding with PayPal payment:
+                            </p>
+                            <ul className="mt-2 text-sm text-yellow-700 list-disc list-inside">
+                              {formValidationErrors.map((err, i) => (
+                                <li key={i}>{err}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <PayPalButton
+                        amount={exhibitorSettings?.fee || 0}
+                        description={`Exhibitor Registration - ${formData.businessName || 'Booth'}`}
+                        onSuccess={handlePayPalSuccess}
+                        onError={handlePayPalError}
+                        onCancel={handlePayPalCancel}
+                      />
+                    )}
                   </div>
                 )}
 

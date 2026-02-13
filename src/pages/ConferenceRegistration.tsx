@@ -127,6 +127,46 @@ const ConferenceRegistration: React.FC = () => {
   const registrationFee = conferenceSettings?.fee ?? 175.00;
   const totalAmount = formData.totalAttendees * registrationFee;
 
+  // Validate required fields before allowing PayPal payment
+  // This prevents users from paying before filling out the form
+  const getFormValidationErrors = (): string[] => {
+    const errors: string[] = [];
+    
+    // Billing/registrant fields
+    if (!formData.billingFirstName.trim()) errors.push('First Name');
+    if (!formData.billingLastName.trim()) errors.push('Last Name');
+    if (!formData.billingEmail.trim()) errors.push('Email');
+    if (!formData.billingPhone.trim()) errors.push('Phone');
+    if (!formData.streetAddress.trim()) errors.push('Street Address');
+    if (!formData.city.trim()) errors.push('City');
+    if (!formData.state) errors.push('State');
+    if (!formData.zipCode.trim()) errors.push('ZIP Code');
+
+    // Conditional fields based on registration type
+    if (formData.registrantIsAttendee) {
+      if (!formData.schoolDistrict.trim()) errors.push('School District / Organization');
+    } else {
+      if (!formData.primaryAttendeeFirstName.trim()) errors.push('Primary Attendee First Name');
+      if (!formData.primaryAttendeeLastName.trim()) errors.push('Primary Attendee Last Name');
+      if (!formData.primaryAttendeeEmail.trim()) errors.push('Primary Attendee Email');
+      if (!formData.primaryAttendeeSchoolDistrict.trim()) errors.push('Primary Attendee School District');
+    }
+
+    // Additional attendees validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    for (let i = 0; i < formData.additionalAttendees.length; i++) {
+      const attendee = formData.additionalAttendees[i];
+      if (!attendee.firstName.trim()) errors.push(`Attendee ${i + 2} First Name`);
+      if (!attendee.lastName.trim()) errors.push(`Attendee ${i + 2} Last Name`);
+      if (!attendee.email.trim()) errors.push(`Attendee ${i + 2} Email`);
+      else if (!emailRegex.test(attendee.email.trim())) errors.push(`Attendee ${i + 2} valid Email`);
+    }
+
+    return errors;
+  };
+
+  const formValidationErrors = getFormValidationErrors();
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     
@@ -1055,17 +1095,54 @@ const ConferenceRegistration: React.FC = () => {
                   onPoNumberChange={setPoNumber}
                 />
 
-                {/* PayPal Button */}
+                {/* Missing fields warning for PO/Check */}
+                {paymentMethod === 'po' && formValidationErrors.length > 0 && (
+                  <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div className="flex items-start">
+                      <AlertCircle className="h-5 w-5 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-yellow-800">
+                          Please fill in the following required fields before submitting:
+                        </p>
+                        <ul className="mt-2 text-sm text-yellow-700 list-disc list-inside">
+                          {formValidationErrors.map((err, i) => (
+                            <li key={i}>{err}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* PayPal Button - only show after basic form validation */}
                 {paymentMethod === 'paypal' && !paypalDetails && (
                   <div className="mt-6">
                     <h3 className="text-lg font-medium text-gray-900 mb-4">Complete Payment</h3>
-                    <PayPalButton
-                      amount={totalAmount}
-                      description={`${conferenceSettings?.name} - Registration for ${formData.billingFirstName} ${formData.billingLastName}`}
-                      onSuccess={handlePayPalSuccess}
-                      onError={handlePayPalError}
-                      onCancel={handlePayPalCancel}
-                    />
+                    {formValidationErrors.length > 0 ? (
+                      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <div className="flex items-start">
+                          <AlertCircle className="h-5 w-5 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-medium text-yellow-800">
+                              Please fill in the following required fields before proceeding with PayPal payment:
+                            </p>
+                            <ul className="mt-2 text-sm text-yellow-700 list-disc list-inside">
+                              {formValidationErrors.map((err, i) => (
+                                <li key={i}>{err}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <PayPalButton
+                        amount={totalAmount}
+                        description={`${conferenceSettings?.name} - Registration for ${formData.billingFirstName} ${formData.billingLastName}`}
+                        onSuccess={handlePayPalSuccess}
+                        onError={handlePayPalError}
+                        onCancel={handlePayPalCancel}
+                      />
+                    )}
                   </div>
                 )}
 

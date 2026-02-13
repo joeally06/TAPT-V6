@@ -27,6 +27,7 @@ export const SecureForm = forwardRef<SecureFormHandle, SecureFormProps>(({
   const [turnstileToken, setTurnstileToken] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [turnstileError, setTurnstileError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [isVerified, setIsVerified] = useState(false);
   const turnstileResetRef = useRef<(() => void) | null>(null);
 
@@ -83,6 +84,7 @@ export const SecureForm = forwardRef<SecureFormHandle, SecureFormProps>(({
 
     setIsSubmitting(true);
     setTurnstileError(null);
+    setSubmitError(null);
 
     try {
       let verified = false;
@@ -118,7 +120,8 @@ export const SecureForm = forwardRef<SecureFormHandle, SecureFormProps>(({
       
     } catch (error) {
       console.error('❌ Form submission error:', error);
-      setTurnstileError(error instanceof Error ? error.message : 'Submission failed');
+      // Display form/submission errors separately from Turnstile security errors
+      setSubmitError(error instanceof Error ? error.message : 'Submission failed');
       setIsVerified(false);
       
       // Reset the Turnstile widget on error to get a fresh token for retry
@@ -155,9 +158,21 @@ export const SecureForm = forwardRef<SecureFormHandle, SecureFormProps>(({
             </div>
           )}
           
-          {isVerified && (
+          {!turnstileToken && !turnstileError && (
+            <div className="text-yellow-700 text-sm bg-yellow-50 p-2 rounded border border-yellow-200">
+              🔒 Waiting for security verification to complete...
+            </div>
+          )}
+
+          {turnstileToken && !turnstileError && (
             <div className="text-green-600 text-sm bg-green-50 p-2 rounded border border-green-200">
-              ✅ Security verification successful
+              ✅ Security verification complete. You may submit the form.
+            </div>
+          )}
+
+          {submitError && (
+            <div className="text-red-600 text-sm bg-red-50 p-3 rounded border border-red-200 mt-2">
+              ⚠️ {submitError}
             </div>
           )}
         </div>
