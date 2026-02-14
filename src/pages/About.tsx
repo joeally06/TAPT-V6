@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Calendar, Users, Award, MapPin } from 'lucide-react';
 import { getSiteSetting } from '../lib/siteSettings';
 
@@ -209,18 +208,6 @@ export const About: React.FC = () => {
         </div>
       </section>
 
-      {/* Call to Action */}
-      <section className="bg-primary py-16 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-bold text-white mb-6">Join us in our mission</h2>
-          <p className="text-xl mb-8 max-w-3xl mx-auto">
-            Become a part of the TAPT community and help us continue to improve student transportation across Tennessee.
-          </p>
-          <Link to="/members" className="bg-white text-primary hover:bg-gray-100 px-8 py-3 rounded-md font-medium transition-colors inline-block">
-            Become a Member
-          </Link>
-        </div>
-      </section>
     </div>
   );
 };
