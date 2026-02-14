@@ -9,12 +9,12 @@ import {
   Award,
   TrendingUp,
   AlertCircle,
-  CheckCircle,
   Clock,
   FileText,
   Store,
   Settings,
-  GraduationCap
+  GraduationCap,
+  MapPin
 } from 'lucide-react';
 
 interface ActivityLog {
@@ -41,7 +41,8 @@ export const AdminDashboard: React.FC = () => {
     pendingNominations: 0,
     upcomingEvents: 0
   });
-  const [recentActivities, setRecentActivities] = useState<ActivityLog[]>([]);
+
+  const [luncheonRegistrations, setLuncheonRegistrations] = useState(0);
 
   useEffect(() => {
     if (!authLoading) {
@@ -94,7 +95,13 @@ export const AdminDashboard: React.FC = () => {
       }
 
       setStats(result.stats);
-      setRecentActivities(result.recentActivities || []);
+
+
+      // Fetch regional luncheon registration count
+      const { count: luncheonCount } = await supabase
+        .from('regional_luncheon_registrations')
+        .select('*', { count: 'exact', head: true });
+      setLuncheonRegistrations(luncheonCount ?? 0);
     } catch (error) {
       console.error('Error fetching stats:', error);
       setError('Failed to load dashboard statistics');
@@ -103,77 +110,7 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  // Helper function to format timestamp to relative time
-  const formatRelativeTime = (timestamp: string): string => {
-    const now = new Date();
-    const activityTime = new Date(timestamp);
-    const diffInSeconds = Math.floor((now.getTime() - activityTime.getTime()) / 1000);
-    
-    if (diffInSeconds < 60) {
-      return 'just now';
-    } else if (diffInSeconds < 3600) {
-      const minutes = Math.floor(diffInSeconds / 60);
-      return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
-    } else if (diffInSeconds < 86400) {
-      const hours = Math.floor(diffInSeconds / 3600);
-      return `${hours} hour${hours > 1 ? 's' : ''} ago`;
-    } else {
-      const days = Math.floor(diffInSeconds / 86400);
-      return `${days} day${days > 1 ? 's' : ''} ago`;
-    }
-  };
 
-  // Helper function to get activity icon and message
-  const getActivityDetails = (activity: ActivityLog): { icon: React.ReactNode; message: string } => {
-    const action = activity.action;
-    
-    if (action.includes('conference_registration')) {
-      return {
-        icon: <CheckCircle className="h-5 w-5 text-green-500" />,
-        message: 'New conference registration submitted'
-      };
-    } else if (action.includes('tech_conference_registration')) {
-      return {
-        icon: <CheckCircle className="h-5 w-5 text-green-500" />,
-        message: 'New tech conference registration submitted'
-      };
-    } else if (action.includes('exhibitor_registration')) {
-      return {
-        icon: <CheckCircle className="h-5 w-5 text-green-500" />,
-        message: 'New exhibitor registration submitted'
-      };
-    } else if (action.includes('scholarship_application')) {
-      return {
-        icon: <CheckCircle className="h-5 w-5 text-green-500" />,
-        message: 'New scholarship application submitted'
-      };
-    } else if (action.includes('nomination')) {
-      return {
-        icon: <Clock className="h-5 w-5 text-orange-500" />,
-        message: 'New Hall of Fame nomination received'
-      };
-    } else if (action.includes('user') || action.includes('create_user')) {
-      return {
-        icon: <Users className="h-5 w-5 text-blue-500" />,
-        message: 'New user account created'
-      };
-    } else if (action.includes('content')) {
-      return {
-        icon: <FileText className="h-5 w-5 text-purple-500" />,
-        message: 'Content updated'
-      };
-    } else if (action.includes('membership')) {
-      return {
-        icon: <Users className="h-5 w-5 text-indigo-500" />,
-        message: 'New membership application received'
-      };
-    } else {
-      return {
-        icon: <CheckCircle className="h-5 w-5 text-gray-500" />,
-        message: `Activity: ${action}`
-      };
-    }
-  };
 
   if (loading) {
     return (
@@ -250,6 +187,12 @@ export const AdminDashboard: React.FC = () => {
             color: 'bg-orange-500'
           },
           {
+            title: 'Luncheon Registrations',
+            value: luncheonRegistrations,
+            icon: MapPin,
+            color: 'bg-rose-500'
+          },
+          {
             title: 'Upcoming Events',
             value: stats.upcomingEvents,
             icon: TrendingUp,
@@ -276,32 +219,7 @@ export const AdminDashboard: React.FC = () => {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Activity */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Recent Activity</h2>
-          <div className="space-y-4">
-            {recentActivities.length > 0 ? (
-              recentActivities.map((activity) => {
-                const { icon, message } = getActivityDetails(activity);
-                return (
-                  <div key={activity.id} className="flex items-center">
-                    {icon}
-                    <div className="ml-3">
-                      <p className="text-sm text-gray-900">{message}</p>
-                      <p className="text-xs text-gray-500">{formatRelativeTime(activity.timestamp)}</p>
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="text-center py-4 text-gray-500">
-                <p>No recent activity found</p>
-              </div>
-            )}
-          </div>
-        </div>
-
+      <div className="grid grid-cols-1 gap-6">
         {/* Quick Actions */}
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h2 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h2>

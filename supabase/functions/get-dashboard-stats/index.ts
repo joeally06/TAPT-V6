@@ -149,13 +149,14 @@ Deno.serve(async (req) => {
       throw new Error(`Failed to count pending nominations: ${pendingError.message}`);
     }
 
-    // Get upcoming events count
+    // Get upcoming events count (compare using date-only string since events store YYYY-MM-DD)
+    const today = new Date().toISOString().split('T')[0]; // e.g. '2026-02-14'
     const { count: upcomingEvents, error: eventsError } = await supabaseAdmin
       .from('content')
       .select('*', { count: 'exact', head: true })
       .eq('type', 'event')
       .eq('status', 'published')
-      .gt('date', new Date().toISOString());
+      .gte('date', today);
 
     if (eventsError) {
       throw new Error(`Failed to count upcoming events: ${eventsError.message}`);
