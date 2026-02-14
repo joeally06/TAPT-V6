@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   uploadConferenceImage,
   getConferenceImages,
@@ -8,7 +8,7 @@ import {
   saveImageMetadata,
   type GalleryImage
 } from '@/lib/conferenceGallery';
-import { Grid, List } from 'lucide-react';
+import { Grid, List, GripVertical } from 'lucide-react';
 
 interface AdminConferenceGalleryProps {
   conferenceId: string;
@@ -24,6 +24,11 @@ export default function AdminConferenceGallery({ conferenceId, conferenceName }:
   const [editingCaption, setEditingCaption] = useState<string | null>(null);
   const [captionText, setCaptionText] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'compact'>('compact');
+
+  // Drag-and-drop state
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [isSavingOrder, setIsSavingOrder] = useState(false);
 
   useEffect(() => {
     loadImages();
@@ -165,6 +170,68 @@ export default function AdminConferenceGallery({ conferenceId, conferenceName }:
     }
   };
 
+  // ─── Drag-and-Drop Handlers ───
+  const handleDragStart = useCallback((e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    // Use a small transparent image to avoid the default browser ghost
+    const ghost = document.createElement('div');
+    ghost.style.opacity = '0';
+    document.body.appendChild(ghost);
+    e.dataTransfer.setDragImage(ghost, 0, 0);
+    requestAnimationFrame(() => document.body.removeChild(ghost));
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverIndex !== index) {
+      setDragOverIndex(index);
+    }
+  }, [dragOverIndex]);
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverIndex(null);
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    setDragOverIndex(null);
+
+    if (draggedIndex === null || draggedIndex === dropIndex) {
+      setDraggedIndex(null);
+      return;
+    }
+
+    // Reorder the array
+    const newImages = [...images];
+    const [draggedItem] = newImages.splice(draggedIndex, 1);
+    newImages.splice(dropIndex, 0, draggedItem);
+
+    // Optimistically update UI
+    const reordered = newImages.map((img, idx) => ({ ...img, display_order: idx }));
+    setImages(reordered);
+    setDraggedIndex(null);
+
+    // Persist to database
+    const updates = reordered.map((img, idx) => ({ id: img.id, display_order: idx }));
+    try {
+      setIsSavingOrder(true);
+      await reorderImages(updates);
+    } catch (err) {
+      setError('Failed to save new order. Reverting...');
+      console.error('Drag reorder error:', err);
+      await loadImages(); // Revert on error
+    } finally {
+      setIsSavingOrder(false);
+    }
+  }, [draggedIndex, images]);
+
+  const handleDragEnd = useCallback(() => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  }, []);
+
   const handleMoveUp = async (index: number) => {
     if (index === 0) return;
 
@@ -270,11 +337,21 @@ export default function AdminConferenceGallery({ conferenceId, conferenceName }:
         </div>
       )}
 
+      {/* Saving Order Indicator */}
+      {isSavingOrder && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <p className="text-sm text-blue-700">Saving new photo order...</p>
+        </div>
+      )}
+
       {/* Gallery Grid */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">
             Gallery Images ({images.length})
+            {images.length > 1 && (
+              <span className="text-sm font-normal text-gray-500 ml-2">Drag to reorder</span>
+            )}
           </h3>
           <div className="flex gap-2">
             <button
@@ -311,19 +388,42 @@ export default function AdminConferenceGallery({ conferenceId, conferenceName }:
             {images.map((image, index) => (
               <div
                 key={image.id}
-                className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow group"
+                draggable
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, index)}
+                onDragEnd={handleDragEnd}
+                className={`bg-white border-2 rounded-lg overflow-hidden transition-all duration-200 group ${
+                  draggedIndex === index
+                    ? 'opacity-40 scale-95 border-blue-400 bg-blue-50'
+                    : dragOverIndex === index && draggedIndex !== null
+                      ? 'border-blue-500 ring-2 ring-blue-300 ring-offset-1 scale-[1.02]'
+                      : 'border-gray-200 hover:shadow-md'
+                } ${draggedIndex !== null ? 'cursor-grabbing' : 'cursor-grab'}`}
               >
                 {/* Compact Image View */}
                 <div className="aspect-square bg-gray-100 relative">
                   <img
                     src={image.thumbnail_url}
                     alt={image.caption || `Photo ${index + 1}`}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover pointer-events-none"
                     loading="lazy"
+                    draggable={false}
                   />
-                  <div className="absolute top-1 right-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">
+                  <div className="absolute top-1 left-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded flex items-center gap-1">
+                    <GripVertical className="h-3 w-3" />
                     #{index + 1}
                   </div>
+                  
+                  {/* Drop Indicator */}
+                  {dragOverIndex === index && draggedIndex !== null && draggedIndex !== index && (
+                    <div className="absolute inset-0 pointer-events-none z-20">
+                      <div className={`absolute ${
+                        draggedIndex < index ? 'bottom-0 left-0 right-0 h-1' : 'top-0 left-0 right-0 h-1'
+                      } bg-blue-500 rounded-full`} />
+                    </div>
+                  )}
                   
                   {/* Hover Overlay with Actions */}
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 p-2">
@@ -383,19 +483,42 @@ export default function AdminConferenceGallery({ conferenceId, conferenceName }:
             {images.map((image, index) => (
               <div
                 key={image.id}
-                className="bg-white border border-gray-300 rounded-lg overflow-hidden shadow-sm"
+                draggable
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, index)}
+                onDragEnd={handleDragEnd}
+                className={`bg-white border-2 rounded-lg overflow-hidden shadow-sm transition-all duration-200 ${
+                  draggedIndex === index
+                    ? 'opacity-40 scale-95 border-blue-400 bg-blue-50'
+                    : dragOverIndex === index && draggedIndex !== null
+                      ? 'border-blue-500 ring-2 ring-blue-300 ring-offset-2 scale-[1.01]'
+                      : 'border-gray-300'
+                } ${draggedIndex !== null ? 'cursor-grabbing' : 'cursor-grab'}`}
               >
                 {/* Image */}
                 <div className="aspect-video bg-gray-100 relative">
                   <img
                     src={image.thumbnail_url}
                     alt={image.caption || image.original_filename}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover pointer-events-none"
                     loading="lazy"
+                    draggable={false}
                   />
-                  <div className="absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
+                  <div className="absolute top-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
+                    <GripVertical className="h-3 w-3" />
                     #{index + 1}
                   </div>
+                  
+                  {/* Drop Indicator */}
+                  {dragOverIndex === index && draggedIndex !== null && draggedIndex !== index && (
+                    <div className="absolute inset-0 pointer-events-none z-20">
+                      <div className={`absolute ${
+                        draggedIndex < index ? 'bottom-0 left-0 right-0 h-1' : 'top-0 left-0 right-0 h-1'
+                      } bg-blue-500 rounded-full`} />
+                    </div>
+                  )}
                 </div>
 
                 {/* Info & Controls */}
