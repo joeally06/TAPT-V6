@@ -19,6 +19,7 @@ import { NEWS_CATEGORIES } from '../lib/types/news';
 import { useAuth } from '../context/AuthContext';
 import { uploadFile } from '../lib/upload';
 import { getPublicUrl } from '../lib/storage';
+import { compressImage } from '../lib/imageCompression';
 import AdminLayout from '../components/AdminLayout';
 
 interface ContentItem {
@@ -153,6 +154,7 @@ export const AdminContent: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [editingItem, setEditingItem] = useState<ContentItem | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [deletingAttachment, setDeletingAttachment] = useState(false);
 
   const [formData, setFormData] = useState<Partial<ContentItem>>({
     title: '',
@@ -223,10 +225,102 @@ export const AdminContent: React.FC = () => {
     }
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setSelectedFile(file);
+      
+      // Compress image files to reduce storage size (skip documents)
+      if (isImageFile(file.type) && file.type !== 'image/gif') {
+        try {
+          const compressed = await compressImage(file, 1920, 0.85);
+          setSelectedFile(compressed);
+        } catch (err) {
+          console.error('Image compression failed, using original:', err);
+          setSelectedFile(file);
+        }
+      } else {
+        // Documents (PDF, Word, Excel, etc.) — no compression
+        setSelectedFile(file);
+      }
+    }
+  };
+
+  const handleDeleteCurrentAttachment = async () => {
+    if (!editingItem) return;
+    
+    const attachmentUrl = editingItem.image_url || editingItem.file_url;
+    if (!attachmentUrl) return;
+    
+    const confirmed = window.confirm('Are you sure you want to delete the current attachment? This cannot be undone.');
+    if (!confirmed) return;
+    
+    setDeletingAttachment(true);
+    setError(null);
+    
+    try {
+      // Extract the storage path from the public URL and delete from storage
+      const url = new URL(attachmentUrl);
+      const pathMatch = url.pathname.match(/\/storage\/v1\/object\/public\/public\/(.+)/);
+      
+      if (pathMatch && pathMatch[1]) {
+        const storagePath = decodeURIComponent(pathMatch[1]);
+        const { error: deleteError } = await supabase.storage
+          .from('public')
+          .remove([storagePath]);
+        
+        if (deleteError) {
+          console.error('Storage delete error:', deleteError);
+        }
+      }
+      
+      // Update the content item in the database to clear the attachment
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+      
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const response = await fetch(`${supabaseUrl}/functions/v1/admin-content`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          ...editingItem,
+          id: editingItem.id,
+          image_url: null,
+          file_url: null,
+          file_type: null,
+          file_size: null,
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Failed to parse error response' }));
+        throw new Error(errorData.message || 'Failed to update content');
+      }
+      
+      // Update local state
+      setEditingItem({
+        ...editingItem,
+        image_url: null,
+        file_url: null,
+        file_type: null,
+        file_size: null,
+      });
+      setFormData(prev => ({
+        ...prev,
+        image_url: null,
+        file_url: null,
+        file_type: null,
+        file_size: null,
+      }));
+      setSuccess('Attachment deleted successfully.');
+      fetchContent();
+    } catch (error: any) {
+      console.error('Error deleting attachment:', error);
+      setError(`Failed to delete attachment: ${error.message}`);
+    } finally {
+      setDeletingAttachment(false);
     }
   };
 
@@ -736,9 +830,20 @@ export const AdminContent: React.FC = () => {
                     )}
                     {/* Show existing file info when editing */}
                     {editingItem && !selectedFile && (editingItem.file_url || editingItem.image_url) && (
-                      <p className="mt-2 text-sm text-gray-500">
-                        Current: {editingItem.file_url ? `Document (${getFileTypeDisplay(editingItem.file_type)})` : 'Image'}
-                      </p>
+                      <div className="mt-2 flex items-center gap-3">
+                        <p className="text-sm text-gray-500">
+                          Current: {editingItem.file_url ? `Document (${getFileTypeDisplay(editingItem.file_type)})` : 'Image'}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={handleDeleteCurrentAttachment}
+                          disabled={deletingAttachment}
+                          className="inline-flex items-center px-2.5 py-1 border border-red-300 rounded-md text-xs font-medium text-red-700 bg-white hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 mr-1" />
+                          {deletingAttachment ? 'Deleting...' : 'Delete'}
+                        </button>
+                      </div>
                     )}
                   </div>
 

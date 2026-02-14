@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Save, Upload, X, Image, AlertCircle, CheckCircle, Mail, Phone, Globe, Type, Clock, MapPin } from 'lucide-react';
+import { Save, Upload, X, Image, AlertCircle, CheckCircle, Mail, Phone, Globe, Type, Clock, MapPin, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { getSiteSetting, updateSiteSetting } from '../lib/siteSettings';
+import { compressImage } from '../lib/imageCompression';
 import AdminLayout from '../components/AdminLayout';
 
 interface SiteSettingsState {
@@ -57,6 +58,8 @@ export const AdminSiteSettings: React.FC = () => {
   const [success, setSuccess] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [compressionInfo, setCompressionInfo] = useState<{ originalSize: number; compressedSize: number } | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [activeTab, setActiveTab] = useState('general');
 
   useEffect(() => {
@@ -125,7 +128,7 @@ export const AdminSiteSettings: React.FC = () => {
     }
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       
@@ -135,14 +138,33 @@ export const AdminSiteSettings: React.FC = () => {
         return;
       }
       
-      setSelectedFile(file);
-      
-      // Create preview URL
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewUrl(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      try {
+        // Compress image to reduce storage size
+        const compressed = await compressImage(file, 1920, 0.85);
+        setSelectedFile(compressed);
+        setCompressionInfo({
+          originalSize: file.size,
+          compressedSize: compressed.size,
+        });
+        
+        // Create preview URL from compressed file
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setPreviewUrl(reader.result as string);
+        };
+        reader.readAsDataURL(compressed);
+      } catch (err) {
+        console.error('Image compression failed, using original:', err);
+        setSelectedFile(file);
+        setCompressionInfo(null);
+        
+        // Create preview URL from original
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setPreviewUrl(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 
@@ -150,8 +172,8 @@ export const AdminSiteSettings: React.FC = () => {
     if (!selectedFile) return null;
     
     try {
-      // Get file extension
-      const fileExt = selectedFile.name.split('.').pop();
+      // Use compressed file extension (compression outputs .jpg)
+      const fileExt = selectedFile.name.split('.').pop() || 'jpg';
       const fileName = `hero-image-${Date.now()}.${fileExt}`;
       const filePath = `site-settings/${fileName}`;
       
@@ -171,6 +193,51 @@ export const AdminSiteSettings: React.FC = () => {
     } catch (error) {
       console.error('Error uploading image:', error);
       throw error;
+    }
+  };
+
+  const handleDeleteHeroImage = async () => {
+    if (!settings.heroImageUrl) return;
+    
+    const confirmed = window.confirm('Are you sure you want to delete the current hero image? This cannot be undone.');
+    if (!confirmed) return;
+    
+    setDeleting(true);
+    setError(null);
+    
+    try {
+      // Extract the storage path from the public URL
+      const url = new URL(settings.heroImageUrl);
+      const pathMatch = url.pathname.match(/\/storage\/v1\/object\/public\/public\/(.+)/);
+      
+      if (pathMatch && pathMatch[1]) {
+        const storagePath = decodeURIComponent(pathMatch[1]);
+        const { error: deleteError } = await supabase.storage
+          .from('public')
+          .remove([storagePath]);
+        
+        if (deleteError) {
+          console.error('Storage delete error:', deleteError);
+          // Continue anyway — the DB setting is more important
+        }
+      }
+      
+      // Clear the hero image URL in site settings
+      await updateSiteSetting('hero_image_url', '');
+      
+      setSettings(prev => ({
+        ...prev,
+        heroImageUrl: ''
+      }));
+      setSelectedFile(null);
+      setPreviewUrl(null);
+      setCompressionInfo(null);
+      setSuccess('Hero image deleted successfully.');
+    } catch (error: any) {
+      console.error('Error deleting hero image:', error);
+      setError(`Failed to delete hero image: ${error.message}`);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -407,13 +474,35 @@ export const AdminSiteSettings: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Current Hero Image
                 </label>
-                <div className="mt-2 relative rounded-lg overflow-hidden bg-gray-100 w-full h-64">
-                  <img 
-                    src={previewUrl || settings.heroImageUrl} 
-                    alt="Hero" 
-                    className="w-full h-full object-cover"
-                  />
-                </div>
+                {(previewUrl || settings.heroImageUrl) ? (
+                  <>
+                    <div className="mt-2 relative rounded-lg overflow-hidden bg-gray-100 w-full h-64">
+                      <img 
+                        src={previewUrl || settings.heroImageUrl} 
+                        alt="Hero" 
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    {settings.heroImageUrl && !previewUrl && (
+                      <button
+                        type="button"
+                        onClick={handleDeleteHeroImage}
+                        disabled={deleting}
+                        className="mt-2 inline-flex items-center px-3 py-1.5 border border-red-300 rounded-md text-sm font-medium text-red-700 bg-white hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Trash2 className="h-4 w-4 mr-1.5" />
+                        {deleting ? 'Deleting...' : 'Delete Current Image'}
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <div className="mt-2 flex items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 w-full h-64">
+                    <div className="text-center text-gray-400">
+                      <Image className="h-12 w-12 mx-auto mb-2" />
+                      <p className="text-sm">No hero image set</p>
+                    </div>
+                  </div>
+                )}
               </div>
               
               <div>
@@ -444,6 +533,7 @@ export const AdminSiteSettings: React.FC = () => {
                         onClick={() => {
                           setSelectedFile(null);
                           setPreviewUrl(null);
+                          setCompressionInfo(null);
                         }}
                         className="ml-2 text-gray-400 hover:text-gray-500"
                       >
@@ -452,8 +542,17 @@ export const AdminSiteSettings: React.FC = () => {
                     </div>
                   )}
                 </div>
+                {compressionInfo && (
+                  <div className="mt-2 flex items-center gap-2 text-sm text-green-600 bg-green-50 border border-green-200 rounded-md px-3 py-2">
+                    <CheckCircle className="h-4 w-4 flex-shrink-0" />
+                    <span>
+                      Image compressed: {(compressionInfo.originalSize / 1024).toFixed(0)}KB → {(compressionInfo.compressedSize / 1024).toFixed(0)}KB
+                      ({Math.round((1 - compressionInfo.compressedSize / compressionInfo.originalSize) * 100)}% reduction)
+                    </span>
+                  </div>
+                )}
                 <p className="mt-2 text-sm text-gray-500">
-                  Recommended size: 1920x1080 pixels. JPG, PNG, or WebP format.
+                  Recommended size: 1920x1080 pixels. JPG, PNG, or WebP format. Images are automatically compressed on upload.
                 </p>
               </div>
             </div>
