@@ -274,44 +274,6 @@ export const Events: React.FC = () => {
           </div>
         </div>
       </section>
-
-      {/* Calendar Download */}
-      <section className="py-16 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-            <div className="md:flex">
-              <div className="p-8 md:flex-1">
-                <h2 className="text-2xl font-bold text-secondary mb-4">TAPT Event Calendar</h2>
-                <p className="text-gray-600 mb-6">
-                  Download or subscribe to our event calendar to stay up-to-date with all TAPT events, workshops, and important dates.
-                </p>
-                <div className="space-y-4">
-                  <button className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
-                    <Calendar className="mr-2 h-5 w-5" />
-                    Add to Calendar
-                  </button>
-                  <button className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
-                    <Calendar className="mr-2 h-5 w-5 text-gray-500" />
-                    Download iCal File
-                  </button>
-                </div>
-              </div>
-              <div className="md:flex-shrink-0 md:w-1/3 bg-gradient-to-br from-primary to-accent p-8 text-white flex items-center">
-                <div>
-                  <h3 className="text-xl font-bold mb-3">Host Your Own Event</h3>
-                  <p className="mb-4">Are you interested in hosting a TAPT workshop or event in your district?</p>
-                  <Link
-                    to="/contact"
-                    className="inline-flex items-center px-4 py-2 border border-white rounded-md text-sm font-medium text-primary bg-white hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white focus:ring-offset-primary"
-                  >
-                    Contact Us
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
     </div>
   );
 };

@@ -1,59 +1,72 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, Phone, MapPin, AlertCircle, Clock } from 'lucide-react';
-import { getSiteSetting } from '../lib/siteSettings';
 import { supabase } from '../lib/supabase';
 import { SecureForm } from '../components/forms/SecureForm';
 
+// Fallback defaults used when site_settings has no value
+const DEFAULTS: Record<string, string> = {
+  contact_email: 'contact@tapt.org',
+  contact_phone: '615-406-9199',
+  contact_address_line1: 'P.O. Box 700',
+  contact_address_line2: '',
+  contact_city: 'Portland',
+  contact_state: 'TN',
+  contact_zip: '37148',
+  business_hours_days: 'Monday – Friday',
+  business_hours_time: '8:00 AM – 4:30 PM CST',
+};
+
+const SETTING_KEYS = Object.keys(DEFAULTS);
+
 export const Contact: React.FC = () => {
-  const [contactEmail, setContactEmail] = useState<string>('contact@tapt.org');
-  const [contactPhone, setContactPhone] = useState<string>('615-406-9199');
-  const [contactAddressLine1, setContactAddressLine1] = useState<string>('P.O. Box 700');
-  const [contactAddressLine2, setContactAddressLine2] = useState<string>('');
-  const [contactCity, setContactCity] = useState<string>('Portland');
-  const [contactState, setContactState] = useState<string>('TN');
-  const [contactZip, setContactZip] = useState<string>('37148');
-  const [businessHoursDays, setBusinessHoursDays] = useState<string>('Monday – Friday');
-  const [businessHoursTime, setBusinessHoursTime] = useState<string>('8:00 AM – 4:30 PM CST');
+  const [contactInfo, setContactInfo] = useState<Record<string, string>>(DEFAULTS);
+  const [contactLoaded, setContactLoaded] = useState(false);
   const [formState, setFormState] = useState({
     submitted: false,
     error: false,
     loading: false
   });
 
+  // Convenient accessors
+  const contactEmail = contactInfo.contact_email;
+  const contactPhone = contactInfo.contact_phone;
+  const contactAddressLine1 = contactInfo.contact_address_line1;
+  const contactAddressLine2 = contactInfo.contact_address_line2;
+  const contactCity = contactInfo.contact_city;
+  const contactState = contactInfo.contact_state;
+  const contactZip = contactInfo.contact_zip;
+  const businessHoursDays = contactInfo.business_hours_days;
+  const businessHoursTime = contactInfo.business_hours_time;
+
   useEffect(() => {
     window.scrollTo(0, 0);
     
     const fetchSettings = async () => {
       try {
-        const email = await getSiteSetting('contact_email');
-        if (email) setContactEmail(email);
+        // Single query to fetch all contact settings at once
+        const { data, error } = await supabase
+          .from('site_settings')
+          .select('setting_key, setting_value')
+          .in('setting_key', SETTING_KEYS);
 
-        const phone = await getSiteSetting('contact_phone');
-        if (phone) setContactPhone(phone);
+        if (error) {
+          console.error('Error fetching contact settings:', error);
+          return; // DEFAULTS already applied via initial state
+        }
 
-        const addressLine1 = await getSiteSetting('contact_address_line1');
-        if (addressLine1) setContactAddressLine1(addressLine1);
-
-        const addressLine2 = await getSiteSetting('contact_address_line2');
-        if (addressLine2) setContactAddressLine2(addressLine2);
-
-        const city = await getSiteSetting('contact_city');
-        if (city) setContactCity(city);
-
-        const state = await getSiteSetting('contact_state');
-        if (state) setContactState(state);
-
-        const zip = await getSiteSetting('contact_zip');
-        if (zip) setContactZip(zip);
-
-        const hoursDays = await getSiteSetting('business_hours_days');
-        if (hoursDays) setBusinessHoursDays(hoursDays);
-
-        const hoursTime = await getSiteSetting('business_hours_time');
-        if (hoursTime) setBusinessHoursTime(hoursTime);
+        if (data && data.length > 0) {
+          const fetched: Record<string, string> = {};
+          for (const row of data) {
+            fetched[row.setting_key] = row.setting_value ?? DEFAULTS[row.setting_key];
+          }
+          // Merge: fetched values override defaults
+          setContactInfo(prev => ({ ...prev, ...fetched }));
+        }
       } catch (error) {
         console.error('Error fetching contact settings:', error);
+      } finally {
+        setContactLoaded(true);
       }
     };
 
@@ -189,17 +202,7 @@ export const Contact: React.FC = () => {
                 </div>
               </div>
 
-              {/* Map or additional content */}
-              <div className="mt-12 bg-gray-200 rounded-lg overflow-hidden h-64">
-                <iframe
-                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d205412.91768841974!2d-86.91399624871484!3d36.23991499510724!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x88644ec5cae45573%3A0xf649d19eb1a80ecb!2sPortland%2C%20TN!5e0!3m2!1sen!2sus!4v1667579591619!5m2!1sen!2sus"
-                  style={{ border: 0 }}
-                  allowFullScreen={false}
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                  className="w-full h-full"
-                ></iframe>
-              </div>
+
             </div>
 
             {/* Contact Form */}
@@ -315,50 +318,6 @@ export const Contact: React.FC = () => {
                 </SecureForm>
               )}
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* FAQ Section */}
-      <section className="py-16 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-secondary mb-2">Frequently Asked Questions</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
-              Find quick answers to common questions about TAPT and our services.
-            </p>
-          </div>
-          
-          <div className="max-w-3xl mx-auto">
-            <dl className="space-y-6">
-              {[
-                {
-                  question: "How do I become a TAPT member?",
-                  answer: "You can become a TAPT member by visiting our Membership page and completing the application form. Annual memberships are available for individuals and organizations."
-                },
-                {
-                  question: "When and where is the next TAPT conference?",
-                  answer: "Our annual conference is typically held in June. Details for the upcoming conference can be found on our Events page or by contacting the TAPT office."
-                },
-                {
-                  question: "Does TAPT offer training programs?",
-                  answer: "Yes, TAPT offers various training programs throughout the year, including safety workshops, driver training, and professional development for transportation supervisors."
-                },
-                {
-                  question: "How can I access resources on the website?",
-                  answer: "Most resources are freely available on our Resources page. Some resources are exclusive to TAPT members and require login credentials."
-                },
-                {
-                  question: "How can I get involved with TAPT committees?",
-                  answer: "TAPT has several committees that members can join. Contact the TAPT office or reach out to the committee chair for information on how to participate."
-                }
-              ].map((faq, index) => (
-                <div key={index} className="bg-white p-6 rounded-lg shadow-sm">
-                  <dt className="text-lg font-semibold text-secondary">{faq.question}</dt>
-                  <dd className="mt-3 text-gray-600">{faq.answer}</dd>
-                </div>
-              ))}
-            </dl>
           </div>
         </div>
       </section>
