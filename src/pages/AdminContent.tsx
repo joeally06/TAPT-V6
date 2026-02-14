@@ -13,7 +13,8 @@ import {
   X,
   Upload,
   Star,
-  Link as LinkIcon
+  Link as LinkIcon,
+  ExternalLink
 } from 'lucide-react';
 import { NEWS_CATEGORIES } from '../lib/types/news';
 import { useAuth } from '../context/AuthContext';
@@ -88,9 +89,10 @@ interface ResourceItem {
   title: string;
   description: string;
   category: string;
-  file_url: string;
-  file_type: string;
-  file_size: number;
+  file_url: string | null;
+  file_type: string | null;
+  file_size: number | null;
+  external_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -332,11 +334,6 @@ export const AdminContent: React.FC = () => {
 
     try {
       if (selectedType === 'resource') {
-        // Resource upload logic
-        if (!selectedFile) {
-          throw new Error('Please select a file to upload');
-        }
-
         if (!formData.category) {
           throw new Error('Please select a category for the resource');
         }
@@ -345,47 +342,81 @@ export const AdminContent: React.FC = () => {
           throw new Error('User not authenticated');
         }
 
-        // Upload file to Supabase Storage
-        const filePath = await uploadFile(
-          selectedFile, 
-          'resources', 
-          user.access_token, 
-          { 
-            bucket: 'public',
-            allowedTypes: [
-              'application/pdf',
-              'application/msword',
-              'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-              'application/vnd.ms-excel',
-              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-              'text/plain',
-              'text/csv'
-            ]
+        if (formData.category === 'links') {
+          // External link resource — no file upload needed
+          const externalUrl = (formData as any).external_url;
+          if (!externalUrl) {
+            throw new Error('Please enter an external URL');
           }
-        );
 
-        // Get public URL for the uploaded file
-        const fileUrl = getPublicUrl('public', filePath);
+          const { data: resourceData, error: resourceError } = await supabase
+            .from('resources')
+            .insert([{
+              title: formData.title,
+              description: formData.description,
+              category: formData.category,
+              file_url: null,
+              file_type: null,
+              file_size: null,
+              external_url: externalUrl,
+              created_by: user.id
+            }])
+            .select()
+            .single();
 
-        // Insert resource record into database
-        const { data: resourceData, error: resourceError } = await supabase
-          .from('resources')
-          .insert([{
-            title: formData.title,
-            description: formData.description,
-            category: formData.category,
-            file_url: fileUrl,
-            file_type: selectedFile.type,
-            file_size: selectedFile.size,
-            created_by: user.id
-          }])
-          .select()
-          .single();
+          if (resourceError) throw resourceError;
 
-        if (resourceError) throw resourceError;
+          setSuccess('External link resource added successfully!');
+          fetchResources();
+        } else {
+          // File upload resource logic
+          if (!selectedFile) {
+            throw new Error('Please select a file to upload');
+          }
 
-        setSuccess('Resource uploaded successfully!');
-        fetchResources();
+          // Upload file to Supabase Storage
+          const filePath = await uploadFile(
+            selectedFile, 
+            'resources', 
+            user.access_token, 
+            { 
+              bucket: 'public',
+              allowedTypes: [
+                'application/pdf',
+                'application/msword',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'application/vnd.ms-excel',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'text/plain',
+                'text/csv'
+              ]
+            }
+          );
+
+          // Get public URL for the uploaded file
+          const fileUrl = getPublicUrl('public', filePath);
+
+          // Insert resource record into database
+          const { data: resourceData, error: resourceError } = await supabase
+            .from('resources')
+            .insert([{
+              title: formData.title,
+              description: formData.description,
+              category: formData.category,
+              file_url: fileUrl,
+              file_type: selectedFile.type,
+              file_size: selectedFile.size,
+              external_url: null,
+              created_by: user.id
+            }])
+            .select()
+            .single();
+
+          if (resourceError) throw resourceError;
+
+          setSuccess('Resource uploaded successfully!');
+          fetchResources();
+        }
       } else {
         let imagePath = formData.image_url;
         let fileUrl = formData.file_url;
@@ -764,26 +795,51 @@ export const AdminContent: React.FC = () => {
                       <option value="laws">Laws & Regulations</option>
                       <option value="training">Training Materials</option>
                       <option value="safety">Safety Resources</option>
+                      <option value="links">External Links</option>
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      File
-                    </label>
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleFileSelect}
-                      required={!editingItem}
-                      className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
-                    />
-                    {selectedFile && (
-                      <p className="mt-2 text-sm text-gray-500">
-                        Selected file: {selectedFile.name} ({formatFileSize(selectedFile.size)})
+                  {formData.category === 'links' ? (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        External URL
+                      </label>
+                      <div className="mt-1 relative rounded-md shadow-sm">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <ExternalLink className="h-5 w-5 text-gray-400" />
+                        </div>
+                        <input
+                          type="url"
+                          value={(formData as any).external_url || ''}
+                          onChange={(e) => setFormData({ ...formData, external_url: e.target.value } as any)}
+                          required
+                          placeholder="https://example.com/resource"
+                          className="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+                        />
+                      </div>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Enter the full URL to the external resource
                       </p>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        File
+                      </label>
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileSelect}
+                        required={!editingItem}
+                        className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                      />
+                      {selectedFile && (
+                        <p className="mt-2 text-sm text-gray-500">
+                          Selected file: {selectedFile.name} ({formatFileSize(selectedFile.size)})
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </>
               ) : (
                 <>
@@ -1018,10 +1074,27 @@ export const AdminContent: React.FC = () => {
                         <div className="text-sm text-gray-500">{resource.category}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500">{resource.file_type.toUpperCase()}</div>
+                        <div className="text-sm text-gray-500">
+                          {resource.external_url ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                              <ExternalLink className="h-3 w-3 mr-1" />
+                              LINK
+                            </span>
+                          ) : (
+                            resource.file_type?.toUpperCase() || '-'
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500">{formatFileSize(resource.file_size)}</div>
+                        <div className="text-sm text-gray-500">
+                          {resource.external_url ? (
+                            <a href={resource.external_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 truncate block max-w-[200px]" title={resource.external_url}>
+                              {resource.external_url}
+                            </a>
+                          ) : (
+                            resource.file_size ? formatFileSize(resource.file_size) : '-'
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-500">

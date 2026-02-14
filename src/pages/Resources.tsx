@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Search, Download, FileText, Book, FileCheck, Folder } from 'lucide-react';
+import { Search, Download, FileText, Book, FileCheck, Folder, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { 
@@ -13,9 +13,10 @@ interface Resource {
   title: string;
   description: string;
   category: string;
-  file_url: string;
-  file_type: string;
-  file_size: number;
+  file_url: string | null;
+  file_type: string | null;
+  file_size: number | null;
+  external_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -43,6 +44,8 @@ const getCategoryIcon = (category: string) => {
         return <Folder className="h-6 w-6" />;
       case 'safety':
         return <FileText className="h-6 w-6" />;
+      case 'links':
+        return <ExternalLink className="h-6 w-6" />;
       default:
         console.warn('Unknown category for icon:', category);
         return <FileText className="h-6 w-6" />;
@@ -63,18 +66,36 @@ const ResourceCard: React.FC<{ resource: Resource; onDownload: (resource: Resour
       <p className="text-gray-600 mb-2">{resource.description}</p>
       <div className="flex flex-wrap items-center text-sm text-gray-500 gap-x-4">
         <span>Updated: {new Date(resource.updated_at).toLocaleDateString()}</span>
-        <span>{resource.file_type.toUpperCase()}</span>
-        <span>{formatFileSize(resource.file_size)}</span>
+        {resource.external_url ? (
+          <span className="text-blue-600">External Link</span>
+        ) : (
+          <>
+            <span>{resource.file_type?.toUpperCase()}</span>
+            <span>{formatFileSize(resource.file_size || 0)}</span>
+          </>
+        )}
       </div>
     </div>
     <div className="mt-4 md:mt-0 flex-shrink-0">
-      <button
-        onClick={() => onDownload(resource)}
-        className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-      >
-        <Download className="mr-2 h-4 w-4" />
-        Download
-      </button>
+      {resource.external_url ? (
+        <a
+          href={resource.external_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+        >
+          <ExternalLink className="mr-2 h-4 w-4" />
+          Visit
+        </a>
+      ) : (
+        <button
+          onClick={() => onDownload(resource)}
+          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+        >
+          <Download className="mr-2 h-4 w-4" />
+          Download
+        </button>
+      )}
     </div>
   </div>
 );

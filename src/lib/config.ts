@@ -34,6 +34,7 @@ export const RESOURCE_CATEGORIES = [
   { id: 'laws', name: 'Laws & Regulations', icon: 'FileCheck' },
   { id: 'training', name: 'Training Materials', icon: 'Book' },
   { id: 'safety', name: 'Safety Resources', icon: 'FileCheck' },
+  { id: 'links', name: 'External Links', icon: 'ExternalLink' },
 ] as const;
 
 export type ResourceCategory = typeof RESOURCE_CATEGORIES[number]['id'];
