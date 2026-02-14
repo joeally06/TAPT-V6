@@ -6,7 +6,7 @@ import {
   RESOURCE_CATEGORIES, 
   type ResourceCategory,
 } from '../lib/config';
-import { FixedSizeList } from 'react-window';
+
 
 interface Resource {
   id: string;
@@ -242,29 +242,11 @@ export const Resources: React.FC = () => {
                   <div className="text-sm text-gray-600 mb-4">
                     {resources.length === 0 ? 'No resources found' : `Showing ${(page - 1) * PAGE_SIZE + 1}-${(page - 1) * PAGE_SIZE + resources.length} of ${totalCount} resources`}
                   </div>
-                  {resources.length > 0 && resources.length > 8 ? (
-                    <FixedSizeList
-                      height={Math.min(8, resources.length) * 120}
-                      width="100%"
-                      itemCount={resources.length}
-                      itemSize={120}
-                      className="divide-y divide-gray-200"
-                    >
-                      {({ index, style }) => (
-                        <ResourceCard
-                          resource={resources[index]}
-                          onDownload={handleDownload}
-                          style={style}
-                        />
-                      )}
-                    </FixedSizeList>
-                  ) : (
-                    <div className="divide-y divide-gray-200">
-                      {resources.map((resource) => (
-                        <ResourceCard key={resource.id} resource={resource} onDownload={handleDownload} />
-                      ))}
-                    </div>
-                  )}
+                  <div className="divide-y divide-gray-200">
+                    {resources.map((resource) => (
+                      <ResourceCard key={resource.id} resource={resource} onDownload={handleDownload} />
+                    ))}
+                  </div>
                   {/* Pagination Controls */}
                   <div className="flex justify-between items-center mt-6">
                     <button
