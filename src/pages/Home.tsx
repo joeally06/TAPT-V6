@@ -111,7 +111,7 @@ export const Home: React.FC = () => {
         <div className="absolute inset-0">
           <img 
             src={heroImageUrl} 
-            alt="Hero" 
+            alt="TAPT - Promoting safe student transportation across Tennessee" 
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-primary/90 via-primary/50 to-transparent"></div>

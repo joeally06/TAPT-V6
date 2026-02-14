@@ -5,8 +5,8 @@
 @layer base {
   :root {
     --tapt-navy: #1e3a5f;
-    --tapt-blue: #2b7eb8;
-    --tapt-gold: #d4a74a;
+    --tapt-blue: #2570a4;
+    --tapt-gold: #8d6e25;
     --tapt-green: #6b9f4d;
     --tapt-orange: #f5a623;
   }
@@ -22,6 +22,16 @@
 }
 
 @layer components {
+  /* Global focus-visible styles for keyboard accessibility */
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [tabindex]:focus-visible {
+    @apply outline-none ring-2 ring-tapt-blue ring-offset-2;
+  }
+
   .section {
     @apply py-12 md:py-16 lg:py-20 px-4;
   }

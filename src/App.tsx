@@ -44,6 +44,9 @@ import AdminContactMessages from './pages/AdminContactMessages';
 import AdminPaymentManagement from './pages/AdminPaymentManagement';
 import AdminPhotoGallery from './pages/AdminPhotoGallery';
 import ConferenceGalleryPage from './pages/ConferenceGalleryPage';
+import { PrivacyPolicy } from './pages/PrivacyPolicy';
+import { TermsOfService } from './pages/TermsOfService';
+import { Accessibility } from './pages/Accessibility';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import './index.css';
@@ -202,7 +205,13 @@ function App() {
             path="/*"
             element={
               <div className="flex flex-col min-h-screen bg-gray-50">
-                <main className="flex-grow">
+                <a
+                  href="#main-content"
+                  className="sr-only focus:not-sr-only focus:absolute focus:top-20 focus:left-4 focus:z-[60] focus:bg-white focus:text-tapt-navy focus:px-4 focus:py-2 focus:rounded focus:shadow-lg focus:font-semibold focus:outline-none focus:ring-2 focus:ring-tapt-blue"
+                >
+                  Skip to main content
+                </a>
+                <main id="main-content" className="flex-grow">
                   <div className="container mx-auto px-4 py-8">
                     <Routes>
                       <Route path="/" element={<Home />} />
@@ -222,6 +231,9 @@ function App() {
                       <Route path="/hall-of-fame-nomination" element={<HallOfFameNomination />} />
                       <Route path="/hall-of-fame-members" element={<HallOfFameMembers />} />
                       <Route path="/conference-gallery" element={<ConferenceGalleryPage />} />
+                      <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                      <Route path="/terms-of-service" element={<TermsOfService />} />
+                      <Route path="/accessibility" element={<Accessibility />} />
                     </Routes>
                   </div>
                 </main>

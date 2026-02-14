@@ -350,9 +350,10 @@ export const AdminBoardMembers: React.FC = () => {
                             setSelectedFile(null);
                             setFormData(prev => ({ ...prev, image: '' }));
                           }}
+                          aria-label="Remove selected image"
                           className="text-gray-400 hover:text-gray-500"
                         >
-                          <X className="h-5 w-5" />
+                          <X className="h-5 w-5" aria-hidden="true" />
                         </button>
                       </div>
                     )}
@@ -465,31 +466,35 @@ export const AdminBoardMembers: React.FC = () => {
                       <button
                         onClick={() => handleMove(member.id, 'up')}
                         disabled={index === 0}
+                        aria-label={`Move ${member.name} up`}
                         className={`p-1 rounded hover:bg-gray-100 ${index === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
-                        <MoveUp className="h-4 w-4" />
+                        <MoveUp className="h-4 w-4" aria-hidden="true" />
                       </button>
                       <button
                         onClick={() => handleMove(member.id, 'down')}
                         disabled={index === members.length - 1}
+                        aria-label={`Move ${member.name} down`}
                         className={`p-1 rounded hover:bg-gray-100 ${index === members.length - 1 ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
-                        <MoveDown className="h-4 w-4" />
+                        <MoveDown className="h-4 w-4" aria-hidden="true" />
                       </button>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button
                       onClick={() => handleEdit(member)}
+                      aria-label={`Edit ${member.name}`}
                       className="text-primary hover:text-primary/80 mr-3"
                     >
-                      <Edit className="h-5 w-5" />
+                      <Edit className="h-5 w-5" aria-hidden="true" />
                     </button>
                     <button
                       onClick={() => handleDelete(member.id)}
+                      aria-label={`Delete ${member.name}`}
                       className="text-red-600 hover:text-red-800"
                     >
-                      <Trash2 className="h-5 w-5" />
+                      <Trash2 className="h-5 w-5" aria-hidden="true" />
                     </button>
                   </td>
                 </tr>

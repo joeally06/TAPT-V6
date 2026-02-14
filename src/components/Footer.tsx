@@ -69,7 +69,7 @@ export const Footer: React.FC = () => {
   }, []);
 
   return (
-    <footer className="bg-tapt-navy text-white">
+    <footer className="bg-tapt-navy text-white" role="contentinfo">
       <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-8">
           <div className="col-span-1 md:col-span-1 lg:col-span-1">
@@ -86,18 +86,18 @@ export const Footer: React.FC = () => {
               <p className="text-gray-100 mb-6">{footerText}</p>
               <div className="flex space-x-4 mt-auto">
                 {socialFacebook && (
-                  <a href={socialFacebook} target="_blank" rel="noopener noreferrer" className="text-gray-100 hover:text-tapt-gold transition-colors">
-                    <Facebook size={20} />
+                  <a href={socialFacebook} target="_blank" rel="noopener noreferrer" aria-label="Visit our Facebook page" className="text-gray-100 hover:text-tapt-gold transition-colors">
+                    <Facebook size={20} aria-hidden="true" />
                   </a>
                 )}
                 {socialTwitter && (
-                  <a href={socialTwitter} target="_blank" rel="noopener noreferrer" className="text-gray-100 hover:text-tapt-gold transition-colors">
-                    <Twitter size={20} />
+                  <a href={socialTwitter} target="_blank" rel="noopener noreferrer" aria-label="Visit our Twitter page" className="text-gray-100 hover:text-tapt-gold transition-colors">
+                    <Twitter size={20} aria-hidden="true" />
                   </a>
                 )}
                 {socialInstagram && (
-                  <a href={socialInstagram} target="_blank" rel="noopener noreferrer" className="text-gray-100 hover:text-tapt-gold transition-colors">
-                    <Instagram size={20} />
+                  <a href={socialInstagram} target="_blank" rel="noopener noreferrer" aria-label="Visit our Instagram page" className="text-gray-100 hover:text-tapt-gold transition-colors">
+                    <Instagram size={20} aria-hidden="true" />
                   </a>
                 )}
               </div>

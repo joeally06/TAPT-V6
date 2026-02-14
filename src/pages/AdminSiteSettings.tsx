@@ -479,7 +479,7 @@ export const AdminSiteSettings: React.FC = () => {
                     <div className="mt-2 relative rounded-lg overflow-hidden bg-gray-100 w-full h-64">
                       <img 
                         src={previewUrl || settings.heroImageUrl} 
-                        alt="Hero" 
+                        alt="Hero image preview" 
                         className="w-full h-full object-cover"
                       />
                     </div>

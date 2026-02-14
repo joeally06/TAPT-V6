@@ -1104,9 +1104,10 @@ export const AdminContent: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button
                           onClick={() => handleDelete(resource.id)}
+                          aria-label={`Delete resource`}
                           className="text-red-600 hover:text-red-800"
                         >
-                          <Trash2 className="h-5 w-5" />
+                          <Trash2 className="h-5 w-5" aria-hidden="true" />
                         </button>
                       </td>
                     </tr>
@@ -1226,22 +1227,25 @@ export const AdminContent: React.FC = () => {
                               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                           }`}
                           title={getVisibilityFromItem(item) === 'featured' ? 'Click to unfeature' : 'Click to feature'}
+                          aria-label={getVisibilityFromItem(item) === 'featured' ? `Unfeature ${item.title}` : `Feature ${item.title}`}
                         >
-                          <Star className={`h-4 w-4 inline-block ${getVisibilityFromItem(item) === 'featured' ? 'fill-yellow-500' : ''}`} />
+                          <Star className={`h-4 w-4 inline-block ${getVisibilityFromItem(item) === 'featured' ? 'fill-yellow-500' : ''}`} aria-hidden="true" />
                         </button>
                         <button
                           onClick={() => handleEdit(item)}
                           className="text-primary hover:text-primary/80 mr-3"
                           title="Edit"
+                          aria-label={`Edit ${item.title}`}
                         >
-                          <Edit className="h-5 w-5" />
+                          <Edit className="h-5 w-5" aria-hidden="true" />
                         </button>
                         <button
                           onClick={() => handleDelete(item.id)}
                           className="text-red-600 hover:text-red-800"
                           title="Delete"
+                          aria-label={`Delete ${item.title}`}
                         >
-                          <Trash2 className="h-5 w-5" />
+                          <Trash2 className="h-5 w-5" aria-hidden="true" />
                         </button>
                       </td>
                     </tr>

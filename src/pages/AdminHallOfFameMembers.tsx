@@ -605,15 +605,17 @@ export const AdminHallOfFameMembers: React.FC = () => {
                           onClick={() => handleEdit(member)}
                           className="text-primary hover:text-primary/80 mr-3"
                           title="Edit member"
+                          aria-label={`Edit ${member.name}`}
                         >
-                          <Edit className="h-5 w-5" />
+                          <Edit className="h-5 w-5" aria-hidden="true" />
                         </button>
                         <button
                           onClick={() => handleDelete(member.id)}
                           className="text-red-600 hover:text-red-800"
                           title="Delete member"
+                          aria-label={`Delete ${member.name}`}
                         >
-                          <Trash2 className="h-5 w-5" />
+                          <Trash2 className="h-5 w-5" aria-hidden="true" />
                         </button>
                       </td>
                     </tr>

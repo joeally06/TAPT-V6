@@ -9,20 +9,20 @@ export default {
       colors: {
         // TAPT Brand Colors from logo
         'tapt-navy': '#1e3a5f',
-        'tapt-blue': '#2b7eb8',
-        'tapt-gold': '#d4a74a',
+        'tapt-blue': '#2570a4',
+        'tapt-gold': '#8d6e25',
         'tapt-green': '#6b9f4d',
         'tapt-orange': '#f5a623',
         
         // Legacy color mapping (maps old colors to new brand colors)
         primary: {
-          DEFAULT: '#2b7eb8',  // tapt-blue
+          DEFAULT: '#2570a4',  // tapt-blue
           50: '#e8f0f8',
           100: '#d1e1f1',
           200: '#a3c3e3',
           300: '#75a5d5',
           400: '#4787c7',
-          500: '#2b7eb8',
+          500: '#2570a4',
           600: '#226593',
           700: '#1a4c6e',
           800: '#11324a',
@@ -42,13 +42,13 @@ export default {
           900: '#050a11',
         },
         accent: {
-          DEFAULT: '#d4a74a',  // tapt-gold
+          DEFAULT: '#8d6e25',  // tapt-gold
           50: '#faf6ec',
           100: '#f5edd9',
           200: '#ebdbb3',
           300: '#e1c98d',
           400: '#d7b767',
-          500: '#d4a74a',
+          500: '#8d6e25',
           600: '#a6863b',
           700: '#7d642c',
           800: '#54431e',

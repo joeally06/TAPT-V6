@@ -212,9 +212,10 @@ const ArchiveViewerModal: React.FC<ArchiveViewerModalProps> = ({
             </h2>
             <button
               onClick={onClose}
+              aria-label="Close archives modal"
               className="text-gray-400 hover:text-gray-500"
             >
-              <X className="h-6 w-6" />
+              <X className="h-6 w-6" aria-hidden="true" />
             </button>
           </div>
         </div>

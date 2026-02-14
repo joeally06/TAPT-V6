@@ -26,7 +26,7 @@ interface CategoryOption {
 const NewsCard: React.FC<{ item: NewsItem; categoryName: string }> = React.memo(({ item, categoryName }) => (
   <article className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-all">
     {item.image_url && (
-      <img src={item.image_url} alt="" className="w-full h-48 object-cover" />
+      <img src={item.image_url} alt={item.title} className="w-full h-48 object-cover" />
     )}
     <div className="p-6">
       <div className="flex items-center text-sm text-gray-500 mb-4">

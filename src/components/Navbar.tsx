@@ -126,6 +126,7 @@ export const Navbar = () => {
 
   return (
     <nav
+      aria-label="Main navigation"
       className={`fixed top-0 w-full z-50 transition-all duration-300 ${
         scrolled ? 'bg-white shadow-md py-2' : 'bg-white/90 backdrop-blur-sm py-4'
       }`}
@@ -220,9 +221,11 @@ export const Navbar = () => {
           <div className="md:hidden">
             <button
               onClick={toggleMenu}
-              className="inline-flex items-center justify-center p-2 rounded-md text-tapt-navy hover:text-tapt-blue focus:outline-none"
+              aria-label={isOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={isOpen}
+              className="inline-flex items-center justify-center p-2 rounded-md text-tapt-navy hover:text-tapt-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-tapt-blue focus-visible:ring-offset-2"
             >
-              {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              {isOpen ? <X className="h-6 w-6" aria-hidden="true" /> : <Menu className="h-6 w-6" aria-hidden="true" />}
             </button>
           </div>
         </div>
