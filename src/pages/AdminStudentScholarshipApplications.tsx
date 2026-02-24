@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Download, Search, ChevronDown, ChevronUp, Trash2, Eye, FileText, Filter, Send, Loader2, Mail } from 'lucide-react';
+import { Download, Search, ChevronDown, ChevronUp, Trash2, Eye, FileText, Filter, Send, Loader2, Mail, CheckCircle, XCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -39,6 +39,11 @@ interface ScholarshipNomination {
   };
   essay: string;
   created_at: string;
+  // Approval workflow fields
+  status: 'pending' | 'approved' | 'rejected';
+  admin_verified_by?: string;
+  admin_verified_at?: string;
+  rejection_reason?: string;
 }
 
 const PAGE_SIZE = 20;
@@ -61,6 +66,9 @@ const AdminStudentScholarshipApplications: React.FC = () => {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [resendingEmail, setResendingEmail] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [showRejectionInput, setShowRejectionInput] = useState(false);
 
   useEffect(() => {
     if (!authLoading) {
@@ -252,6 +260,91 @@ const AdminStudentScholarshipApplications: React.FC = () => {
       alert(error instanceof Error ? error.message : 'Failed to resend confirmation email');
     } finally {
       setResendingEmail(false);
+    }
+  };
+
+  // Update nomination status (approve/reject)
+  const handleStatusUpdate = async (id: string, status: 'approved' | 'rejected') => {
+    if (status === 'rejected' && (!rejectionReason || rejectionReason.trim() === '')) {
+      alert('Please provide a rejection reason.');
+      return;
+    }
+
+    setUpdatingStatus(id);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert('You must be logged in to perform this action');
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-scholarship-status`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            id,
+            status,
+            rejectionReason: status === 'rejected' ? rejectionReason.trim() : undefined,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || `Failed to ${status} nomination`);
+      }
+
+      setSuccess(`Nomination ${status} successfully! A notification email has been sent.`);
+      setTimeout(() => setSuccess(null), 5000);
+
+      // Update local state
+      setNominations(prev =>
+        prev.map(nom =>
+          nom.id === id
+            ? {
+                ...nom,
+                status,
+                rejection_reason: status === 'rejected' ? rejectionReason.trim() : undefined,
+                admin_verified_by: status === 'approved' ? session.user.id : undefined,
+                admin_verified_at: status === 'approved' ? new Date().toISOString() : undefined,
+              }
+            : nom
+        )
+      );
+
+      // Update selected nomination if viewing
+      if (selectedNomination?.id === id) {
+        setSelectedNomination(prev =>
+          prev
+            ? {
+                ...prev,
+                status,
+                rejection_reason: status === 'rejected' ? rejectionReason.trim() : undefined,
+                admin_verified_by: status === 'approved' ? session.user.id : undefined,
+                admin_verified_at: status === 'approved' ? new Date().toISOString() : undefined,
+              }
+            : null
+        );
+      }
+
+      // Reset rejection UI
+      setShowRejectionInput(false);
+      setRejectionReason('');
+    } catch (error: any) {
+      console.error('Error updating nomination status:', error);
+      setError(error.message || `Failed to ${status} nomination`);
+      setTimeout(() => setError(null), 5000);
+    } finally {
+      setUpdatingStatus(null);
     }
   };
 
@@ -607,6 +700,16 @@ const AdminStudentScholarshipApplications: React.FC = () => {
                         <SortIcon field="created_at" />
                       </div>
                     </th>
+                    <th 
+                      scope="col" 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                      onClick={() => handleSort('status')}
+                    >
+                      <div className="flex items-center">
+                        Status
+                        <SortIcon field="status" />
+                      </div>
+                    </th>
                     <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
                     </th>
@@ -644,11 +747,25 @@ const AdminStudentScholarshipApplications: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {new Date(nomination.created_at).toLocaleDateString()}
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          nomination.status === 'approved' ? 'bg-green-100 text-green-800' :
+                          nomination.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {nomination.status === 'approved' ? '✓ Approved' :
+                           nomination.status === 'rejected' ? '✗ Rejected' :
+                           '● Pending'}
+                        </span>
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button
                           onClick={() => {
                             setSelectedNomination(nomination);
                             setShowDetailsModal(true);
+                            setShowRejectionInput(false);
+                            setRejectionReason('');
+                            setEmailSent(false);
                           }}
                           className="text-primary hover:text-primary/80 mr-3"
                           title="View details"
@@ -802,6 +919,115 @@ const AdminStudentScholarshipApplications: React.FC = () => {
                   <p className="text-gray-600">
                     <span className="font-medium">Submitted:</span> {new Date(selectedNomination.created_at).toLocaleString()}
                   </p>
+                </div>
+              </div>
+
+              {/* Approval/Rejection Workflow */}
+              <div className="mb-6">
+                <h4 className="font-medium text-gray-700 mb-2">Approval Status</h4>
+                <div className={`p-4 rounded-md ${
+                  selectedNomination.status === 'approved' ? 'bg-green-50 border border-green-200' :
+                  selectedNomination.status === 'rejected' ? 'bg-red-50 border border-red-200' :
+                  'bg-yellow-50 border border-yellow-200'
+                }`}>
+                  {/* Current status display */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className={`px-3 py-1 inline-flex text-sm leading-5 font-semibold rounded-full ${
+                      selectedNomination.status === 'approved' ? 'bg-green-100 text-green-800' :
+                      selectedNomination.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                      'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {selectedNomination.status === 'approved' ? '✓ Approved' :
+                       selectedNomination.status === 'rejected' ? '✗ Rejected' :
+                       '● Pending Review'}
+                    </span>
+                    {selectedNomination.admin_verified_at && (
+                      <span className="text-xs text-gray-500">
+                        on {new Date(selectedNomination.admin_verified_at).toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Show rejection reason if rejected */}
+                  {selectedNomination.status === 'rejected' && selectedNomination.rejection_reason && (
+                    <div className="mt-2 p-3 bg-red-100 rounded border border-red-200">
+                      <p className="text-sm font-medium text-red-800">Rejection Reason:</p>
+                      <p className="text-sm text-red-700 mt-1">{selectedNomination.rejection_reason}</p>
+                    </div>
+                  )}
+
+                  {/* Finalized message */}
+                  {(selectedNomination.status === 'approved' || selectedNomination.status === 'rejected') && (
+                    <p className="text-xs text-gray-500 mt-2 italic">
+                      This decision is final and cannot be changed.
+                    </p>
+                  )}
+
+                  {/* Action buttons for pending nominations */}
+                  {selectedNomination.status === 'pending' && (
+                    <div className="mt-3">
+                      {!showRejectionInput ? (
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => handleStatusUpdate(selectedNomination.id, 'approved')}
+                            disabled={updatingStatus === selectedNomination.id}
+                            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {updatingStatus === selectedNomination.id ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <CheckCircle className="mr-2 h-4 w-4" />
+                            )}
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => setShowRejectionInput(true)}
+                            disabled={updatingStatus === selectedNomination.id}
+                            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <XCircle className="mr-2 h-4 w-4" />
+                            Reject
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <label className="block text-sm font-medium text-red-800">
+                            Rejection Reason <span className="text-red-600">*</span>
+                          </label>
+                          <textarea
+                            value={rejectionReason}
+                            onChange={(e) => setRejectionReason(e.target.value)}
+                            placeholder="Please provide a reason for rejecting this nomination..."
+                            rows={3}
+                            className="w-full rounded-md border-red-300 shadow-sm focus:border-red-500 focus:ring-red-500 text-sm"
+                          />
+                          <div className="flex gap-3">
+                            <button
+                              onClick={() => handleStatusUpdate(selectedNomination.id, 'rejected')}
+                              disabled={updatingStatus === selectedNomination.id || !rejectionReason.trim()}
+                              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {updatingStatus === selectedNomination.id ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <XCircle className="mr-2 h-4 w-4" />
+                              )}
+                              Confirm Rejection
+                            </button>
+                            <button
+                              onClick={() => {
+                                setShowRejectionInput(false);
+                                setRejectionReason('');
+                              }}
+                              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               

@@ -459,6 +459,16 @@ const AdminExhibitorRegistrations: React.FC = () => {
                     </th>
                     <th 
                       scope="col" 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                      onClick={() => handleSort('payment_status')}
+                    >
+                      <div className="flex items-center">
+                        Payment Status
+                        <SortIcon field="payment_status" />
+                      </div>
+                    </th>
+                    <th 
+                      scope="col" 
                       className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                     >
                       Participants
@@ -487,6 +497,15 @@ const AdminExhibitorRegistrations: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {new Date(registration.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          registration.payment_status === 'completed' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {registration.payment_status || 'pending'}
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {registration.participants && registration.participants.length > 0 ? (

@@ -28,6 +28,7 @@ const AdminConferenceRegistrations: React.FC = () => {
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
+    setPage(1); // Reset to first page on new search
   };
 
   // Refactor: Use Edge Function for clearing all conference registrations
@@ -203,17 +204,25 @@ const AdminConferenceRegistrations: React.FC = () => {
       fetchRegistrations();
     }
     // eslint-disable-next-line
-  }, [authLoading, user, page]);
+  }, [authLoading, user, page, searchTerm]);
 
   const fetchRegistrations = async () => {
     try {
       setLoading(true);
       const from = (page - 1) * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
-      const { data, error, count } = await supabase
+      let query = supabase
         .from('conference_registrations')
-        .select(`*, attendees:conference_attendees(*)`, { count: 'exact' })
-        .range(from, to);
+        .select(`*, attendees:conference_attendees(*)`, { count: 'exact' });
+
+      if (searchTerm.trim()) {
+        const term = `%${searchTerm.trim()}%`;
+        query = query.or(
+          `first_name.ilike.${term},last_name.ilike.${term},email.ilike.${term},school_district.ilike.${term}`
+        );
+      }
+
+      const { data, error, count } = await query.range(from, to);
       if (error) throw error;
       setRegistrations(data || []);
       setTotalCount(count || 0);

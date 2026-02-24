@@ -105,7 +105,7 @@ export const Home: React.FC = () => {
   };
 
   return (
-    <div className="pt-16 overflow-x-hidden">
+    <div className="pt-16">
       {/* Hero Section */}
       <section className="relative h-[600px] flex items-center overflow-hidden">
         <div className="absolute inset-0">
