@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Download, Search, ChevronDown, ChevronUp, Edit, Trash2, Eye, Send, Loader2, Mail } from 'lucide-react';
+import { Download, Search, Trash2, Eye, Send, Loader2, Mail } from 'lucide-react';
 import ArchiveViewerModal from '../components/ArchiveViewerModal';
 import { useAuth } from '../context/AuthContext';
 import AdminLayout from '../components/AdminLayout';
@@ -17,7 +17,7 @@ const AdminConferenceRegistrations: React.FC = () => {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  const [registrations, setRegistrations] = useState([]);
+  const [registrations, setRegistrations] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');

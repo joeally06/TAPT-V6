@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Download, Search, ChevronDown, ChevronUp, Edit, Trash2, Eye, Send, Loader2, Mail, CheckCircle, XCircle } from 'lucide-react';
+import { Download, Search, ChevronDown, ChevronUp, Trash2, Eye, Send, Loader2, Mail, CheckCircle, XCircle } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useAuth } from '../context/AuthContext';

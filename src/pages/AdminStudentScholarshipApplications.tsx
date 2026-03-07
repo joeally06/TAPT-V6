@@ -92,7 +92,7 @@ const AdminStudentScholarshipApplications: React.FC = () => {
       const to = from + PAGE_SIZE - 1;
       
       // For sorting by name, we need special handling since it's in a JSONB field
-      let orderBy = sortField;
+      let orderBy: string = sortField;
       if (sortField === 'full_name') {
         orderBy = 'full_name->last';
       }
@@ -352,7 +352,6 @@ const AdminStudentScholarshipApplications: React.FC = () => {
     if (!nominations.length) return;
 
     const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.width;
     const margin = 14;
     
     // Add title
