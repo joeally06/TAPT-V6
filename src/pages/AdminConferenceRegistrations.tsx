@@ -23,6 +23,7 @@ const AdminConferenceRegistrations: React.FC = () => {
   const [success, setSuccess] = useState('');
   const [resendingEmail, setResendingEmail] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
 
@@ -129,66 +130,81 @@ const AdminConferenceRegistrations: React.FC = () => {
     }
   };
 
-  const exportToCSV = () => {
-    if (!registrations.length) return;
+  const exportToCSV = async () => {
+    try {
+      setExporting(true);
 
-    const headers = [
-      'Registration Date',
-      'First Name',
-      'Last Name',
-      'Email',
-      'Phone',
-      'School District',
-      'Job Title',
-      'Total Attendees',
-      'Total Amount',
-      'Payment Method',
-      'Payment Status',
-      'PO Number',
-      'PayPal Transaction ID',
-      'PayPal Payer Email',
-      'Payment Completed At',
-      'Additional Attendees'
-    ];
+      // Fetch ALL registrations (no pagination) for export
+      const { data: allRegistrations, error: fetchError } = await supabase
+        .from('conference_registrations')
+        .select(`*, attendees:conference_attendees(*)`);
 
-    const csvData = registrations.map((reg: any) => {
-      const additionalAttendees = reg.attendees
-        ? reg.attendees.map((a: any) => `${a.first_name} ${a.last_name} (${a.email})`).join('; ')
-        : '';
+      if (fetchError) throw fetchError;
+      if (!allRegistrations || allRegistrations.length === 0) return;
 
-      return [
-        new Date(reg.created_at).toLocaleDateString(),
-        reg.first_name || '',
-        reg.last_name || '',
-        reg.email || '',
-        reg.phone || '',
-        reg.school_district || '',
-        reg.job_title || '',
-        reg.total_attendees || 0,
-        `$${(reg.total_amount || 0).toFixed(2)}`,
-        reg.payment_method || '',
-        reg.payment_status || '',
-        reg.po_number || '',
-        reg.paypal_transaction_id || '',
-        reg.paypal_payer_email || '',
-        reg.payment_completed_at ? new Date(reg.payment_completed_at).toLocaleString() : '',
-        additionalAttendees
+      const headers = [
+        'Registration Date',
+        'First Name',
+        'Last Name',
+        'Email',
+        'Phone',
+        'School District',
+        'Job Title',
+        'Total Attendees',
+        'Total Amount',
+        'Payment Method',
+        'Payment Status',
+        'PO Number',
+        'PayPal Transaction ID',
+        'PayPal Payer Email',
+        'Payment Completed At',
+        'Additional Attendees'
       ];
-    });
 
-    const csvContent = [
-      headers.join(','),
-      ...csvData.map(row => row.map(cell => `"${cell}"`).join(','))
-    ].join('\n');
+      const csvData = allRegistrations.map((reg: any) => {
+        const additionalAttendees = reg.attendees
+          ? reg.attendees.map((a: any) => `${a.first_name} ${a.last_name} (${a.email})`).join('; ')
+          : '';
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `conference-registrations-${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+        return [
+          new Date(reg.created_at).toLocaleDateString(),
+          reg.first_name || '',
+          reg.last_name || '',
+          reg.email || '',
+          reg.phone || '',
+          reg.school_district || '',
+          reg.job_title || '',
+          reg.total_attendees || 0,
+          `$${(reg.total_amount || 0).toFixed(2)}`,
+          reg.payment_method || '',
+          reg.payment_status || '',
+          reg.po_number || '',
+          reg.paypal_transaction_id || '',
+          reg.paypal_payer_email || '',
+          reg.payment_completed_at ? new Date(reg.payment_completed_at).toLocaleString() : '',
+          additionalAttendees
+        ];
+      });
+
+      const csvContent = [
+        headers.join(','),
+        ...csvData.map(row => row.map(cell => `"${cell}"`).join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `conference-registrations-${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err: any) {
+      console.error('Error exporting registrations:', err);
+      setError('Failed to export registrations');
+    } finally {
+      setExporting(false);
+    }
   };
 
   useEffect(() => {
@@ -307,10 +323,20 @@ const AdminConferenceRegistrations: React.FC = () => {
 
             <button
               onClick={exportToCSV}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+              disabled={exporting || totalCount === 0}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
             >
-              <Download className="h-5 w-5 mr-2" />
-              Export to CSV
+              {exporting ? (
+                <>
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                  Exporting...
+                </>
+              ) : (
+                <>
+                  <Download className="h-5 w-5 mr-2" />
+                  Export to CSV
+                </>
+              )}
             </button>
           </div>
         </div>

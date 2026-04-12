@@ -62,6 +62,7 @@ const AdminExhibitorRegistrations: React.FC = () => {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [resendingEmail, setResendingEmail] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (!authLoading) {
@@ -245,76 +246,95 @@ const AdminExhibitorRegistrations: React.FC = () => {
     }
   };
 
-  const exportToCSV = () => {
-    if (!registrations.length) return;
+  const exportToCSV = async () => {
+    try {
+      setExporting(true);
 
-    const headers = [
-      'Business Name',
-      'Contact Name',
-      'Email',
-      'Phone',
-      'Mobile Phone',
-      'Address',
-      'City',
-      'State',
-      'ZIP',
-      'Booth Requirements',
-      'Products Description',
-      'Additional Comments',
-      'Registration Date',
-      'Payment Method',
-      'Payment Status',
-      'PO Number',
-      'PayPal Transaction ID',
-      'PayPal Payer Email',
-      'Payment Completed At',
-      'Additional Participants Count',
-      'Participant Names'
-    ];
+      // Fetch ALL registrations (no pagination) for export
+      const { data: allRegistrations, error: fetchError } = await supabase
+        .from('exhibitor_registrations')
+        .select(`
+          *,
+          participants:exhibitor_participants(*)
+        `)
+        .order(sortField, { ascending: sortDirection === 'asc' });
 
-    const csvData = registrations.map(reg => {
-      const participantNames = reg.participants
-        ?.map(p => `${p.first_name} ${p.last_name}${p.role ? ` (${p.role})` : ''}`)
-        .join('; ') || '';
-        
-      return [
-        reg.business_name,
-        `${reg.first_name} ${reg.last_name}`,
-        reg.email,
-        reg.phone,
-        reg.mobile_phone || '',
-        `${reg.street_address}${reg.street_address2 ? ', ' + reg.street_address2 : ''}`,
-        reg.city,
-        reg.state,
-        reg.zip_code,
-        reg.booth_requirements || '',
-        reg.products_description || '',
-        reg.additional_comments || '',
-        new Date(reg.created_at).toLocaleDateString(),
-        reg.payment_method || '',
-        reg.payment_status || '',
-        reg.po_number || '',
-        reg.paypal_transaction_id || '',
-        reg.paypal_payer_email || '',
-        reg.payment_completed_at ? new Date(reg.payment_completed_at).toLocaleString() : '',
-        reg.participants?.length || 0,
-        participantNames
+      if (fetchError) throw fetchError;
+      if (!allRegistrations || allRegistrations.length === 0) return;
+
+      const headers = [
+        'Business Name',
+        'Contact Name',
+        'Email',
+        'Phone',
+        'Mobile Phone',
+        'Address',
+        'City',
+        'State',
+        'ZIP',
+        'Booth Requirements',
+        'Products Description',
+        'Additional Comments',
+        'Registration Date',
+        'Payment Method',
+        'Payment Status',
+        'PO Number',
+        'PayPal Transaction ID',
+        'PayPal Payer Email',
+        'Payment Completed At',
+        'Additional Participants Count',
+        'Participant Names'
       ];
-    });
 
-    const csvContent = [
-      headers.join(','),
-      ...csvData.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-    ].join('\n');
+      const csvData = allRegistrations.map(reg => {
+        const participantNames = reg.participants
+          ?.map((p: any) => `${p.first_name} ${p.last_name}${p.role ? ` (${p.role})` : ''}`)
+          .join('; ') || '';
+          
+        return [
+          reg.business_name,
+          `${reg.first_name} ${reg.last_name}`,
+          reg.email,
+          reg.phone,
+          reg.mobile_phone || '',
+          `${reg.street_address}${reg.street_address2 ? ', ' + reg.street_address2 : ''}`,
+          reg.city,
+          reg.state,
+          reg.zip_code,
+          reg.booth_requirements || '',
+          reg.products_description || '',
+          reg.additional_comments || '',
+          new Date(reg.created_at).toLocaleDateString(),
+          reg.payment_method || '',
+          reg.payment_status || '',
+          reg.po_number || '',
+          reg.paypal_transaction_id || '',
+          reg.paypal_payer_email || '',
+          reg.payment_completed_at ? new Date(reg.payment_completed_at).toLocaleString() : '',
+          reg.participants?.length || 0,
+          participantNames
+        ];
+      });
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `exhibitor-registrations-${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      const csvContent = [
+        headers.join(','),
+        ...csvData.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `exhibitor-registrations-${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err: any) {
+      console.error('Error exporting registrations:', err);
+      setError('Failed to export registrations');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const filteredRegistrations = registrations.filter(reg => {
@@ -392,11 +412,20 @@ const AdminExhibitorRegistrations: React.FC = () => {
 
             <button
               onClick={exportToCSV}
-              disabled={registrations.length === 0}
+              disabled={exporting || totalCount === 0}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
             >
-              <Download className="h-5 w-5 mr-2" />
-              Export to CSV
+              {exporting ? (
+                <>
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                  Exporting...
+                </>
+              ) : (
+                <>
+                  <Download className="h-5 w-5 mr-2" />
+                  Export to CSV
+                </>
+              )}
             </button>
           </div>
         </div>
