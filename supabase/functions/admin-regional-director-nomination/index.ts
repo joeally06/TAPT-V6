@@ -76,6 +76,10 @@ function generateApprovalEmail(data: {
           <li style="margin-bottom: 10px;">Additional details will be sent closer to the event.</li>
         </ol>
         
+        <div style="background: #fffbeb; border-radius: 8px; padding: 15px; margin: 20px 0; border-left: 4px solid #f59e0b;">
+          <p style="margin: 0; font-size: 14px;"><strong>📋 Campaign Information:</strong> Nominees may promote their candidacy through flyers distributed during the Annual Conference. All campaign efforts must remain professional and respectful.</p>
+        </div>
+        
         <p>Thank you for your participation in TAPT leadership!</p>
         
         <p style="color: #666;">
