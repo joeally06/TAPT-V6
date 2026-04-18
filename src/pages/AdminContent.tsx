@@ -941,6 +941,8 @@ export const AdminContent: React.FC = () => {
                           <option value="hall-of-fame">Hall of Fame Nomination</option>
                           <option value="student-scholarship">Student Scholarship Application</option>
                           <option value="exhibitor">Exhibitor Registration</option>
+                          <option value="regional-director-nomination">Regional Director Nomination</option>
+                          <option value="president-nomination">President Nomination</option>
                         </select>
                         <p className="mt-1 text-sm text-gray-500">
                           When published, this event will link to the selected form
@@ -1193,6 +1195,8 @@ export const AdminContent: React.FC = () => {
                                 {item.linked_form_type === 'hall-of-fame' && 'Hall of Fame Nomination'}
                                 {item.linked_form_type === 'student-scholarship' && 'Student Scholarship'}
                                 {item.linked_form_type === 'exhibitor' && 'Exhibitor Registration'}
+                                {item.linked_form_type === 'regional-director-nomination' && 'Regional Director Nomination'}
+                                {item.linked_form_type === 'president-nomination' && 'President Nomination'}
                               </span>
                             ) : item.link ? (
                               <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">

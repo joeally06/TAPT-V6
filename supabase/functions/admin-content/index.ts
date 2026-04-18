@@ -159,7 +159,7 @@ Deno.serve(async (req) => {
 
       // Validate linked_form_type if present
       if (body.linked_form_type) {
-        const validFormTypes = ['conference', 'tech-conference', 'regional-luncheon', 'hall-of-fame', 'student-scholarship', 'exhibitor'];
+        const validFormTypes = ['conference', 'tech-conference', 'regional-luncheon', 'hall-of-fame', 'student-scholarship', 'exhibitor', 'regional-director-nomination', 'president-nomination'];
         if (!validFormTypes.includes(body.linked_form_type)) {
           throw new Error('Invalid linked form type');
         }
@@ -327,11 +327,12 @@ Deno.serve(async (req) => {
 
     throw new Error(`Unsupported method: ${req.method}`);
   } catch (error) {
-    console.error("Error in admin-content function:", error);
+    const errorMessage = error instanceof Error ? error.message : (error as any)?.message || JSON.stringify(error);
+    console.error("Error in admin-content function:", errorMessage);
     return new Response(
       JSON.stringify({
         success: false,
-        message: sanitizeError(error),
+        message: errorMessage,
       }),
       { 
         status: 400,

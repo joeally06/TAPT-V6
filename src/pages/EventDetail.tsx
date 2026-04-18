@@ -121,6 +121,10 @@ export const EventDetail: React.FC = () => {
           return { href: '/hall-of-fame-nomination', text: 'Submit Nomination', isExternal: false };
         case 'student-scholarship':
           return { href: '/student-scholarship-application', text: 'Apply for Scholarship', isExternal: false };
+        case 'regional-director-nomination':
+          return { href: '/regional-director-nomination', text: 'Submit Nomination', isExternal: false };
+        case 'president-nomination':
+          return { href: '/president-nomination', text: 'Submit Nomination', isExternal: false };
         default:
           return null;
       }

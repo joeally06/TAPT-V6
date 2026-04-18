@@ -85,6 +85,10 @@ export const Home: React.FC = () => {
           return '/student-scholarship-application';
         case 'regional-luncheon':
           return '/regional-luncheon-registration';
+        case 'regional-director-nomination':
+          return '/regional-director-nomination';
+        case 'president-nomination':
+          return '/president-nomination';
         default:
           return `/events/${event.id}`;
       }
@@ -238,7 +242,7 @@ export const Home: React.FC = () => {
                           to={getEventLink(event)}
                           className="inline-flex items-center text-tapt-blue hover:text-tapt-navy font-semibold text-sm group/link"
                         >
-                          {event.linked_form_type ? 'Register Now' : 'Learn More'}
+                          {event.linked_form_type?.includes('nomination') ? 'Nominate Now' : event.linked_form_type ? 'Register Now' : 'Learn More'}
                           <ArrowRight className="ml-2 h-4 w-4 group-hover/link:translate-x-1 transition-transform" />
                         </Link>
                       )}

@@ -79,6 +79,10 @@ export const Events: React.FC = () => {
           return '/hall-of-fame-nomination';
         case 'student-scholarship':
           return '/student-scholarship-application';
+        case 'regional-director-nomination':
+          return '/regional-director-nomination';
+        case 'president-nomination':
+          return '/president-nomination';
         default:
           return `/events/${event.id}`;
       }
@@ -161,7 +165,7 @@ export const Events: React.FC = () => {
                       to={getEventLink(featuredEvent)}
                       className="mt-6 inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary/90"
                     >
-                      {featuredEvent.linked_form_type ? 'Register Now' : 'Event Details'}
+                      {featuredEvent.linked_form_type?.includes('nomination') ? 'Nominate Now' : featuredEvent.linked_form_type ? 'Register Now' : 'Event Details'}
                       <ChevronRight className="ml-2 h-5 w-5" />
                     </Link>
                   )}
@@ -264,7 +268,7 @@ export const Events: React.FC = () => {
                         to={getEventLink(event)}
                         className="inline-block text-primary font-medium hover:underline"
                       >
-                        {event.linked_form_type ? 'Register Now' : 'Event Details'} <ChevronRight className="inline h-4 w-4" />
+                        {event.linked_form_type?.includes('nomination') ? 'Nominate Now' : event.linked_form_type ? 'Register Now' : 'Event Details'} <ChevronRight className="inline h-4 w-4" />
                       </Link>
                     )}
                   </div>
