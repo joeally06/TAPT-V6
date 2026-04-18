@@ -74,7 +74,8 @@ export const Navbar = () => {
         { name: 'Tech Conference Registration', path: '/tech-conference-registration' },
         { name: 'Regional Luncheon Registration', path: '/regional-luncheon-registration' },
         { name: 'Exhibitor Registration', path: '/exhibitor-registration' },
-        { name: 'Student Scholarship', path: '/student-scholarship-application' }
+        { name: 'Student Scholarship', path: '/student-scholarship-application' },
+        { name: 'Regional Director Nomination', path: '/regional-director-nomination' }
       ]
     },
     { 

@@ -80,7 +80,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {  const [isSi
         { name: 'Regional Luncheon', path: '/admin/regional-luncheon-settings' },
         { name: 'Exhibitor', path: '/admin/exhibitor-settings' },
         { name: 'Student Scholarship', path: '/admin/student-scholarship-settings' },
-        { name: 'Hall of Fame', path: '/admin/hall-of-fame-settings' }
+        { name: 'Hall of Fame', path: '/admin/hall-of-fame-settings' },
+        { name: 'Regional Director', path: '/admin/regional-director-nomination-settings' }
       ]
     },
     {
@@ -124,6 +125,13 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {  const [isSi
       submenu: [
         { name: 'Members', path: '/admin/hall-of-fame-members' },
         { name: 'Nominations', path: '/admin/hall-of-fame-nominations' }
+      ]
+    },
+    {
+      name: 'Nominations',
+      icon: Award,
+      submenu: [
+        { name: 'Regional Director', path: '/admin/regional-director-nominations' }
       ]
     },
     {
