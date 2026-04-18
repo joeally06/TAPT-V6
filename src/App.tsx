@@ -41,6 +41,9 @@ import { HallOfFameMembers } from './pages/HallOfFameMembers';
 import RegionalDirectorNomination from './pages/RegionalDirectorNomination';
 import AdminRegionalDirectorNominationSettings from './pages/AdminRegionalDirectorNominationSettings';
 import AdminRegionalDirectorNominations from './pages/AdminRegionalDirectorNominations';
+import PresidentNomination from './pages/PresidentNomination';
+import AdminPresidentNominationSettings from './pages/AdminPresidentNominationSettings';
+import AdminPresidentNominations from './pages/AdminPresidentNominations';
 import AdminSiteSettings from './pages/AdminSiteSettings';
 import AdminPaymentSettings from './pages/AdminPaymentSettings';
 import AdminContactMessages from './pages/AdminContactMessages';
@@ -192,6 +195,16 @@ function App() {
               <AdminRegionalDirectorNominations />
             </ProtectedRoute>
           } />
+          <Route path="/admin/president-nomination-settings" element={
+            <ProtectedRoute requireAdmin>
+              <AdminPresidentNominationSettings />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/president-nominations" element={
+            <ProtectedRoute requireAdmin>
+              <AdminPresidentNominations />
+            </ProtectedRoute>
+          } />
           <Route path="/admin/site-settings" element={
             <ProtectedRoute requireAdmin>
               <AdminSiteSettings />
@@ -244,6 +257,7 @@ function App() {
                       <Route path="/hall-of-fame-nomination" element={<HallOfFameNomination />} />
                       <Route path="/hall-of-fame-members" element={<HallOfFameMembers />} />
                       <Route path="/regional-director-nomination" element={<RegionalDirectorNomination />} />
+                      <Route path="/president-nomination" element={<PresidentNomination />} />
                       <Route path="/conference-gallery" element={<ConferenceGalleryPage />} />
                       <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                       <Route path="/terms-of-service" element={<TermsOfService />} />

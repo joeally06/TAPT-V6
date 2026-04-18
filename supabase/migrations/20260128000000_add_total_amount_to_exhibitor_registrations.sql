@@ -2,4 +2,4 @@
 -- This ensures payment amounts are properly recorded and displayed in the payment management system
 
 ALTER TABLE exhibitor_registrations 
-ADD COLUMN total_amount NUMERIC(10, 2);
+ADD COLUMN IF NOT EXISTS total_amount NUMERIC(10, 2);
