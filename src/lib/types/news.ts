@@ -11,6 +11,9 @@ export interface NewsItem {
   link: string | null;
   created_at: string;
   is_featured: boolean;
+  is_pinned?: boolean;
+  publish_at?: string | null;
+  expires_at?: string | null;
   file_url?: string | null;
   file_type?: string | null;
   file_size?: number | null;

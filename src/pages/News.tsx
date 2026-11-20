@@ -3,6 +3,7 @@ import { Calendar, ChevronDown, Search, Tag } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { NewsFilters } from '../lib/types/news';
+import { getAnnouncementCategoryLabel } from '../lib/announcements';
 
 interface NewsItem {
   id: string;
@@ -16,6 +17,7 @@ interface NewsItem {
   category: string;
   link: string | null;
   created_at: string;
+  publish_at?: string | null;
 }
 
 interface CategoryOption {
@@ -31,10 +33,10 @@ const NewsCard: React.FC<{ item: NewsItem; categoryName: string }> = React.memo(
     <div className="p-6">
       <div className="flex items-center text-sm text-gray-500 mb-4">
         <Calendar className="h-4 w-4 mr-2" />
-        {new Date(item.date || item.created_at).toLocaleDateString()}
+        {new Date(item.publish_at || item.date || item.created_at).toLocaleDateString()}
         {item.type === 'announcement' ? (
           <span className="ml-4 px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-            Announcement
+            Announcement · {getAnnouncementCategoryLabel(item.category)}
           </span>
         ) : (
           <>
@@ -95,7 +97,9 @@ export const News: React.FC = () => {
           .order('created_at', { ascending: false });
 
         if (error) throw error;
-        setNewsItems(data || []);
+        // Newest first by the date shown on each card (an announcement shows when it went live)
+        const shownDate = (item: NewsItem) => Date.parse(item.publish_at || item.date || item.created_at);
+        setNewsItems([...(data || [])].sort((a, b) => shownDate(b) - shownDate(a)));
       } catch (err) {
         console.error('Error fetching news:', err);
         setError('Failed to load news items');

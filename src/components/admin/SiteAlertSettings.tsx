@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle, Save } from 'lucide-react';
 import { updateSiteSetting } from '../../lib/siteSettings';
+import { fromLocalInput, toLocalInput } from '../../lib/datetime';
 import {
   EMPTY_SITE_ALERT,
   SITE_ALERT_KEY,
@@ -21,17 +22,6 @@ const LEVEL_OPTIONS: { value: SiteAlertLevel; label: string; hint: string }[] = 
 
 const INPUT_CLASS =
   'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary';
-
-const pad = (n: number) => String(n).padStart(2, '0');
-
-// <input type="datetime-local"> works in the admin's local time; the stored value is an ISO string.
-const toLocalInput = (iso: string | null): string => {
-  if (!iso) return '';
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-};
-
-const fromLocalInput = (value: string): string | null => (value ? new Date(value).toISOString() : null);
 
 const describeStatus = (alert: SiteAlertConfig): string => {
   if (!alert.enabled) return 'Off. Visitors do not see it.';

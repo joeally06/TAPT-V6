@@ -29,7 +29,7 @@ const LEVELS: SiteAlertLevel[] = ['info', 'urgent', 'success'];
 
 // Internal paths ("/events") use the router; anything else must be http(s).
 export const isInternalAlertLink = (url: string): boolean =>
-  url.startsWith('/') && !url.startsWith('//') && !url.includes('\\');
+  url.startsWith('/') && !url.startsWith('//') && !/[\s\\]/.test(url);
 
 export const isSafeAlertLink = (url: string): boolean => {
   if (isInternalAlertLink(url)) return true;

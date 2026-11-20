@@ -13,6 +13,7 @@ import {
   X,
   Upload,
   Star,
+  Pin,
   Link as LinkIcon,
   ExternalLink
 } from 'lucide-react';
@@ -22,6 +23,9 @@ import { uploadFile } from '../lib/upload';
 import { getPublicUrl } from '../lib/storage';
 import { compressImage } from '../lib/imageCompression';
 import AdminLayout from '../components/AdminLayout';
+import { AnnouncementLead } from '../components/AnnouncementCard';
+import { ANNOUNCEMENT_CATEGORIES, getAnnouncementCategory, getAnnouncementStatus } from '../lib/announcements';
+import { fromLocalInput, toLocalInput } from '../lib/datetime';
 
 interface ContentItem {
   id: string;
@@ -38,6 +42,10 @@ interface ContentItem {
   category: string | null;
   link: string | null;
   is_featured: boolean;
+  created_at?: string;
+  is_pinned?: boolean;
+  publish_at?: string | null;
+  expires_at?: string | null;
   linked_form_type: 'conference' | 'tech-conference' | 'regional-luncheon' | 'hall-of-fame' | 'student-scholarship' | 'exhibitor' | null;
 }
 
@@ -131,6 +139,11 @@ const getItemFlagsFromVisibility = (visibility: HomepageVisibility): Pick<Conten
 
 // Get badge styling based on visibility
 const getVisibilityBadge = (item: ContentItem): { label: string; className: string } => {
+  if (item.type === 'announcement') {
+    const status = getAnnouncementStatus(item);
+    if (status === 'scheduled') return { label: 'Scheduled', className: 'bg-blue-100 text-blue-800' };
+    if (status === 'expired') return { label: 'Expired', className: 'bg-gray-200 text-gray-700' };
+  }
   const visibility = getVisibilityFromItem(item);
   switch (visibility) {
     case 'draft':
@@ -418,6 +431,15 @@ export const AdminContent: React.FC = () => {
           fetchResources();
         }
       } else {
+        if (
+          selectedType === 'announcement' &&
+          formData.publish_at &&
+          formData.expires_at &&
+          Date.parse(formData.expires_at) <= Date.parse(formData.publish_at)
+        ) {
+          throw new Error('"Remove from homepage on" must be after "Publish on".');
+        }
+
         let imagePath = formData.image_url;
         let fileUrl = formData.file_url;
         let fileType = formData.file_type;
@@ -489,6 +511,8 @@ export const AdminContent: React.FC = () => {
             file_type: fileType,
             file_size: fileSize,
             type: selectedType,
+            // Announcements only use the four announcement categories; drop a stale news category
+            ...(selectedType === 'announcement' ? { category: getAnnouncementCategory(formData.category) } : {}),
             id: editingItem?.id, // Pass id for update, undefined for insert
             linked_form_type: formData.linked_form_type
           })
@@ -864,6 +888,26 @@ export const AdminContent: React.FC = () => {
                     </div>
                   )}
 
+                  {selectedType === 'announcement' && (
+                    <div>
+                      <label htmlFor="announcementCategory" className="block text-sm font-medium text-gray-700">
+                        Category
+                      </label>
+                      <select
+                        id="announcementCategory"
+                        value={getAnnouncementCategory(formData.category)}
+                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+                      >
+                        {ANNOUNCEMENT_CATEGORIES.map((category) => (
+                          <option key={category.value} value={category.value}>
+                            {category.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
                       {selectedType === 'announcement' ? 'Attachment (Image or Document)' : 'Image'}
@@ -985,7 +1029,7 @@ export const AdminContent: React.FC = () => {
                           return;
                         }
                         const flags = getItemFlagsFromVisibility(visibility);
-                        setFormData({ ...formData, ...flags });
+                        setFormData({ ...formData, ...flags, is_pinned: flags.is_featured ? formData.is_pinned : false });
                       }}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
                     >
@@ -999,6 +1043,92 @@ export const AdminContent: React.FC = () => {
                       {VISIBILITY_OPTIONS.find(opt => opt.value === getVisibilityFromItem(formData))?.description}
                     </p>
                   </div>
+
+                  {selectedType === 'announcement' && (
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label htmlFor="announcementPublishAt" className="block text-sm font-medium text-gray-700">
+                            Publish on (optional)
+                          </label>
+                          <input
+                            type="datetime-local"
+                            id="announcementPublishAt"
+                            value={toLocalInput(formData.publish_at)}
+                            onChange={(e) => setFormData({ ...formData, publish_at: fromLocalInput(e.target.value) })}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+                          />
+                          <p className="mt-1 text-xs text-gray-500">Leave empty to publish right away. Visitors cannot see it before this time.</p>
+                        </div>
+                        <div>
+                          <label htmlFor="announcementExpiresAt" className="block text-sm font-medium text-gray-700">
+                            Remove from homepage on (optional)
+                          </label>
+                          <input
+                            type="datetime-local"
+                            id="announcementExpiresAt"
+                            value={toLocalInput(formData.expires_at)}
+                            onChange={(e) => setFormData({ ...formData, expires_at: fromLocalInput(e.target.value) })}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+                          />
+                          <p className="mt-1 text-xs text-gray-500">It leaves the home page but stays on the News page.</p>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label htmlFor="announcementPinned" className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                          <input
+                            type="checkbox"
+                            id="announcementPinned"
+                            checked={Boolean(formData.is_pinned)}
+                            disabled={getVisibilityFromItem(formData) !== 'featured'}
+                            onChange={(e) => setFormData({ ...formData, is_pinned: e.target.checked })}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary disabled:opacity-50"
+                          />
+                          Pin to the top of the home page
+                        </label>
+                        <p className="mt-1 text-xs text-gray-500">
+                          {getVisibilityFromItem(formData) === 'featured'
+                            ? 'Replaces the announcement that is pinned now.'
+                            : 'Set Homepage Visibility to Featured to pin it.'}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="mb-2 text-sm font-medium text-gray-700">Preview, as visitors see it</p>
+                        <p className="mb-2 text-xs text-gray-500">
+                          {(() => {
+                            const status = getAnnouncementStatus({
+                              status: formData.status ?? 'draft',
+                              publish_at: formData.publish_at,
+                              expires_at: formData.expires_at
+                            });
+                            if (status === 'draft') return 'Draft. Visitors do not see it.';
+                            if (status === 'scheduled') {
+                              return `Scheduled. Visitors see it from ${new Date(formData.publish_at as string).toLocaleString()}.`;
+                            }
+                            if (status === 'expired') return 'Expired. It is off the home page and still on the News page.';
+                            return 'Live. Visitors see it now.';
+                          })()}
+                        </p>
+                        <AnnouncementLead
+                          preview
+                          item={{
+                            id: editingItem?.id ?? 'preview',
+                            title: formData.title || 'Your title appears here',
+                            description: formData.description || 'Your message appears here.',
+                            category: getAnnouncementCategory(formData.category),
+                            created_at: editingItem?.created_at ?? new Date().toISOString(),
+                            publish_at: formData.publish_at,
+                            is_pinned: formData.is_pinned,
+                            file_url: formData.file_url,
+                            file_type: formData.file_type,
+                            file_size: formData.file_size
+                          }}
+                        />
+                      </div>
+                    </>
+                  )}
                 </>
               )}
 
@@ -1163,7 +1293,15 @@ export const AdminContent: React.FC = () => {
                             </div>
                           ) : null}
                           <div>
-                            <div className="text-sm font-medium text-gray-900">{item.title}</div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {item.is_pinned && (
+                                <>
+                                  <Pin className="h-3.5 w-3.5 inline-block mr-1 text-tapt-blue" aria-hidden="true" />
+                                  <span className="sr-only">Pinned: </span>
+                                </>
+                              )}
+                              {item.title}
+                            </div>
                             {item.file_url && (
                               <a 
                                 href={item.file_url} 

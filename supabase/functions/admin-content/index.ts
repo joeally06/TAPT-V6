@@ -186,6 +186,30 @@ Deno.serve(async (req) => {
         }
       }
 
+      // Validate announcement categories (stored in the existing category column)
+      if (body.type === 'announcement' && body.category) {
+        const validAnnouncementCategories = ['event', 'deadline', 'safety', 'general'];
+        if (!validAnnouncementCategories.includes(body.category)) {
+          throw new Error('Invalid announcement category');
+        }
+      }
+
+      // Validate scheduling dates: a valid date string or empty
+      const parseOptionalDate = (value: unknown, label: string): string | null => {
+        if (value === null || value === undefined || value === '') return null;
+        if (typeof value !== 'string' || Number.isNaN(Date.parse(value))) {
+          throw new Error(`Invalid ${label}`);
+        }
+        return new Date(value).toISOString();
+      };
+      // Scheduling applies to announcements only; a stale form state must not hide an event or news item
+      const isAnnouncement = body.type === 'announcement';
+      const publishAt = isAnnouncement ? parseOptionalDate(body.publish_at, 'publish date') : null;
+      const expiresAt = isAnnouncement ? parseOptionalDate(body.expires_at, 'end date') : null;
+      if (publishAt && expiresAt && Date.parse(expiresAt) <= Date.parse(publishAt)) {
+        throw new Error('The end date must be after the publish date');
+      }
+
       // Explicitly validate boolean fields to prevent type confusion attacks
       const validateBoolean = (value: unknown): boolean => {
         if (typeof value === 'boolean') return value;
@@ -194,6 +218,14 @@ Deno.serve(async (req) => {
         return Boolean(value);
       };
 
+      // Only a published, featured announcement can be pinned. Anything else is quietly unpinned,
+      // because the quick visibility toggle re-sends the whole row.
+      const isFeatured = validateBoolean(body.is_featured);
+      const isPinned = validateBoolean(body.is_pinned)
+        && body.type === 'announcement'
+        && body.status === 'published'
+        && isFeatured;
+
       // Prepare data for insert/update with explicit boolean conversion
       const contentData = {
         title: body.title,
@@ -201,7 +233,10 @@ Deno.serve(async (req) => {
         type: body.type,
         status: body.status,
         featured: validateBoolean(body.featured),
-        is_featured: validateBoolean(body.is_featured),
+        is_featured: isFeatured,
+        is_pinned: isPinned,
+        publish_at: publishAt,
+        expires_at: expiresAt,
         image_url: body.image_url || null,
         date: body.date || null,
         category: body.category || null,
@@ -211,6 +246,19 @@ Deno.serve(async (req) => {
         file_type: body.file_type || null,
         file_size: body.file_size || null
       };
+
+      // Only one announcement can be pinned: release the current one first
+      if (isPinned) {
+        let unpin = supabaseAdmin
+          .from('content')
+          .update({ is_pinned: false })
+          .eq('is_pinned', true);
+        if (body.id) {
+          unpin = unpin.neq('id', body.id);
+        }
+        const { error: unpinError } = await unpin;
+        if (unpinError) throw unpinError;
+      }
 
       let result;
       if (body.id) {

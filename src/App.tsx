@@ -9,6 +9,7 @@ import { Contact } from './pages/Contact';
 import { News } from './pages/News';
 import { Events } from './pages/Events';
 import { EventDetail } from './pages/EventDetail';
+import { NewsDetail } from './pages/NewsDetail';
 import { Members } from './pages/Members';
 import { AdminLogin } from './pages/AdminLogin';
 import { AdminDashboard } from './pages/AdminDashboard';
@@ -247,6 +248,7 @@ function App() {
                       <Route path="/board-members" element={<BoardMembers />} />
                       <Route path="/resources" element={<Resources />} />
                       <Route path="/news" element={<News />} />
+                      <Route path="/news/:id" element={<NewsDetail />} />
                       <Route path="/events" element={<Events />} />
                       <Route path="/events/:id" element={<EventDetail />} />
                       <Route path="/members" element={<Members />} />

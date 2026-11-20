@@ -138,6 +138,27 @@ const emailData: PaymentReceiptData = {
 const emailHtml = generatePaymentReceiptEmail(emailData);
 ```
 
+## Alert Bar
+
+A short notice shown above the navbar on every public page (not on `/admin`). It replaces the old hardcoded "under construction" strip on the home page.
+
+- **Where to edit:** Admin > Site Settings > **Alert Bar** tab. It has its own Save button, separate from the other tabs.
+- **Fields:** show/hide switch, type (information, urgent, good news), message (200 characters), optional link button (a path on this site such as `/conference-registration`, or an `https://` address), optional start and end time.
+- **Visitors** can dismiss it. The dismissal is remembered in their browser until the message, type or link changes.
+- **Storage:** one `site_settings` row with key `site_alert` holding a JSON object. No row, or the switch off, or outside the dates, shows nothing.
+- **Code:** `src/lib/siteAlert.ts` (parsing and rules), `src/components/SiteAlert.tsx` (the bar), `src/components/admin/SiteAlertSettings.tsx` (the editor).
+
+## Announcement Scheduling
+
+Announcements (Admin > Content > Announcements) can be scheduled, categorised and pinned.
+
+- **Category:** General, Event, Deadline or Safety. Stored in the existing `content.category` column. Older announcements with no category show as General.
+- **Publish on:** optional. Until this time the item is hidden from visitors on the site and in the normal table API (the database policy checks `publish_at`). The older search function `tapt_search_content` can still return unpublished rows to anyone; the migration includes a commented `REVOKE` to close it.
+- **Remove from homepage on:** optional. After this time the item leaves the home page. It stays on the News page and keeps its own page at `/news/:id`, so old announcements remain as an archive.
+- **Pin to the top:** one announcement can be pinned, and only if it is set to Featured. Pinning another one replaces it.
+- **Home page:** shows the pinned (or newest) featured announcement as a lead story and up to four more in a list.
+- **Database:** columns `publish_at`, `expires_at`, `is_pinned` on `content` (migration `20261120000000_announcement_scheduling.sql`). The migration also clears stale news categories on old announcements so the new category rule can be added. Apply the migration first, then deploy the `admin-content` function, then the site.
+
 ## Security Best Practices
 
 ### What's Protected
