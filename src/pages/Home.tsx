@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, CheckCircle, Users, Calendar, BookOpen, AlertCircle, FileText, Download, Image as ImageIcon, Award } from 'lucide-react';
+import { ArrowRight, CheckCircle, Users, Calendar, BookOpen, FileText, Download, Image as ImageIcon, Award } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { NewsItem } from '../lib/types/news';
 import { getSiteSetting } from '../lib/siteSettings';
@@ -139,29 +139,6 @@ export const Home: React.FC = () => {
           </div>
         </div>
       </section>
-
-      {/* Announcement Banner - Fixed Mobile Layout */}
-      <div className="bg-accent/10 border-y border-accent/20">
-        <div className="max-w-7xl mx-auto py-3 px-4 sm:px-6 lg:px-8">
-          <div className="flex items-start sm:items-center justify-between flex-col sm:flex-row gap-3">
-            <div className="flex-1 flex items-start sm:items-center w-full">
-              <AlertCircle className="flex-shrink-0 h-5 w-5 text-accent mt-0.5 sm:mt-0" />
-              <p className="ml-3 font-medium text-secondary text-sm sm:text-base leading-relaxed">
-                <span className="hidden md:inline">Important: </span>
-                The site is currently under construction. Check back soon for more features and content!
-              </p>
-            </div>
-            <div className="w-full sm:w-auto">
-              <Link 
-                to="/contact" 
-                className="flex items-center justify-center px-4 py-2 border border-transparent rounded-md text-sm font-medium text-accent bg-white/50 hover:bg-white w-full sm:w-auto"
-              >
-                Contact Us
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Featured Events - Horizontal Scroll */}
       {featuredEvents.length > 0 && (

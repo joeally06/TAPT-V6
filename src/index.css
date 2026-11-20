@@ -14,6 +14,8 @@
   body {
     @apply bg-gray-50 text-gray-900 font-sans;
     overflow-x: hidden;
+    /* Height of the site alert bar (set by SiteAlert); 0 when no alert is showing */
+    padding-top: var(--alert-h, 0px);
   }
 
   h1, h2, h3, h4, h5, h6 {

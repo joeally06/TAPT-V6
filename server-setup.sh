@@ -138,7 +138,7 @@ if [ ! -f "$APP_DIR/.env" ]; then
 
 # Supabase Configuration
 VITE_SUPABASE_URL=https://tjxnjhjkxldhupitkvqk.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqeG5qaGpreGxkaHVwaXRrdnFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU0MDc3OTIsImV4cCI6MjA1MDk4Mzc5Mn0.ZpJT3tFFHfzrYj9EwEVIpz6z-M0kqIpTIEH5h5zmpHo
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqeG5qaGpreGxkaHVwaXRrdnFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY5MDcxOTIsImV4cCI6MjA2MjQ4MzE5Mn0.w2O2vurDZWYuKMOvXPgOW1TBiVGvJg4E8ujDM4EUbws
 
 # Cloudflare Turnstile Site Key (Public)
 VITE_TURNSTILE_SITE_KEY=0x4AAAAAABkM3_N9Cr9SJhxe
@@ -164,7 +164,7 @@ print_success "Production build completed in ./dist"
 # 11. CREATE PM2 ECOSYSTEM FILE
 # ==========================================
 print_info "Step 11/12: Creating PM2 configuration..."
-cat > $APP_DIR/ecosystem.config.js << EOF
+cat > $APP_DIR/ecosystem.config.cjs << EOF
 module.exports = {
   apps: [{
     name: '${APP_NAME}',
@@ -189,7 +189,7 @@ module.exports = {
   }]
 };
 EOF
-chown $ACTUAL_USER:$ACTUAL_USER $APP_DIR/ecosystem.config.js
+chown $ACTUAL_USER:$ACTUAL_USER $APP_DIR/ecosystem.config.cjs
 print_success "PM2 ecosystem file created"
 
 # ==========================================
@@ -213,7 +213,7 @@ print_success "Cleaned up existing processes"
 # ==========================================
 print_info "Starting application with PM2..."
 cd $APP_DIR
-sudo -u $ACTUAL_USER pm2 start ecosystem.config.js
+sudo -u $ACTUAL_USER pm2 start ecosystem.config.cjs
 sudo -u $ACTUAL_USER pm2 save
 print_success "Application started on port $APP_PORT"
 

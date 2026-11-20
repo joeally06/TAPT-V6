@@ -129,9 +129,10 @@ export const Navbar = () => {
   return (
     <nav
       aria-label="Main navigation"
-      className={`fixed top-0 w-full z-50 transition-all duration-300 ${
+      className={`fixed w-full z-50 transition-all duration-300 ${
         scrolled ? 'bg-white shadow-md py-2' : 'bg-white/90 backdrop-blur-sm py-4'
       }`}
+      style={{ top: 'var(--alert-h, 0px)' }}
     >
       <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6">
         <div className="flex justify-between items-center">

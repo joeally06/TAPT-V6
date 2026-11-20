@@ -53,6 +53,7 @@ import ConferenceGalleryPage from './pages/ConferenceGalleryPage';
 import { PrivacyPolicy } from './pages/PrivacyPolicy';
 import { TermsOfService } from './pages/TermsOfService';
 import { Accessibility } from './pages/Accessibility';
+import { SiteAlert } from './components/SiteAlert';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import './index.css';
@@ -81,6 +82,7 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <SiteAlert />
         <Navbar />
         <Routes>
           {/* Admin Routes - Must come BEFORE catch-all */}
