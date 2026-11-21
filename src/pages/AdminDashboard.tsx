@@ -1,116 +1,96 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { AlertCircle, ArrowRight, CheckCircle, Clock, Inbox } from 'lucide-react';
 import AdminLayout from '../components/AdminLayout';
 import { useAuth } from '../context/AuthContext';
+import { fetchAdminCounts, type AdminCounts } from '../lib/adminCounts';
 import {
-  Users,
-  Calendar,
-  Award,
-  TrendingUp,
-  AlertCircle,
-  Clock,
-  FileText,
-  Store,
-  Settings,
-  GraduationCap,
-  MapPin
-} from 'lucide-react';
+  buildAttentionItems,
+  daysUntil,
+  deadlineParts,
+  describeActivity,
+  describeDaysUntil,
+  fetchDashboard,
+  formatMoney,
+  relativeTime,
+  type AttentionTone,
+  type DashboardData
+} from '../lib/dashboard';
 
-interface ActivityLog {
-  id: string;
-  user_id: string;
-  action: string;
-  outcome: string;
-  timestamp: string;
-  details: any;
-}
+const TONE_STYLES: Record<AttentionTone, { icon: React.ComponentType<{ className?: string }>; box: string }> = {
+  red: { icon: AlertCircle, box: 'bg-red-100 text-red-700' },
+  amber: { icon: Clock, box: 'bg-amber-100 text-amber-800' },
+  blue: { icon: Inbox, box: 'bg-blue-100 text-blue-700' }
+};
+
+const CARD = 'rounded-lg bg-white shadow-sm';
+const SECTION_TITLE = 'text-lg font-semibold text-gray-900';
 
 export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState({
-    conferenceRegistrations: 0,
-    techConferenceRegistrations: 0,
-    exhibitorRegistrations: 0,
-    scholarshipApplications: 0,
-    nominations: 0,
-    totalUsers: 0,
-    pendingNominations: 0,
-    upcomingEvents: 0
-  });
-
-  const [luncheonRegistrations, setLuncheonRegistrations] = useState(0);
+  // undefined: older function without this data. null: the function could not build it.
+  const [dashboard, setDashboard] = useState<DashboardData | null | undefined>(undefined);
+  const [counts, setCounts] = useState<AdminCounts>({});
 
   useEffect(() => {
-    if (!authLoading) {
-      if (!user) {
-        navigate('/admin/login');
-        return;
-      }
-      if (user.role !== 'admin') {
-        navigate('/');
-        return;
-      }
-      fetchDashboardStats();
+    if (authLoading) return;
+    if (!user) {
+      navigate('/admin/login');
+      return;
     }
-    // eslint-disable-next-line
-  }, [authLoading, user]);
+    if (user.role !== 'admin') {
+      navigate('/');
+      return;
+    }
 
-  const fetchDashboardStats = async () => {
-    try {
+    let cancelled = false;
+    const load = async () => {
       setLoading(true);
       setError(null);
+      const [dashboardResult, countsResult] = await Promise.allSettled([fetchDashboard(), fetchAdminCounts()]);
+      if (cancelled) return;
 
-      // Get the Supabase URL from environment variables
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      if (!supabaseUrl) {
-        throw new Error('VITE_SUPABASE_URL is not defined');
+      if (dashboardResult.status === 'fulfilled') {
+        setDashboard(dashboardResult.value);
+      } else {
+        console.error('Error fetching dashboard:', dashboardResult.reason);
+        setError('Failed to load the dashboard figures.');
       }
-
-      // Get the current session
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('No active session');
-      }
-
-      // Call the Edge Function to get dashboard stats
-      const response = await fetch(`${supabaseUrl}/functions/v1/get-dashboard-stats`, {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch dashboard statistics');
-      }
-
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to fetch dashboard statistics');
-      }
-
-      setStats(result.stats);
-
-
-      // Fetch regional luncheon registration count
-      const { count: luncheonCount } = await supabase
-        .from('regional_luncheon_registrations')
-        .select('*', { count: 'exact', head: true });
-      setLuncheonRegistrations(luncheonCount ?? 0);
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-      setError('Failed to load dashboard statistics');
-    } finally {
+      if (countsResult.status === 'fulfilled') setCounts(countsResult.value);
       setLoading(false);
-    }
-  };
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, user, navigate]);
 
+  const attention = useMemo(() => buildAttentionItems(counts, dashboard ?? null), [counts, dashboard]);
 
+  // Forms that still close today or later (the function also sends yesterday's UTC date, for evening viewers)
+  const upcoming = useMemo(
+    () => (dashboard?.closing ?? []).filter((item) => daysUntil(item.closes_at) >= 0),
+    [dashboard]
+  );
+
+  const totals = useMemo(() => {
+    const programs = dashboard?.programs ?? [];
+    const sum = (pick: (p: (typeof programs)[number]) => number) => programs.reduce((total, p) => total + pick(p), 0);
+    const paid = sum((p) => p.paid);
+    const awaiting = sum((p) => p.awaiting);
+    return {
+      registered: sum((p) => p.registered),
+      newThisWeek: sum((p) => p.newThisWeek),
+      paid,
+      awaiting,
+      paidShare: paid + awaiting > 0 ? (paid / (paid + awaiting)) * 100 : 0,
+      collected: sum((p) => p.collected),
+      outstanding: sum((p) => p.outstanding)
+    };
+  }, [dashboard]);
 
   if (loading) {
     return (
@@ -124,166 +104,234 @@ export const AdminDashboard: React.FC = () => {
 
   return (
     <AdminLayout>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard Overview</h1>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <p className="mt-1 text-sm text-gray-600">
-          Welcome to the TAPT administration panel. Here's an overview of your site's activity.
+          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
         </p>
       </div>
 
       {error && (
-        <div className="mb-8 bg-red-50 border-l-4 border-red-400 p-4">
+        <div className="mb-6 border-l-4 border-red-400 bg-red-50 p-4" role="alert">
           <div className="flex">
-            <AlertCircle className="h-5 w-5 text-red-400" />
-            <div className="ml-3">
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
+            <AlertCircle className="h-5 w-5 text-red-400" aria-hidden="true" />
+            <p className="ml-3 text-sm text-red-700">{error}</p>
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        {[
-          {
-            title: 'Total Users',
-            value: stats.totalUsers,
-            icon: Users,
-            color: 'bg-blue-500'
-          },
-          {
-            title: 'Conference Registrations',
-            value: stats.conferenceRegistrations,
-            icon: Calendar,
-            color: 'bg-green-500'
-          },
-          {
-            title: 'Tech Conference Registrations',
-            value: stats.techConferenceRegistrations,
-            icon: Calendar,
-            color: 'bg-purple-500'
-          },
-          {
-            title: 'Exhibitor Registrations',
-            value: stats.exhibitorRegistrations,
-            icon: Store,
-            color: 'bg-teal-500'
-          },
-          {
-            title: 'Scholarship Applications',
-            value: stats.scholarshipApplications,
-            icon: GraduationCap,
-            color: 'bg-amber-500'
-          },
-          {
-            title: 'Hall of Fame Nominations',
-            value: stats.nominations,
-            icon: Award,
-            color: 'bg-yellow-500'
-          },
-          {
-            title: 'Pending Nominations',
-            value: stats.pendingNominations,
-            icon: Clock,
-            color: 'bg-orange-500'
-          },
-          {
-            title: 'Luncheon Registrations',
-            value: luncheonRegistrations,
-            icon: MapPin,
-            color: 'bg-rose-500'
-          },
-          {
-            title: 'Upcoming Events',
-            value: stats.upcomingEvents,
-            icon: TrendingUp,
-            color: 'bg-indigo-500'
-          }
-        ].map((stat, index) => (
-          <div key={index} className="bg-white rounded-lg shadow-sm overflow-hidden">
-            <div className="p-6">
-              <div className="flex items-center">
-                <div className={`${stat.color} rounded-lg p-3`}>
-                  <stat.icon className="h-6 w-6 text-white" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600 truncate">
-                    {stat.title}
-                  </p>
-                  <p className="mt-1 text-3xl font-semibold text-gray-900">
-                    {stat.value}
-                  </p>
-                </div>
+      {!error && dashboard === undefined && (
+        <p className="mb-6 rounded-md bg-blue-50 p-3 text-sm text-blue-800">
+          Payment totals, deadlines and recent activity appear once the updated dashboard function is deployed.
+        </p>
+      )}
+
+      {!error && dashboard === null && (
+        <p className="mb-6 rounded-md bg-amber-50 p-3 text-sm text-amber-900" role="status">
+          Some dashboard figures could not be loaded. Try again in a moment.
+        </p>
+      )}
+
+      {/* Needs your attention */}
+      <section aria-labelledby="attention-heading" className={`${CARD} mb-6`}>
+        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
+          <h2 id="attention-heading" className={SECTION_TITLE}>
+            Needs your attention
+          </h2>
+          {attention.length > 0 && <span className="text-sm text-gray-500">{attention.length} to look at</span>}
+        </div>
+        {attention.length === 0 ? (
+          <div className="flex items-center gap-3 px-5 py-6 text-sm text-gray-700">
+            <CheckCircle className="h-5 w-5 text-green-600" aria-hidden="true" />
+            Nothing needs your attention right now.
+          </div>
+        ) : (
+          <ul>
+            {attention.map((item) => {
+              const { icon: Icon, box } = TONE_STYLES[item.tone];
+              return (
+                <li key={item.key} className="flex items-center gap-3 border-b border-gray-100 px-5 py-3 last:border-b-0">
+                  <span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg ${box}`}>
+                    <Icon className="h-5 w-5" aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-900">{item.title}</p>
+                    {item.detail && <p className="text-xs text-gray-600">{item.detail}</p>}
+                  </div>
+                  <Link
+                    to={item.path}
+                    className="inline-flex flex-shrink-0 items-center gap-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    {item.linkLabel}
+                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      {dashboard && (
+        <>
+          {/* Summary cards */}
+          <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className={`${CARD} p-5`}>
+              <p className="text-sm font-medium text-gray-600">Registered</p>
+              <p className="mt-1 text-3xl font-semibold tabular-nums text-tapt-navy">{totals.registered}</p>
+              <p className="mt-1 text-sm text-gray-600">
+                {totals.newThisWeek > 0 ? `${totals.newThisWeek} new in the last 7 days` : 'None new in the last 7 days'}
+              </p>
+              <p className="mt-1 text-xs text-gray-500">Conference, Tech Conference and Exhibitors</p>
+            </div>
+
+            <div className={`${CARD} p-5`}>
+              <p className="text-sm font-medium text-gray-600">Payments</p>
+              <p className="mt-1 text-3xl font-semibold tabular-nums text-tapt-navy">
+                {totals.paid} <span className="text-base font-normal text-gray-600">paid</span>
+              </p>
+              <div
+                className="mt-3 h-2 overflow-hidden rounded-full bg-amber-200"
+                role="img"
+                aria-label={`${totals.paid} paid and ${totals.awaiting} awaiting payment`}
+              >
+                <div className="h-full bg-green-600" style={{ width: `${totals.paidShare}%` }} />
               </div>
+              <p className="mt-2 text-sm text-gray-600">{totals.awaiting} awaiting payment</p>
+            </div>
+
+            <div className={`${CARD} p-5`}>
+              <p className="text-sm font-medium text-gray-600">Money collected</p>
+              <p className="mt-1 text-3xl font-semibold tabular-nums text-tapt-navy">{formatMoney(totals.collected)}</p>
+              <p className="mt-1 text-sm text-gray-600">{formatMoney(totals.outstanding)} still outstanding</p>
             </div>
           </div>
-        ))}
-      </div>
 
-      <div className="grid grid-cols-1 gap-6">
-        {/* Quick Actions */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-2 gap-4">
-            {[
-              {
-                title: 'Manage Users',
-                path: '/admin/users',
-                icon: Users,
-                color: 'bg-blue-100 text-blue-600'
-              },
-              {
-                title: 'View Registrations',
-                path: '/admin/conference-registrations',
-                icon: Calendar,
-                color: 'bg-green-100 text-green-600'
-              },
-              {
-                title: 'Review Nominations',
-                path: '/admin/hall-of-fame-nominations',
-                icon: Award,
-                color: 'bg-yellow-100 text-yellow-600'
-              },
-              {
-                title: 'Manage Content',
-                path: '/admin/content',
-                icon: FileText,
-                color: 'bg-purple-100 text-purple-600'
-              },
-              {
-                title: 'Exhibitor Settings',
-                path: '/admin/exhibitor-settings',
-                icon: Store,
-                color: 'bg-teal-100 text-teal-600'
-              },
-              {
-                title: 'Scholarship Settings',
-                path: '/admin/student-scholarship-settings',
-                icon: GraduationCap,
-                color: 'bg-amber-100 text-amber-600'
-              },
-              {
-                title: 'Site Settings',
-                path: '/admin/site-settings',
-                icon: Settings,
-                color: 'bg-gray-100 text-gray-600'
-              }
-            ].map((action, index) => (
-              <button
-                key={index}
-                onClick={() => navigate(action.path)}
-                className="flex flex-col items-center justify-center p-4 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                <div className={`p-3 rounded-lg ${action.color}`}>
-                  <action.icon className="h-6 w-6" />
-                </div>
-                <span className="mt-2 text-sm font-medium text-gray-900">
-                  {action.title}
-                </span>
-              </button>
-            ))}
+          <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+            {/* Programs */}
+            <section aria-labelledby="programs-heading" className={`${CARD} lg:col-span-2`}>
+              <div className="border-b border-gray-100 px-5 py-3">
+                <h2 id="programs-heading" className={SECTION_TITLE}>
+                  Programs
+                </h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      <th scope="col" className="px-5 py-2">Program</th>
+                      <th scope="col" className="px-3 py-2 text-right">Registered</th>
+                      <th scope="col" className="px-3 py-2 text-right">Paid</th>
+                      <th scope="col" className="px-3 py-2 text-right">Awaiting</th>
+                      <th scope="col" className="px-5 py-2 text-right">Collected</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {dashboard.programs.map((program) => (
+                      <tr key={program.key}>
+                        <th scope="row" className="px-5 py-3 text-left font-medium">
+                          <Link to={program.path} className="text-tapt-blue hover:text-tapt-navy hover:underline">
+                            {program.label}
+                          </Link>
+                        </th>
+                        <td className="px-3 py-3 text-right tabular-nums">{program.registered}</td>
+                        <td className="px-3 py-3 text-right tabular-nums">{program.paid}</td>
+                        <td className="px-3 py-3 text-right tabular-nums">{program.awaiting}</td>
+                        <td className="px-5 py-3 text-right tabular-nums">{formatMoney(program.collected)}</td>
+                      </tr>
+                    ))}
+                    {dashboard.others.map((program) => (
+                      <tr key={program.key}>
+                        <th scope="row" className="px-5 py-3 text-left font-medium">
+                          <Link to={program.path} className="text-tapt-blue hover:text-tapt-navy hover:underline">
+                            {program.label}
+                          </Link>
+                        </th>
+                        <td className="px-3 py-3 text-right tabular-nums">{program.count}</td>
+                        <td className="px-3 py-3 text-right text-gray-400"><span aria-hidden="true">–</span><span className="sr-only">Not applicable</span></td>
+                        <td className="px-3 py-3 text-right text-gray-400"><span aria-hidden="true">–</span><span className="sr-only">Not applicable</span></td>
+                        <td className="px-5 py-3 text-right text-gray-400"><span aria-hidden="true">–</span><span className="sr-only">Not applicable</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="border-t border-gray-100 px-5 py-2 text-xs text-gray-500">
+                Figures are for the current cycle and start again after a year-end rollover. Registered also counts
+                payments that failed or were refunded, so Paid and Awaiting can add up to less.
+              </p>
+            </section>
+
+            {/* Coming up */}
+            <section aria-labelledby="coming-up-heading" className={CARD}>
+              <div className="border-b border-gray-100 px-5 py-3">
+                <h2 id="coming-up-heading" className={SECTION_TITLE}>
+                  Coming up
+                </h2>
+              </div>
+              {upcoming.length === 0 ? (
+                <p className="px-5 py-6 text-sm text-gray-600">No forms close in the next 30 days.</p>
+              ) : (
+                <ul>
+                  {upcoming.map((item) => {
+                    const days = daysUntil(item.closes_at);
+                    const soon = days <= 7;
+                    const { day, month } = deadlineParts(item.closes_at);
+                    return (
+                      <li key={`${item.label}-${item.name ?? ''}-${item.closes_at}`} className="border-b border-gray-100 last:border-b-0">
+                        <Link to={item.path} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50">
+                          <time
+                            dateTime={item.closes_at}
+                            className={`w-11 flex-shrink-0 rounded-md py-1 text-center leading-tight ${
+                              soon ? 'bg-red-100 text-red-700' : 'bg-blue-50 text-tapt-navy'
+                            }`}
+                          >
+                            <span className="block font-heading text-base font-bold">{day}</span>
+                            <span className="block text-[10px] font-bold uppercase">{month}</span>
+                          </time>
+                          <span className="min-w-0 text-sm">
+                            <span className="block font-medium text-gray-900">{item.label} closes</span>
+                            <span className="block text-xs text-gray-600">
+                              {describeDaysUntil(days)}
+                              {item.name ? ` · ${item.name}` : ''}
+                            </span>
+                          </span>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
           </div>
-        </div>
-      </div>
+
+          {/* Recent activity */}
+          <section aria-labelledby="activity-heading" className={CARD}>
+            <div className="border-b border-gray-100 px-5 py-3">
+              <h2 id="activity-heading" className={SECTION_TITLE}>
+                Recent activity
+              </h2>
+            </div>
+            {dashboard.activity.length === 0 ? (
+              <p className="px-5 py-6 text-sm text-gray-600">No recent activity.</p>
+            ) : (
+              <ul className="px-5 py-1">
+                {dashboard.activity.map((entry) => (
+                  <li
+                    key={entry.id}
+                    className="flex items-baseline justify-between gap-4 border-b border-dashed border-gray-200 py-2 text-sm last:border-b-0"
+                  >
+                    <span className="min-w-0 break-words text-gray-800">{describeActivity(entry.action, entry.actor)}</span>
+                    <time dateTime={entry.at} className="flex-shrink-0 text-xs text-gray-500">
+                      {relativeTime(entry.at)}
+                    </time>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </>
+      )}
     </AdminLayout>
   );
 };
