@@ -23,12 +23,24 @@ const AdminRegionalLuncheonRegistrations: React.FC = () => {
   const [viewRegistration, setViewRegistration] = useState<RegionalLuncheonRegistration | null>(null);
   const [resendingEmail, setResendingEmail] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [eventName, setEventName] = useState<string | null>(null);
 
   const regions = ['West Region', 'Middle Region', 'Cookeville Region', 'Greeneville Region', 'East Region'];
 
   useEffect(() => {
     fetchRegistrations();
+    fetchEventName();
   }, []);
+
+  // The event these registrations are for (the one that is active now)
+  const fetchEventName = async () => {
+    const { data } = await supabase
+      .from('regional_luncheon_settings')
+      .select('name')
+      .eq('is_active', true)
+      .maybeSingle();
+    setEventName(data?.name ?? null);
+  };
 
   const fetchRegistrations = async () => {
     try {
@@ -309,7 +321,7 @@ const AdminRegionalLuncheonRegistrations: React.FC = () => {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Regional Luncheon Registrations</h1>
-            <p className="text-gray-600 mt-1">April 2026</p>
+            {eventName && <p className="text-gray-600 mt-1">{eventName}</p>}
           </div>
           <button
             onClick={fetchRegistrations}

@@ -159,6 +159,32 @@ Announcements (Admin > Content > Announcements) can be scheduled, categorised an
 - **Home page:** shows the pinned (or newest) featured announcement as a lead story and up to four more in a list.
 - **Database:** columns `publish_at`, `expires_at`, `is_pinned` on `content` (migration `20261120000000_announcement_scheduling.sql`). The migration also clears stale news categories on old announcements so the new category rule can be added. Apply the migration first, then deploy the `admin-content` function, then the site.
 
+## Year-End Rollover
+
+The Conference, Tech Conference, Exhibitor, Hall of Fame, Student Scholarship, President nominations, Regional Director nominations and Regional Luncheon settings pages each have a **Rollover** button that starts the next year's cycle.
+
+- **What it does, in one step:** copies every current registration (and attendees or booth participants) into the archive, clears the live list, keeps last year's settings as an inactive row, and adds a new active settings row with the new name and dates. It all happens inside one database transaction: if anything fails, nothing at all is changed, so it is always safe to try again.
+- **Before you start:** the dialog shows how many rows will be archived and links to the registrations list so you can export a CSV first. You must type `ROLLOVER` to confirm.
+- **If the page is out of date** (settings changed in another tab, or the button was pressed twice) the rollover is refused with "The active settings changed since this page was loaded. Reload the page".
+- **After it runs:** the Archives page lists each batch with the cycle name (for example "2026 Conference"). Last year's settings stay in the settings list and can be activated again.
+- **Clear All** buttons were removed from all eight forms. Rollover is the only way to clear a year.
+- **Memberships has no rollover on purpose.** Approved members are a permanent roster (nothing expires and there is no year in the data), so archiving them each year would empty it. Yearly renewal would need its own design.
+- **Regional Luncheon** has a registration deadline instead of start/end dates. The date, time and venue of each region on the settings page become the new event's dates, so check them before you confirm. The public form refuses a registration posted for an event that is no longer the active one.
+- **Clear Settings** (President and Regional Director) now only deactivates the active settings; it no longer deletes every settings row, so earlier cycles stay available and the Archives page can still name them.
+- **Only one active settings row** is allowed for the President and Regional Director nomination settings (a unique index, like the other forms).
+- **Archives page:** eight tabs, a working search (cycle, date, names, districts, emails), and a CSV download per archive that includes attendees (conference, tech conference) or booth participants (exhibitor).
+- **Code:** database function `rollover_cycle` and migrations `20261121000000_rollover_cycle.sql` and `20261122000000_rollover_more_forms.sql`; edge function `rollover` (checks the caller is an admin, then calls the database function); `src/lib/rollover.ts`, `src/components/admin/RolloverModal.tsx`.
+- **If it says an archive table is missing columns:** a column was added to a live table without adding it to its archive table. Run the migration's "bring archive tables in line" step again (the migration can be re-run) or add the column to the archive table, then retry. Nothing was lost; the rollover stopped before touching any data.
+- **Deploying:** run the pre-check query at the top of each migration (optional), apply `20261121000000_rollover_cycle.sql` and then `20261122000000_rollover_more_forms.sql`, then deploy these functions: `rollover`, `admin-exhibitor-registrations`, `admin-student-scholarship-applications`, `admin-president-settings`, `admin-regional-director-settings`, `send-payment-receipt`, `submit-regional-luncheon` and `submit-conference-registration`. The two submit functions now refuse a registration posted for an event or conference that is no longer the active one, so a form left open from last year cannot register against it. Then deploy the site.
+
+## Public Read Access on Personal Data
+
+`hall_of_fame_nominations` and `membership_applications` were created with a policy that let anyone holding the public site key read every row (names, emails, phone numbers). Nothing on the website needs that: the admin pages read these tables while signed in as an admin, and the edge functions use the service role.
+
+- **Fix:** migration `20261122100000_restrict_public_reads.sql` drops those public read policies and adds an admin read policy only if a table would otherwise have none. It is a separate file so it can be applied on its own.
+- **Before applying:** run the read-only `pg_policies` query in the header of the migration to see what the live database actually has. The migrations in the repository may not match it exactly.
+- **After applying:** run the same query again. No row should be readable by `public`/`anon` with a condition of `true`, and each table should still show an admin policy.
+
 ## Security Best Practices
 
 ### What's Protected

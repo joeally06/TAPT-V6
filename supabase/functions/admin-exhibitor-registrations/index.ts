@@ -138,69 +138,10 @@ Deno.serve(async (req) => {
     if (req.method === 'DELETE') {
       const body = await req.json();
       
-      // Clear all registrations
+      // Clearing a whole year is done only by the year-end rollover, which archives everything and cannot
+      // stop half way. This direct "clear all" path was removed.
       if (body.clear) {
-        // First, archive current registrations
-        const { data: registrations, error: fetchError } = await supabaseAdmin
-          .from('exhibitor_registrations')
-          .select('*');
-        
-        if (fetchError) throw fetchError;
-        
-        if (registrations && registrations.length > 0) {
-          // Generate archive ID
-          const archiveId = crypto.randomUUID();
-          
-          // Prepare archive data
-          const archiveData = registrations.map(reg => ({
-            ...reg,
-            id: crypto.randomUUID(),
-            original_id: reg.id,
-            archived_at: new Date().toISOString(),
-            archive_id: archiveId
-          }));
-          
-          // Insert into archive
-          const { error: archiveError } = await supabaseAdmin
-            .from('exhibitor_registrations_archive')
-            .insert(archiveData);
-          
-          if (archiveError) throw archiveError;
-          
-          // Delete all registrations
-          const { error: deleteError } = await supabaseAdmin
-            .from('exhibitor_registrations')
-            .delete()
-            .not('id', 'is', null);
-          
-          if (deleteError) throw deleteError;
-          
-          // Log the action
-          try {
-            await supabaseAdmin.from('admin_logs').insert([{
-              user_id: user.id,
-              action: 'clear_exhibitor_registrations',
-              outcome: 'success',
-              details: { count: registrations.length, archive_id: archiveId }
-            }]);
-          } catch (logError) {
-            // Don't fail the request if logging fails
-            console.error("Error logging action:", logError);
-          }
-        }
-        
-        return new Response(
-          JSON.stringify({ 
-            success: true,
-            message: 'All exhibitor registrations cleared and archived successfully'
-          }),
-          { 
-            headers: {
-              ...corsHeaders,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
+        throw new Error('Clearing all exhibitor registrations is no longer available here. Use the rollover on the Exhibitor Settings page.');
       }
       
       // Delete single registration

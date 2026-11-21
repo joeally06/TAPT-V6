@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Download, Search } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { fetchAllPages } from '../lib/rollover';
 
 interface ArchivedRegistration {
   id: string;
@@ -14,6 +14,8 @@ interface ArchivedRegistration {
   created_at: string;
   archived_at: string;
   archive_id: string;
+  // The registration's id before it was archived; archived attendees still point at this id
+  original_id?: string | null;
 }
 
 interface ArchivedAttendee {
@@ -66,13 +68,12 @@ const ArchiveViewerModal: React.FC<ArchiveViewerModalProps> = ({
         ? 'conference_registrations_archive' 
         : 'tech_conference_registrations_archive';
 
-      const { data, error } = await supabase
-        .from(tableName)
-        .select('archived_at');
+      const data = await fetchAllPages<{ archived_at: string }>(tableName, {
+        orderColumn: 'archived_at',
+        columns: 'id, archived_at'
+      });
 
-      if (error) throw error;
-
-      const uniqueYears = [...new Set(data.map(item => 
+      const uniqueYears = [...new Set(data.map(item =>
         new Date(item.archived_at).getFullYear()
       ))].sort((a, b) => b - a);
 
@@ -93,8 +94,9 @@ const ArchiveViewerModal: React.FC<ArchiveViewerModalProps> = ({
       setLoading(true);
       setError(null);
 
-      const startDate = `${year}-01-01`;
-      const endDate = `${year}-12-31`;
+      // The year list above is built from local dates, so the range is the local calendar year too
+      const startDate = new Date(year, 0, 1).toISOString();
+      const endDate = new Date(year + 1, 0, 1).toISOString();
 
       const registrationsTable = type === 'conference' 
         ? 'conference_registrations_archive' 
@@ -105,24 +107,21 @@ const ArchiveViewerModal: React.FC<ArchiveViewerModalProps> = ({
         : 'tech_conference_attendees_archive';
 
       // Fetch registrations
-      const { data: registrations, error: regError } = await supabase
-        .from(registrationsTable)
-        .select('*')
-        .gte('archived_at', startDate)
-        .lte('archived_at', endDate)
-        .order('archived_at', { ascending: false });
-
-      if (regError) throw regError;
+      const registrations = await fetchAllPages<ArchivedRegistration>(registrationsTable, {
+        orderColumn: 'archived_at',
+        gte: ['archived_at', startDate],
+        lt: ['archived_at', endDate]
+      });
 
       // Fetch attendees for all registrations
       const archiveIds = [...new Set(registrations.map(reg => reg.archive_id))];
       
-      const { data: attendeesData, error: attError } = await supabase
-        .from(attendeesTable)
-        .select('*')
-        .in('archive_id', archiveIds);
-
-      if (attError) throw attError;
+      const attendeesData = archiveIds.length === 0
+        ? []
+        : await fetchAllPages<ArchivedAttendee>(attendeesTable, {
+            orderColumn: 'archived_at',
+            inValues: ['archive_id', archiveIds]
+          });
 
       // Group attendees by registration_id
       const attendeesByRegistration = attendeesData.reduce((acc, attendee) => {
@@ -158,7 +157,7 @@ const ArchiveViewerModal: React.FC<ArchiveViewerModalProps> = ({
     ];
 
     const csvData = archives.map(reg => {
-      const regAttendees = attendees[reg.id] || [];
+      const regAttendees = attendees[reg.original_id ?? reg.id] || [];
       const additionalAttendees = regAttendees
         .map(a => `${a.first_name} ${a.last_name} (${a.email})`)
         .join('; ');
@@ -319,7 +318,7 @@ const ArchiveViewerModal: React.FC<ArchiveViewerModalProps> = ({
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-500">
                             <ul className="list-disc list-inside">
-                              {(attendees[reg.id] || []).map((attendee, index) => (
+                              {(attendees[reg.original_id ?? reg.id] || []).map((attendee, index) => (
                                 <li key={attendee.id}>
                                   {attendee.first_name} {attendee.last_name} ({attendee.email})
                                 </li>

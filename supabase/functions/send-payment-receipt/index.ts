@@ -24,6 +24,18 @@ const securityHeaders = {
 
 console.log('🚀 Send Payment Receipt function initialized');
 
+// The event name comes from the settings table and is placed inside the email HTML
+const escapeHtml = (value: string): string =>
+  value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+// "October 1, 2026 - October 3, 2026" (or one date when the event is a single day)
+const formatEventDates = (start?: string | null, end?: string | null): string => {
+  if (!start) return '';
+  const format = (value: string) =>
+    new Date(value).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  return end && end !== start ? `${format(start)} - ${format(end)}` : format(start);
+};
+
 Deno.serve(async (req) => {
   // Handle CORS preflight immediately
   if (req.method === 'OPTIONS') {
@@ -144,30 +156,30 @@ Deno.serve(async (req) => {
     const settings = await fetchSettings(supabaseAdmin);
     console.log('✅ Settings loaded:', Object.keys(settings).length, 'settings found');
 
-    // Fetch conference/event settings for additional details (optional)
+    // Event details for the receipt (optional: a failed lookup never blocks the email).
+    // A conference registration records which settings row it belongs to. Tech conference and exhibitor
+    // registrations do not, so they use the settings that are active now (the current cycle).
     let conferenceName = '';
     let conferenceDate = '';
 
-    if (registrationType === 'conference') {
-      const { data: settings } = await supabaseAdmin
-        .from('conference_settings')
-        .select('conference_name, conference_date')
-        .single();
-      
-      if (settings) {
-        conferenceName = settings.conference_name || '';
-        conferenceDate = settings.conference_date || '';
-      }
-    } else if (registrationType === 'tech_conference') {
-      const { data: settings } = await supabaseAdmin
-        .from('tech_conference_settings')
-        .select('conference_name, conference_date')
-        .single();
-      
-      if (settings) {
-        conferenceName = settings.conference_name || '';
-        conferenceDate = settings.conference_date || '';
-      }
+    const eventTable =
+      registrationType === 'conference'
+        ? 'conference_settings'
+        : registrationType === 'tech_conference'
+        ? 'tech_conference_settings'
+        : 'exhibitor_settings';
+
+    let eventQuery = supabaseAdmin.from(eventTable).select('name, start_date, end_date');
+    eventQuery = registrationType === 'conference' && registration.conference_id
+      ? eventQuery.eq('id', registration.conference_id)
+      : eventQuery.eq('is_active', true);
+    const { data: eventSettings, error: eventError } = await eventQuery.maybeSingle();
+
+    if (eventError) {
+      console.warn('⚠️ Could not load event details for the receipt:', eventError.message);
+    } else if (eventSettings) {
+      conferenceName = escapeHtml(eventSettings.name || '');
+      conferenceDate = formatEventDates(eventSettings.start_date, eventSettings.end_date);
     }
 
     // Prepare email data with dynamic settings

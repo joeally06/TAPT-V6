@@ -1,25 +1,36 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Archive, Search, Download } from 'lucide-react';
+import { Archive, Search, Download, Loader2 } from 'lucide-react';
 import AdminLayout from '../components/AdminLayout';
 import { useAuth } from '../context/AuthContext';
-
-interface ArchiveItem {
-  id: string;
-  archive_id: string;
-  archived_at: string;
-  [key: string]: any;
-}
+import { fetchAllPages } from '../lib/rollover';
+import {
+  ARCHIVE_TYPES,
+  getArchiveType,
+  groupBatches,
+  groupChildren,
+  buildArchiveCsv,
+  batchMatchesSearch,
+  formatArchiveDate,
+  type ArchiveBatch,
+  type ArchiveKind,
+  type ArchiveRow
+} from '../lib/archiveTypes';
 
 export const AdminArchives: React.FC = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [archiveType, setArchiveType] = useState<'conference' | 'tech-conference' | 'hall-of-fame' | 'exhibitor' | 'student-scholarship'>('conference');
-  const [archives, setArchives] = useState<Record<string, ArchiveItem[]>>({});
+  const [notice, setNotice] = useState<string | null>(null);
+  const [archiveType, setArchiveType] = useState<ArchiveKind>('conference');
+  const [archives, setArchives] = useState<Partial<Record<ArchiveKind, ArchiveRow[]>>>({});
+  // Archive tables that could not be read (for example a table the database does not have yet)
+  const [failedKinds, setFailedKinds] = useState<ArchiveKind[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [cycleNames, setCycleNames] = useState<Record<string, string>>({});
+  const [exportingId, setExportingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading) {
@@ -37,162 +48,104 @@ export const AdminArchives: React.FC = () => {
   }, [authLoading, user]);
 
   const fetchArchives = async () => {
-    try {
-      setLoading(true);
-      setError(null);
+    setLoading(true);
+    setError(null);
 
-      const tables = {
-        conference: 'conference_registrations_archive',
-        'tech-conference': 'tech_conference_registrations_archive',
-        'hall-of-fame': 'hall_of_fame_nominations_archive',
-        'exhibitor': 'exhibitor_registrations_archive',
-        'student-scholarship': 'student_scholarship_applications_archive'
-      };
+    const loaded: Partial<Record<ArchiveKind, ArchiveRow[]>> = {};
+    const failed: ArchiveKind[] = [];
 
-      const archiveData: Record<string, ArchiveItem[]> = {};
-
-      for (const [key, table] of Object.entries(tables)) {
-        const { data, error } = await supabase
-          .from(table)
-          .select('*')
-          .order('archived_at', { ascending: false });
-
-        if (error) throw error;
-
-        // Group by archive_id
-        const grouped = (data || []).reduce((acc: Record<string, ArchiveItem[]>, item) => {
-          const archiveId = item.archive_id;
-          if (!acc[archiveId]) {
-            acc[archiveId] = [];
-          }
-          acc[archiveId].push(item);
-          return acc;
-        }, {});
-
-        archiveData[key] = Object.values(grouped).flat();
+    // Every page of every archive, so batches over 1000 rows are not cut short. One archive failing does not hide the rest.
+    for (const type of ARCHIVE_TYPES) {
+      try {
+        loaded[type.kind] = await fetchAllPages<ArchiveRow>(type.table, { orderColumn: 'archived_at' });
+      } catch (loadError) {
+        console.error(`Error fetching ${type.table}:`, loadError);
+        failed.push(type.kind);
       }
+    }
 
-      setArchives(archiveData);
-    } catch (error: any) {
-      console.error('Error fetching archives:', error);
+    setArchives(loaded);
+    setFailedKinds(failed);
+    if (failed.length === ARCHIVE_TYPES.length) {
       setError('Failed to load archives');
-    } finally {
-      setLoading(false);
     }
+    await loadCycleNames(loaded);
+    setLoading(false);
   };
 
-  const exportArchive = (archiveId: string) => {
-    const archiveItems = archives[archiveType].filter(item => item.archive_id === archiveId);
-    const csvContent = convertToCSV(archiveItems);
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${archiveType}-archive-${archiveId}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const convertToCSV = (items: ArchiveItem[]) => {
-    if (items.length === 0) return '';
-    
-    // Define headers based on archive type
-    let headers: string;
-    
-    switch (archiveType) {
-      case 'conference':
-      case 'tech-conference':
-        headers = ['School District', 'Name', 'Email', 'Phone', 'Total Attendees', 'Total Amount', 'Archived Date'].join(',');
-        break;
-      case 'hall-of-fame':
-        headers = ['Nominee', 'District', 'Region', 'Years of Service', 'Status', 'Archived Date'].join(',');
-        break;
-      case 'exhibitor':
-        headers = ['Business Name', 'Contact Name', 'Email', 'Phone', 'City', 'State', 'Archived Date'].join(',');
-        break;
-      case 'student-scholarship':
-        headers = ['Name', 'Email', 'High School', 'School District', 'Status', 'Archived Date'].join(',');
-        break;
-      default:
-        headers = Object.keys(items[0])
-          .filter(key => !['id', 'archive_id'].includes(key))
-          .join(',');
-    }
-      
-    // Map rows based on archive type
-    const rows = items.map(item => {
-      switch (archiveType) {
-        case 'conference':
-        case 'tech-conference':
-          return [
-            `"${item.school_district || ''}"`,
-            `"${item.first_name || ''} ${item.last_name || ''}"`,
-            `"${item.email || ''}"`,
-            `"${item.phone || ''}"`,
-            `"${item.total_attendees || 0}"`,
-            `"${item.total_amount || 0}"`,
-            `"${new Date(item.archived_at).toLocaleDateString() || ''}"`,
-          ].join(',');
-        case 'hall-of-fame':
-          return [
-            `"${item.nominee_first_name || ''} ${item.nominee_last_name || ''}"`,
-            `"${item.district || ''}"`,
-            `"${item.region || ''}"`,
-            `"${item.years_of_service || ''}"`,
-            `"${item.status || ''}"`,
-            `"${new Date(item.archived_at).toLocaleDateString() || ''}"`,
-          ].join(',');
-        case 'exhibitor':
-          return [
-            `"${item.business_name || ''}"`,
-            `"${item.first_name || ''} ${item.last_name || ''}"`,
-            `"${item.email || ''}"`,
-            `"${item.phone || ''}"`,
-            `"${item.city || ''}"`,
-            `"${item.state || ''}"`,
-            `"${new Date(item.archived_at).toLocaleDateString() || ''}"`,
-          ].join(',');
-        case 'student-scholarship':
-          // Handle the JSONB structure for full_name
-          const fullName = item.full_name ? 
-            `${item.full_name.first || ''} ${item.full_name.last || ''}` : '';
-          return [
-            `"${fullName}"`,
-            `"${item.email || ''}"`,
-            `"${item.high_school || ''}"`,
-            `"${item.school_district || ''}"`,
-            `"${item.application_status || ''}"`,
-            `"${new Date(item.archived_at).toLocaleDateString() || ''}"`,
-          ].join(',');
-        default:
-          return Object.entries(item)
-            .filter(([key]) => !['id', 'archive_id'].includes(key))
-            .map(([_, value]) => `"${value}"`)
-            .join(',');
+  // Names of the cycles (settings rows) the archives belong to, for example "2026 Conference"
+  const loadCycleNames = async (loaded: Partial<Record<ArchiveKind, ArchiveRow[]>>) => {
+    const names: Record<string, string> = {};
+    for (const type of ARCHIVE_TYPES) {
+      const ids = [
+        ...new Set(
+          (loaded[type.kind] ?? [])
+            .map((row) => row.archived_settings_id)
+            .filter((id): id is string => typeof id === 'string' && id !== '')
+        )
+      ];
+      if (ids.length === 0) continue;
+      try {
+        const { data, error: namesError } = await supabase.from(type.settingsTable).select('id, name').in('id', ids);
+        if (namesError) throw namesError;
+        for (const row of (data ?? []) as unknown as { id: string; name: string }[]) names[row.id] = row.name;
+      } catch (namesError) {
+        // The names are only a label; the archives themselves still show
+        console.error(`Error loading cycle names from ${type.settingsTable}:`, namesError);
       }
-    });
-    
-    return [headers, ...rows].join('\n');
+    }
+    setCycleNames(names);
   };
 
-  const getArchiveTitle = (type: string) => {
-    switch (type) {
-      case 'conference':
-        return 'Conference Registrations';
-      case 'tech-conference':
-        return 'Tech Conference Registrations';
-      case 'hall-of-fame':
-        return 'Hall of Fame Nominations';
-      case 'exhibitor':
-        return 'Exhibitor Registrations';
-      case 'student-scholarship':
-        return 'Student Scholarship Applications';
-      default:
-        return '';
+  const config = getArchiveType(archiveType);
+
+  const batches = useMemo(() => groupBatches(archives[archiveType] ?? []), [archives, archiveType]);
+  const visibleBatches = useMemo(
+    () => batches.filter((batch) => batchMatchesSearch(config, batch, searchTerm, batch.settingsId ? cycleNames[batch.settingsId] : null)),
+    [batches, config, searchTerm, cycleNames]
+  );
+  const searching = searchTerm.trim() !== '';
+
+  // Downloads one archive as a CSV. Attendees / booth participants are fetched when needed.
+  const exportBatch = async (batch: ArchiveBatch) => {
+    setExportingId(batch.archiveId);
+    setError(null);
+    setNotice(null);
+    try {
+      let childrenByParent = new Map<string, ArchiveRow[]>();
+      if (config.child) {
+        try {
+          const children = await fetchAllPages<ArchiveRow>(config.child.table, {
+            orderColumn: 'archived_at',
+            inValues: ['archive_id', [batch.archiveId]]
+          });
+          childrenByParent = groupChildren(children, config.child.foreignKey);
+        } catch (childError) {
+          // The download still works without the attendee / participant details, but say so
+          console.error(`Error loading ${config.child.table}:`, childError);
+          setNotice('The file was downloaded without attendee or booth participant details because they could not be loaded.');
+        }
+      }
+
+      const csvContent = buildArchiveCsv(config, batch.rows, childrenByParent);
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `${archiveType}-archive-${batch.archiveId}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (exportError) {
+      console.error('Error exporting archive:', exportError);
+      setError('Could not download this archive. Please try again.');
+    } finally {
+      setExportingId(null);
     }
   };
+
+  const failedLabels = failedKinds.map((kind) => getArchiveType(kind).tabLabel);
 
   return (
     <AdminLayout>
@@ -208,26 +161,35 @@ export const AdminArchives: React.FC = () => {
           </div>
         )}
 
+        {notice && (
+          <div role="status" className="mb-6 bg-amber-50 border-l-4 border-amber-400 p-4">
+            <p className="text-amber-800">{notice}</p>
+          </div>
+        )}
+
+        {failedLabels.length > 0 && failedLabels.length < ARCHIVE_TYPES.length && (
+          <div role="status" className="mb-6 bg-amber-50 border-l-4 border-amber-400 p-4">
+            <p className="text-amber-800">
+              Some archives could not be loaded: {failedLabels.join(', ')}. The database may not have been updated for
+              them yet.
+            </p>
+          </div>
+        )}
+
         {/* Archive Type Selector */}
         <div className="mb-6">
-          <div className="flex space-x-4">
-            {[
-              { id: 'conference', label: 'Conference' },
-              { id: 'tech-conference', label: 'Tech Conference' },
-              { id: 'hall-of-fame', label: 'Hall of Fame' },
-              { id: 'exhibitor', label: 'Exhibitor' },
-              { id: 'student-scholarship', label: 'Student Scholarship' }
-            ].map((type) => (
+          <div className="flex flex-wrap gap-2">
+            {ARCHIVE_TYPES.map((type) => (
               <button
-                key={type.id}
-                onClick={() => setArchiveType(type.id as typeof archiveType)}
+                key={type.kind}
+                onClick={() => setArchiveType(type.kind)}
                 className={`px-4 py-2 rounded-md text-sm font-medium ${
-                  archiveType === type.id
+                  archiveType === type.kind
                     ? 'bg-primary text-white'
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
-                {type.label}
+                {type.tabLabel}
               </button>
             ))}
           </div>
@@ -236,15 +198,22 @@ export const AdminArchives: React.FC = () => {
         {/* Search */}
         <div className="mb-6">
           <div className="relative max-w-md">
+            <label htmlFor="archive-search" className="sr-only">
+              Search archives
+            </label>
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
+              id="archive-search"
               type="text"
-              placeholder="Search archives..."
+              placeholder="Search by cycle, date, name, district or email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
             />
           </div>
+          <p aria-live="polite" className="mt-2 text-sm text-gray-500 min-h-[1.25rem]">
+            {searching && !loading ? `${visibleBatches.length} of ${batches.length} archives match` : ''}
+          </p>
         </div>
 
         {/* Archives List */}
@@ -254,11 +223,23 @@ export const AdminArchives: React.FC = () => {
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary border-t-transparent"></div>
               <p className="mt-2 text-gray-600">Loading archives...</p>
             </div>
-          ) : archives[archiveType]?.length === 0 ? (
+          ) : failedKinds.includes(archiveType) ? (
+            <div className="p-8 text-center">
+              <Archive className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900">These archives could not be loaded</h3>
+              <p className="mt-1 text-gray-500">Reload the page to try again.</p>
+            </div>
+          ) : batches.length === 0 ? (
             <div className="p-8 text-center">
               <Archive className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900">No Archives Found</h3>
-              <p className="mt-1 text-gray-500">There are no archived {getArchiveTitle(archiveType).toLowerCase()} yet.</p>
+              <p className="mt-1 text-gray-500">There are no archived {config.title.toLowerCase()} yet.</p>
+            </div>
+          ) : visibleBatches.length === 0 ? (
+            <div className="p-8 text-center">
+              <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900">No archives match your search</h3>
+              <p className="mt-1 text-gray-500">Try a different name, district, email, date or cycle.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -268,51 +249,41 @@ export const AdminArchives: React.FC = () => {
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Archive Date
                     </th>
-                    {archiveType === 'conference' || archiveType === 'tech-conference' ? (
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        School Districts
-                      </th>
-                    ) : archiveType === 'hall-of-fame' ? (
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Nominations
-                      </th>
-                    ) : archiveType === 'exhibitor' ? (
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Businesses
-                      </th>
-                    ) : (
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Applications
-                      </th>
-                    )}
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Cycle
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      {config.countLabel}
+                    </th>
                     <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {Object.entries(
-                    archives[archiveType].reduce((acc: Record<string, ArchiveItem[]>, item) => {
-                      if (!acc[item.archive_id]) {
-                        acc[item.archive_id] = [];
-                      }
-                      acc[item.archive_id].push(item);
-                      return acc;
-                    }, {})
-                  ).map(([archiveId, items]) => (
-                    <tr key={archiveId}>
+                  {visibleBatches.map((batch) => (
+                    <tr key={batch.archiveId}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {new Date(items[0].archived_at).toLocaleDateString()}
+                        {formatArchiveDate(batch.archivedAt)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {(batch.settingsId && cycleNames[batch.settingsId]) || '—'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {items.length} items
+                        {batch.rows.length} items
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button
-                          onClick={() => exportArchive(archiveId)}
-                          className="text-primary hover:text-primary/80"
+                          onClick={() => exportBatch(batch)}
+                          disabled={exportingId !== null}
+                          aria-label={`Download CSV of the archive from ${formatArchiveDate(batch.archivedAt)}`}
+                          className="text-primary hover:text-primary/80 disabled:opacity-50"
                         >
-                          <Download className="h-5 w-5" />
+                          {exportingId === batch.archiveId ? (
+                            <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+                          ) : (
+                            <Download className="h-5 w-5" aria-hidden="true" />
+                          )}
                         </button>
                       </td>
                     </tr>

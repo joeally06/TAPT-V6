@@ -199,6 +199,23 @@ Deno.serve(async (req) => {
 
     console.log('✅ Validated regions:', validatedRegions);
 
+    // The form must be for the event that is open right now. A year-end rollover keeps last year's event
+    // (inactive), so a form left open from before it must not register against it.
+    if (sanitizedData.eventId) {
+      const { data: activeEvent } = await supabaseAdmin
+        .from('regional_luncheon_settings')
+        .select('id')
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (!activeEvent || activeEvent.id !== sanitizedData.eventId) {
+        return new Response(
+          JSON.stringify({ error: 'Registration for this event is closed or has been replaced by a newer one. Please reload the page.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     // Check for existing registration with same email and event (prevent duplicates)
     if (sanitizedData.eventId) {
       const { data: existingRegistration, error: checkError } = await supabaseAdmin
@@ -271,7 +288,7 @@ Deno.serve(async (req) => {
       
       if (!error && data) {
         eventSettings = data;
-        console.log('📅 Event settings retrieved:', { id: data.id, event_name: data.event_name });
+        console.log('📅 Event settings retrieved:', { id: data.id, name: data.name });
       } else {
         console.warn('⚠️ Could not retrieve event settings:', error?.message);
       }
@@ -312,7 +329,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      const eventName = eventSettings?.event_name || 'TAPT Regional Luncheon';
+      const eventName = eventSettings?.name || 'TAPT Regional Luncheon';
       const registrationDeadline = eventSettings?.registration_deadline || 'TBD';
       
       // Generate email HTML for multi-region registration

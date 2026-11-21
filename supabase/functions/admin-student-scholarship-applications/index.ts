@@ -138,69 +138,10 @@ Deno.serve(async (req) => {
     if (req.method === 'DELETE') {
       const body = await req.json();
       
-      // Clear all applications
+      // Clearing a whole year is done only by the year-end rollover, which archives everything and cannot
+      // stop half way. This direct "clear all" path was removed.
       if (body.clear) {
-        // First, archive current applications
-        const { data: applications, error: fetchError } = await supabaseAdmin
-          .from('student_scholarship_applications')
-          .select('*');
-        
-        if (fetchError) throw fetchError;
-        
-        if (applications && applications.length > 0) {
-          // Generate archive ID
-          const archiveId = crypto.randomUUID();
-          
-          // Prepare archive data
-          const archiveData = applications.map(app => ({
-            ...app,
-            id: crypto.randomUUID(),
-            original_id: app.id,
-            archived_at: new Date().toISOString(),
-            archive_id: archiveId
-          }));
-          
-          // Insert into archive
-          const { error: archiveError } = await supabaseAdmin
-            .from('student_scholarship_applications_archive')
-            .insert(archiveData);
-          
-          if (archiveError) throw archiveError;
-          
-          // Delete all applications
-          const { error: deleteError } = await supabaseAdmin
-            .from('student_scholarship_applications')
-            .delete()
-            .not('id', 'is', null);
-          
-          if (deleteError) throw deleteError;
-          
-          // Log the action
-          try {
-            await supabaseAdmin.from('admin_logs').insert([{
-              user_id: user.id,
-              action: 'clear_scholarship_applications',
-              outcome: 'success',
-              details: { count: applications.length, archive_id: archiveId }
-            }]);
-          } catch (logError) {
-            // Don't fail the request if logging fails
-            console.error("Error logging action:", logError);
-          }
-        }
-        
-        return new Response(
-          JSON.stringify({ 
-            success: true,
-            message: 'All scholarship applications cleared and archived successfully'
-          }),
-          { 
-            headers: {
-              ...corsHeaders,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
+        throw new Error('Clearing all scholarship applications is no longer available here. Use the rollover on the Scholarship Settings page.');
       }
       
       // Delete single application

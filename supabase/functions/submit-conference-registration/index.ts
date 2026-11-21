@@ -214,6 +214,28 @@ Deno.serve(async (req) => {
         });
     }
 
+    // The form must be for the conference that is open right now. A year-end rollover keeps last year's settings
+    // row (inactive), so a form left open from before the rollover must not register against it.
+    const { data: openConference, error: openConferenceError } = await supabaseAdmin
+      .from('conference_settings')
+      .select('id, is_active')
+      .eq('id', sanitizedData.conferenceId)
+      .maybeSingle();
+
+    if (openConferenceError || !openConference) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Conference not found or no longer available.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!openConference.is_active) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Registration for this conference is closed or has been replaced by a newer one. Please reload the page.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Insert main registration with sanitized data
     // Determine the effective school district (from registrant if attending, or from primary attendee)
     const effectiveSchoolDistrict = sanitizedData.registrantIsAttendee 

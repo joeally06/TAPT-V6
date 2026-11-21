@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Clock, Save, AlertCircle, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Clock, Save, AlertCircle, Trash2, Archive, ToggleLeft, ToggleRight } from 'lucide-react';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { useAuth } from '../context/AuthContext';
 import AdminLayout from '../components/AdminLayout';
+import RolloverModal from '../components/admin/RolloverModal';
+import { runRollover, describeRolloverResult } from '../lib/rollover';
 
 interface RegionalDirectorSettings {
   id: string;
@@ -25,6 +27,8 @@ export const AdminRegionalDirectorNominationSettings: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showClearModal, setShowClearModal] = useState(false);
+  const [showRolloverModal, setShowRolloverModal] = useState(false);
+  const [isRollingOver, setIsRollingOver] = useState(false);
   const [allSettings, setAllSettings] = useState<RegionalDirectorSettings[]>([]);
   
   const [settings, setSettings] = useState<RegionalDirectorSettings>({
@@ -179,12 +183,35 @@ export const AdminRegionalDirectorNominationSettings: React.FC = () => {
         nomination_instructions: '',
         is_active: true,
       });
-      setAllSettings([]);
+      await fetchSettings();
     } catch (error: any) {
       setError(`Failed to clear settings: ${error.message}`);
     } finally {
       setClearing(false);
       setShowClearModal(false);
+    }
+  };
+
+  const handleRollover = async () => {
+    try {
+      setIsRollingOver(true);
+      setError(null);
+      setSuccess(null);
+
+      if (!settings.name.trim() || !settings.start_date || !settings.end_date) {
+        throw new Error('Please set the title and both dates before rolling over');
+      }
+
+      // The server archives the nominations, clears them and starts the new period in one step. It keeps the old
+      // settings (inactive) and adds a new settings row.
+      const result = await runRollover('regional-director-nomination', { ...settings });
+      setSuccess(`Regional Director nominations rolled over successfully! ${describeRolloverResult('regional-director-nomination', result)}`);
+      await fetchSettings();
+    } catch (error) {
+      setError(`Failed to rollover regional director nominations: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsRollingOver(false);
+      setShowRolloverModal(false);
     }
   };
 
@@ -196,7 +223,7 @@ export const AdminRegionalDirectorNominationSettings: React.FC = () => {
       const { error: deactivateError } = await supabase
         .from('regional_director_nomination_settings')
         .update({ is_active: false })
-        .neq('id', 'no-match');
+        .not('id', 'is', null);
 
       if (deactivateError) throw deactivateError;
 
@@ -319,7 +346,7 @@ export const AdminRegionalDirectorNominationSettings: React.FC = () => {
           </div>
         )}
 
-        <div className="mb-6 flex justify-start">
+        <div className="mb-6 flex justify-between">
           <button
             onClick={() => setShowClearModal(true)}
             disabled={clearing}
@@ -327,6 +354,14 @@ export const AdminRegionalDirectorNominationSettings: React.FC = () => {
           >
             <Trash2 className="mr-2 h-5 w-5" />
             {clearing ? 'Clearing...' : 'Clear Settings'}
+          </button>
+
+          <button
+            onClick={() => setShowRolloverModal(true)}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+          >
+            <Archive className="mr-2 h-5 w-5" />
+            Rollover Nominations
           </button>
         </div>
 
@@ -447,13 +482,27 @@ export const AdminRegionalDirectorNominationSettings: React.FC = () => {
           </div>
         </form>
 
+        <RolloverModal
+          isOpen={showRolloverModal}
+          type="regional-director-nomination"
+          title="Rollover Regional Director Nominations"
+          fields={[
+            { id: 'name', label: 'New Nomination Period Title', type: 'text', value: settings.name, onChange: (value) => setSettings((previous) => ({ ...previous, name: value })) },
+            { id: 'start-date', label: 'New Start Date', type: 'date', value: settings.start_date, onChange: (value) => setSettings((previous) => ({ ...previous, start_date: value })) },
+            { id: 'end-date', label: 'New End Date', type: 'date', value: settings.end_date, onChange: (value) => setSettings((previous) => ({ ...previous, end_date: value })) }
+          ]}
+          submitting={isRollingOver}
+          onConfirm={handleRollover}
+          onClose={() => setShowRolloverModal(false)}
+        />
+
         {/* Clear Confirmation Modal */}
         <ConfirmationModal
           isOpen={showClearModal}
           onClose={() => setShowClearModal(false)}
           onConfirm={handleClearTable}
           title="Clear Settings"
-          message="Are you sure you want to clear all Regional Director nomination settings? This action cannot be undone."
+          message="Are you sure you want to clear the active Regional Director nomination settings? Nominations will be closed until you save or activate settings again. Earlier settings are kept."
           confirmText="Clear Settings"
           cancelText="Cancel"
           variant="danger"

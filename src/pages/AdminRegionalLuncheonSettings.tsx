@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Save, AlertCircle, ArrowLeft, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Calendar, Save, AlertCircle, ArrowLeft, Archive, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { useAuth } from '../context/AuthContext';
 import AdminLayout from '../components/AdminLayout';
+import RolloverModal from '../components/admin/RolloverModal';
+import { runRollover, describeRolloverResult } from '../lib/rollover';
 
 interface RegionalDate {
   region: string;
@@ -34,6 +36,8 @@ const AdminRegionalLuncheonSettings: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [allSettings, setAllSettings] = useState<RegionalLuncheonSettings[]>([]);
   const [settingToDelete, setSettingToDelete] = useState<string | null>(null);
+  const [showRolloverModal, setShowRolloverModal] = useState(false);
+  const [isRollingOver, setIsRollingOver] = useState(false);
   
   const [settings, setSettings] = useState<RegionalLuncheonSettings>({
     id: '',
@@ -272,6 +276,32 @@ const AdminRegionalLuncheonSettings: React.FC = () => {
     }
   };
 
+  const handleRollover = async () => {
+    try {
+      setIsRollingOver(true);
+      setError(null);
+      setSuccess(null);
+
+      if (!settings.name.trim() || !settings.registration_deadline) {
+        throw new Error('Please set the event name and the registration deadline before rolling over');
+      }
+      if (settings.regional_dates.some((rd) => !rd.date || !rd.time)) {
+        throw new Error('All regional dates and times are required');
+      }
+
+      // The server archives the registrations, clears them and starts the new event in one step. It keeps the old
+      // event (inactive) and adds a new one using the regional dates on this page.
+      const result = await runRollover('regional-luncheon', { ...settings });
+      setSuccess(`Regional luncheon rolled over successfully! ${describeRolloverResult('regional-luncheon', result)}`);
+      await fetchSettings();
+    } catch (error) {
+      setError(`Failed to rollover regional luncheon: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsRollingOver(false);
+      setShowRolloverModal(false);
+    }
+  };
+
   const handleCreateNew = () => {
     setSettings({
       id: '',
@@ -315,12 +345,21 @@ const AdminRegionalLuncheonSettings: React.FC = () => {
             <h1 className="text-3xl font-bold text-gray-900">Regional Luncheon Settings</h1>
           </div>
           {settings.id && (
-            <button
-              onClick={handleCreateNew}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-            >
-              Create New Event
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowRolloverModal(true)}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Archive className="w-4 h-4 mr-2" />
+                Rollover
+              </button>
+              <button
+                onClick={handleCreateNew}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                Create New Event
+              </button>
+            </div>
           )}
         </div>
 
@@ -551,6 +590,20 @@ const AdminRegionalLuncheonSettings: React.FC = () => {
           message="Are you sure you want to delete these settings? This action cannot be undone."
           confirmText="Delete"
           confirmButtonClass="bg-red-600 hover:bg-red-700"
+        />
+
+        <RolloverModal
+          isOpen={showRolloverModal}
+          type="regional-luncheon"
+          title="Rollover Regional Luncheon"
+          note="The date, time and venue of each region on this page are used for the new event. Check them before you confirm."
+          fields={[
+            { id: 'name', label: 'New Event Name', type: 'text', value: settings.name, onChange: (value) => setSettings((previous) => ({ ...previous, name: value })) },
+            { id: 'deadline', label: 'New Registration Deadline', type: 'date', value: settings.registration_deadline, onChange: (value) => setSettings((previous) => ({ ...previous, registration_deadline: value })) }
+          ]}
+          submitting={isRollingOver}
+          onConfirm={handleRollover}
+          onClose={() => setShowRolloverModal(false)}
         />
       </div>
     </AdminLayout>

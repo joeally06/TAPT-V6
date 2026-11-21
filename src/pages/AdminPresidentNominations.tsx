@@ -54,7 +54,6 @@ export const AdminPresidentNominations: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
   const [nominations, setNominations] = useState<PresidentNomination[]>([]);
   const [loading, setLoading] = useState(true);
-  const [clearing, setClearing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -222,27 +221,6 @@ export const AdminPresidentNominations: React.FC = () => {
       fetchNominations();
     } catch (error: any) {
       alert('Failed to delete nomination. Please try again.');
-    }
-  };
-
-  const handleClearTable = async () => {
-    if (!confirm('Are you sure you want to clear all President nominations? This action cannot be undone.')) return;
-    setClearing(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      const { error } = await supabase
-        .from('president_nominations')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-
-      if (error) throw error;
-      setNominations([]);
-      setSuccess('President nominations cleared successfully!');
-    } catch (error: any) {
-      setError(`Failed to clear nominations: ${error.message}`);
-    } finally {
-      setClearing(false);
     }
   };
 
@@ -435,14 +413,6 @@ export const AdminPresidentNominations: React.FC = () => {
             />
           </div>
           <div className="flex gap-4">
-            <button
-              onClick={handleClearTable}
-              disabled={clearing}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
-            >
-              <Trash2 className="mr-2 h-5 w-5" />
-              {clearing ? 'Clearing...' : 'Clear All'}
-            </button>
             <button
               onClick={exportToPDF}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90"

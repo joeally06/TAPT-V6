@@ -97,13 +97,13 @@ Deno.serve(async (req) => {
     }
 
     // ========================================
-    // DELETE: Clear settings
+    // DELETE: Clear settings (deactivate; earlier cycles are kept so archives can still name them)
     // ========================================
     if (req.method === 'DELETE') {
       const { error: deleteError } = await supabaseAdmin
         .from('regional_director_nomination_settings')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+        .update({ is_active: false })
+        .eq('is_active', true);
 
       if (deleteError) throw deleteError;
 

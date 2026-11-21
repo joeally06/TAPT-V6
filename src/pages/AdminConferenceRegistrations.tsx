@@ -29,7 +29,6 @@ const AdminConferenceRegistrations: React.FC = () => {
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedRegistration, setSelectedRegistration] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [clearing, setClearing] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -62,34 +61,6 @@ const AdminConferenceRegistrations: React.FC = () => {
     setPaymentFilter(filter);
     setPage(1);
     clearSelection();
-  };
-
-  // Refactor: Use Edge Function for clearing all conference registrations
-  const handleClearTable = async () => {
-    setClearing(true);
-    setError('');
-    try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-conference-registrations`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user?.access_token}`
-        },
-        body: JSON.stringify({ clear: true })
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to clear conference registrations');
-      }
-      setSuccess('All conference registrations cleared successfully!');
-      clearSelection();
-      loadSummary();
-      fetchRegistrations();
-    } catch (error: any) {
-      setError(`Failed to clear conference registrations: ${error.message}`);
-    } finally {
-      setClearing(false);
-    }
   };
 
   const handleDeleteRegistration = async (registrationId: string) => {
@@ -348,27 +319,6 @@ const AdminConferenceRegistrations: React.FC = () => {
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-secondary hover:bg-secondary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary"
             >
               View Archives
-            </button>
-
-            <button
-              onClick={handleClearTable}
-              disabled={clearing}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
-            >
-              {clearing ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Clearing...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="mr-2 h-5 w-5" />
-                  Clear All
-                </>
-              )}
             </button>
 
             <button
