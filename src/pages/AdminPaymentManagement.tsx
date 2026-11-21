@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import AdminLayout from '../components/AdminLayout';
+import { markRegistrationPaid, NOT_AWAITING_PAYMENT_MESSAGE } from '../lib/registrationPayments';
 import { CheckCircle, XCircle, DollarSign, Search, Filter, AlertCircle } from 'lucide-react';
 
 interface PendingPayment {
@@ -144,54 +145,10 @@ export default function AdminPaymentManagement() {
       setError(null);
       setSuccess(null);
 
-      const tableName = payment.type === 'conference' 
-        ? 'conference_registrations'
-        : payment.type === 'tech_conference'
-        ? 'tech_conference_registrations'
-        : 'exhibitor_registrations';
+      // Records the payment, then emails the receipt (shared with the registration pages)
+      const { receiptSent } = await markRegistrationPaid(payment.type, payment.id);
 
-      // Update payment status in database
-      const { error: updateError } = await supabase
-        .from(tableName)
-        .update({
-          payment_status: 'completed',
-          payment_completed_at: new Date().toISOString()
-        })
-        .eq('id', payment.id);
-
-      if (updateError) throw updateError;
-
-      console.log('✅ Payment status updated, waiting for commit...');
-
-      // Wait a moment for database to commit the transaction
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      console.log('📧 Sending receipt email...');
-
-      // Send payment receipt email via Edge Function
-      try {
-        const { data, error: emailError } = await supabase.functions.invoke('send-payment-receipt', {
-          body: {
-            registrationId: payment.id,
-            registrationType: payment.type
-          }
-        });
-
-        if (emailError) {
-          console.error('⚠️ Email function error:', emailError);
-          throw emailError;
-        }
-        
-        if (data && !data.success) {
-          console.error('⚠️ Email send failed:', data);
-          throw new Error(data.error || 'Email send failed');
-        }
-        
-        console.log('✅ Payment receipt email sent successfully:', data);
-      } catch (emailError: any) {
-        // Log error but don't fail the whole operation
-        console.error('⚠️ Failed to send payment receipt email:', emailError);
-        console.warn('Payment was marked as paid, but email notification failed');
+      if (!receiptSent) {
         // Still show success for payment, but note email issue
         setSuccess(
           `Payment marked as completed for ${payment.first_name} ${payment.last_name}. ` +
@@ -216,6 +173,8 @@ export default function AdminPaymentManagement() {
 
     } catch (error: any) {
       console.error('Error marking payment as paid:', error);
+      // Already paid elsewhere: the list is out of date, so reload it
+      if (error?.message === NOT_AWAITING_PAYMENT_MESSAGE) fetchPendingPayments();
       setError(`Failed to update payment status: ${error.message || 'Unknown error'}`);
     } finally {
       setProcessing(null);

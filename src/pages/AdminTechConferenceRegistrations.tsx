@@ -5,6 +5,22 @@ import { Download, Search, ChevronDown, ChevronUp, Edit, Trash2, Eye, Send, Load
 import ArchiveViewerModal from '../components/ArchiveViewerModal';
 import { useAuth } from '../context/AuthContext';
 import AdminLayout from '../components/AdminLayout';
+import { PaymentSummaryStrip } from '../components/admin/PaymentSummaryStrip';
+import { PaymentFilterChips } from '../components/admin/PaymentFilterChips';
+import { PaymentStatusBadge } from '../components/admin/PaymentStatusBadge';
+import { BulkSelectionBar } from '../components/admin/BulkSelectionBar';
+import { MarkPaidPanel } from '../components/admin/MarkPaidPanel';
+import { useRowSelection } from '../lib/useRowSelection';
+import {
+  applyPaymentFilter,
+  buildSearchFilter,
+  getPaymentState,
+  type PaymentFilter
+} from '../lib/registrationPayments';
+import { PageSelectCheckbox } from '../components/admin/PageSelectCheckbox';
+import { usePaymentSummary } from '../lib/usePaymentSummary';
+import { useLatestRequest } from '../lib/useLatestRequest';
+import { useDebouncedValue } from '../lib/useDebouncedValue';
 
 interface TechConferenceAttendee {
   id: string;
@@ -58,6 +74,15 @@ const AdminTechConferenceRegistrations: React.FC = () => {
   const [resendingEmail, setResendingEmail] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
+  const { summary, failed: summaryFailed, reload: loadSummary } = usePaymentSummary(
+    'tech_conference_registrations',
+    !authLoading && user?.role === 'admin'
+  );
+  const startRequest = useLatestRequest();
+  // The search box updates at once; the server is asked once typing pauses
+  const searchQuery = useDebouncedValue(searchTerm, 250);
+  const { selected, toggle, togglePage, clear: clearSelection } = useRowSelection();
 
   useEffect(() => {
     if (!authLoading) {
@@ -72,31 +97,52 @@ const AdminTechConferenceRegistrations: React.FC = () => {
       fetchRegistrations();
     }
     // eslint-disable-next-line
-  }, [authLoading, user, page]);
+  }, [authLoading, user, page, searchQuery, paymentFilter]);
 
   const fetchRegistrations = async () => {
+    const isCurrent = startRequest();
     try {
       setLoading(true);
       const from = (page - 1) * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
-      const { data, error, count } = await supabase
+      let query = supabase
         .from('tech_conference_registrations')
-        .select(`*, attendees:tech_conference_attendees(*)`, { count: 'exact' })
+        .select(`*, attendees:tech_conference_attendees(*)`, { count: 'exact' });
+
+      const searchFilter = buildSearchFilter(searchQuery, ['school_district', 'first_name', 'last_name', 'email']);
+      if (searchFilter) {
+        query = query.or(searchFilter);
+      }
+      query = applyPaymentFilter(query, paymentFilter);
+
+      // A fixed order keeps rows from repeating or going missing between pages
+      const { data, error, count } = await query
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
         .range(from, to);
 
       if (error) throw error;
+      if (!isCurrent()) return;
       setRegistrations(data || []);
       setTotalCount(count || 0);
     } catch (error: any) {
       console.error('Error fetching registrations:', error);
-      setError('Failed to load registrations');
+      if (isCurrent()) setError('Failed to load registrations');
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   };
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
+    setPage(1);
+    clearSelection();
+  };
+
+  const handlePaymentFilter = (filter: PaymentFilter) => {
+    setPaymentFilter(filter);
+    setPage(1);
+    clearSelection();
   };
 
   const handleDeleteRegistration = async (registrationId: string) => {
@@ -115,6 +161,8 @@ const AdminTechConferenceRegistrations: React.FC = () => {
       if (deleteError) throw deleteError;
 
       setSuccess('Registration deleted successfully!');
+      clearSelection();
+      loadSummary();
       fetchRegistrations();
       setTimeout(() => setSuccess(null), 3000);
     } catch (error: any) {
@@ -199,6 +247,8 @@ const AdminTechConferenceRegistrations: React.FC = () => {
 
       setSuccess('Tech conference registrations cleared successfully!');
       setRegistrations([]);
+      clearSelection();
+      loadSummary();
     } catch (error: any) {
       console.error('Error clearing registrations:', error);
       setError(`Failed to clear registrations: ${error.message}`);
@@ -207,16 +257,20 @@ const AdminTechConferenceRegistrations: React.FC = () => {
     }
   };
 
-  const exportToCSV = async () => {
+  const exportToCSV = async (onlyIds?: Set<string>) => {
     try {
       setExporting(true);
 
       // Fetch ALL registrations (no pagination) for export
-      const { data: allRegistrations, error: fetchError } = await supabase
+      const { data: everyRegistration, error: fetchError } = await supabase
         .from('tech_conference_registrations')
         .select(`*, attendees:tech_conference_attendees(*)`);
 
       if (fetchError) throw fetchError;
+      // When rows are ticked, keep only those
+      const allRegistrations = onlyIds
+        ? (everyRegistration ?? []).filter((reg) => onlyIds.has(reg.id))
+        : everyRegistration;
       if (!allRegistrations || allRegistrations.length === 0) return;
 
       const headers = [
@@ -270,7 +324,7 @@ const AdminTechConferenceRegistrations: React.FC = () => {
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
       link.setAttribute('href', url);
-      link.setAttribute('download', `tech-conference-registrations-${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute('download', `tech-conference-registrations${onlyIds ? '-selected' : ''}-${new Date().toISOString().split('T')[0]}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -282,15 +336,10 @@ const AdminTechConferenceRegistrations: React.FC = () => {
     }
   };
 
-  const filteredRegistrations = registrations.filter(reg => {
-    const searchStr = searchTerm.toLowerCase();
-    return (
-      reg.school_district.toLowerCase().includes(searchStr) ||
-      reg.first_name.toLowerCase().includes(searchStr) ||
-      reg.last_name.toLowerCase().includes(searchStr) ||
-      reg.email.toLowerCase().includes(searchStr)
-    );
-  });
+  // Search and the payment filter run on the server, so the page shows exactly what was fetched
+  const filteredRegistrations = registrations;
+
+  const pageIds = filteredRegistrations.map((registration) => registration.id);
 
   return (
     <AdminLayout>
@@ -313,6 +362,9 @@ const AdminTechConferenceRegistrations: React.FC = () => {
             <p className="text-green-700">{success}</p>
           </div>
         )}
+
+        <PaymentSummaryStrip summary={summary} unavailable={summaryFailed} />
+        <PaymentFilterChips value={paymentFilter} onChange={handlePaymentFilter} />
 
         {/* Controls */}
         <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -357,8 +409,8 @@ const AdminTechConferenceRegistrations: React.FC = () => {
             </button>
 
             <button
-              onClick={exportToCSV}
-              disabled={exporting || totalCount === 0}
+              onClick={() => exportToCSV()}
+              disabled={exporting || summary?.registered === 0}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
             >
               {exporting ? (
@@ -369,12 +421,19 @@ const AdminTechConferenceRegistrations: React.FC = () => {
               ) : (
                 <>
                   <Download className="h-5 w-5 mr-2" />
-                  Export to CSV
+                  Export all to CSV
                 </>
               )}
             </button>
           </div>
         </div>
+
+        <BulkSelectionBar
+          count={selected.size}
+          exporting={exporting}
+          onExport={() => exportToCSV(selected)}
+          onClear={clearSelection}
+        />
 
         {/* Registrations Table */}
         <div className="bg-white shadow-md rounded-lg overflow-hidden">
@@ -392,6 +451,9 @@ const AdminTechConferenceRegistrations: React.FC = () => {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
+                    <th scope="col" className="w-10 px-4 py-3">
+                      <PageSelectCheckbox ids={pageIds} selected={selected} onToggle={togglePage} />
+                    </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Registration Date
                     </th>
@@ -417,7 +479,16 @@ const AdminTechConferenceRegistrations: React.FC = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredRegistrations.map((registration) => (
-                    <tr key={registration.id} className="hover:bg-gray-50">
+                    <tr key={registration.id} className={`hover:bg-gray-50 ${selected.has(registration.id) ? 'bg-blue-50' : ''}`}>
+                      <td className="w-10 px-4 py-4">
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${registration.first_name} ${registration.last_name}`}
+                          checked={selected.has(registration.id)}
+                          onChange={() => toggle(registration.id)}
+                          className="rounded border-gray-300 text-primary focus:ring-primary"
+                        />
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {new Date(registration.created_at).toLocaleDateString()}
                       </td>
@@ -439,13 +510,7 @@ const AdminTechConferenceRegistrations: React.FC = () => {
                         ${registration.total_amount.toFixed(2)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          registration.payment_status === 'completed' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {registration.payment_status || 'pending'}
-                        </span>
+                        <PaymentStatusBadge state={getPaymentState(registration)} />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex justify-end gap-2">
@@ -586,13 +651,7 @@ const AdminTechConferenceRegistrations: React.FC = () => {
                     <div>
                       <dt className="text-sm font-medium text-gray-500">Payment Status</dt>
                       <dd className="mt-1">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          selectedRegistration.payment_status === 'completed' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {selectedRegistration.payment_status || 'pending'}
-                        </span>
+                        <PaymentStatusBadge state={getPaymentState(selectedRegistration)} showDetail={false} />
                       </dd>
                     </div>
                     {selectedRegistration.po_number && (
@@ -621,6 +680,17 @@ const AdminTechConferenceRegistrations: React.FC = () => {
                     )}
                   </dl>
                 </div>
+
+                <MarkPaidPanel
+                  registration={selectedRegistration}
+                  type="tech_conference"
+                  onMarkedPaid={(id, changes) => {
+                    setSelectedRegistration((previous) => (previous && previous.id === id ? { ...previous, ...changes } : previous));
+                    clearSelection();
+                    loadSummary();
+                    fetchRegistrations();
+                  }}
+                />
 
                 {/* Additional Attendees */}
                 {selectedRegistration.attendees && selectedRegistration.attendees.length > 0 && (
