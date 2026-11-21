@@ -150,14 +150,20 @@ A short notice shown above the navbar on every public page (not on `/admin`). It
 
 ## Announcement Scheduling
 
-Announcements (Admin > Content > Announcements) can be scheduled, categorised and pinned.
+Announcements (Admin > Content > Announcements) open in a two-column editor: the text on the left; status, dates, pin and a live preview on the right.
 
-- **Category:** General, Event, Deadline or Safety. Stored in the existing `content.category` column. Older announcements with no category show as General.
-- **Publish on:** optional. Until this time the item is hidden from visitors on the site and in the normal table API (the database policy checks `publish_at`). The older search function `tapt_search_content` can still return unpublished rows to anyone; the migration includes a commented `REVOKE` to close it.
-- **Remove from homepage on:** optional. After this time the item leaves the home page. It stays on the News page and keeps its own page at `/news/:id`, so old announcements remain as an archive.
-- **Pin to the top:** one announcement can be pinned, and only if it is set to Featured. Pinning another one replaces it.
-- **Home page:** shows the pinned (or newest) featured announcement as a lead story and up to four more in a list.
+- **Status:** three buttons. **Draft** is not visible to visitors. **Scheduled** goes live at a time you choose (it must be in the future). **Published** is live as soon as you save. A line under the buttons says what will happen, for example "Goes live Dec 5, 2026, 8:00 AM and leaves the home page Jan 10, 2027, 12:00 AM." The Save button changes to match: Save draft, Save and schedule, Save and publish.
+- **Remove on:** optional. After this time the item leaves the home page. It stays on the News page and keeps its own page at `/news/:id`, so old announcements remain as an archive.
+- **Show on the home page:** off means the announcement appears on the News page only. A draft cannot be shown on the home page.
+- **Pin to top of home page:** needs "Show on the home page". One announcement is pinned at a time; pinning another replaces it.
+- **Category:** General, Event, Deadline or Safety. Older announcements with no category show as General.
+- **Message:** plain text; line breaks are kept.
+- **Alert bar:** the site-wide alert stays its own setting under Site settings > Alert Bar. The editor links to it.
+- **When it saves:** going live from a draft or a schedule records that moment as the publish date, so visitors see the day it went live. An announcement that is already live keeps its date. Saving as Draft clears "Show on the home page" and the pin.
+- **Until the publish time** the item is hidden from visitors on the site and in the normal table API (the database policy checks `publish_at`). The older search function `tapt_search_content` can still return unpublished rows to anyone; the migration includes a commented `REVOKE` to close it.
+- **Home page:** shows the pinned (or newest) announcement set to appear on the home page as a lead story and up to four more in a list.
 - **Database:** columns `publish_at`, `expires_at`, `is_pinned` on `content` (migration `20261120000000_announcement_scheduling.sql`). The migration also clears stale news categories on old announcements so the new category rule can be added. Apply the migration first, then deploy the `admin-content` function, then the site.
+- **Code:** `src/components/admin/AnnouncementEditor.tsx` (the editor), `src/lib/announcements.ts` (status, summary and save rules).
 
 ## Year-End Rollover
 

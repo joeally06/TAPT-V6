@@ -23,9 +23,8 @@ import { uploadFile } from '../lib/upload';
 import { getPublicUrl } from '../lib/storage';
 import { compressImage } from '../lib/imageCompression';
 import AdminLayout from '../components/AdminLayout';
-import { AnnouncementLead } from '../components/AnnouncementCard';
-import { ANNOUNCEMENT_CATEGORIES, getAnnouncementCategory, getAnnouncementStatus } from '../lib/announcements';
-import { fromLocalInput, toLocalInput } from '../lib/datetime';
+import AnnouncementEditor from '../components/admin/AnnouncementEditor';
+import { getAnnouncementCategory, getAnnouncementStatus } from '../lib/announcements';
 
 interface ContentItem {
   id: string;
@@ -339,8 +338,9 @@ export const AdminContent: React.FC = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // The announcement editor passes the values it prepared (status, dates, home page, pin) as `overrides`.
+  const handleSubmit = async (e: React.FormEvent | null, overrides?: Partial<ContentItem>) => {
+    e?.preventDefault();
     setError(null);
     setSuccess(null);
     setUploading(true);
@@ -431,19 +431,12 @@ export const AdminContent: React.FC = () => {
           fetchResources();
         }
       } else {
-        if (
-          selectedType === 'announcement' &&
-          formData.publish_at &&
-          formData.expires_at &&
-          Date.parse(formData.expires_at) <= Date.parse(formData.publish_at)
-        ) {
-          throw new Error('"Remove from homepage on" must be after "Publish on".');
-        }
+        const data = { ...formData, ...overrides };
 
-        let imagePath = formData.image_url;
-        let fileUrl = formData.file_url;
-        let fileType = formData.file_type;
-        let fileSize = formData.file_size;
+        let imagePath = data.image_url;
+        let fileUrl = data.file_url;
+        let fileType = data.file_type;
+        let fileSize = data.file_size;
         
         if (selectedFile) {
           // Validate file type for announcements
@@ -505,16 +498,16 @@ export const AdminContent: React.FC = () => {
             'Authorization': `Bearer ${session.access_token}`
           },
           body: JSON.stringify({
-            ...formData,
+            ...data,
             image_url: imagePath,
             file_url: fileUrl,
             file_type: fileType,
             file_size: fileSize,
             type: selectedType,
             // Announcements only use the four announcement categories; drop a stale news category
-            ...(selectedType === 'announcement' ? { category: getAnnouncementCategory(formData.category) } : {}),
+            ...(selectedType === 'announcement' ? { category: getAnnouncementCategory(data.category) } : {}),
             id: editingItem?.id, // Pass id for update, undefined for insert
-            linked_form_type: formData.linked_form_type
+            linked_form_type: data.linked_form_type
           })
         });
         
@@ -760,7 +753,35 @@ export const AdminContent: React.FC = () => {
           </button>
         </div>
 
-        {showForm && (
+        {showForm && selectedType === 'announcement' && (
+          <AnnouncementEditor
+            key={editingItem?.id ?? 'new'}
+            values={formData}
+            onChange={(changes) => setFormData((previous) => ({ ...previous, ...changes }))}
+            isEditing={Boolean(editingItem)}
+            createdAt={editingItem?.created_at}
+            previousStatus={editingItem ? editingItem.status : null}
+            acceptExtensions={ANNOUNCEMENT_ACCEPT_EXTENSIONS}
+            onFileSelect={handleFileSelect}
+            selectedFileLabel={
+              selectedFile
+                ? `Selected: ${selectedFile.name} (${getFileTypeDisplay(selectedFile.type)}, ${formatFileSize(selectedFile.size)})`
+                : null
+            }
+            currentAttachmentLabel={
+              editingItem && (editingItem.file_url || editingItem.image_url)
+                ? `Current: ${editingItem.file_url ? `Document (${getFileTypeDisplay(editingItem.file_type)})` : 'Image'}`
+                : null
+            }
+            onDeleteAttachment={handleDeleteCurrentAttachment}
+            deletingAttachment={deletingAttachment}
+            saving={uploading}
+            onSubmit={(values) => handleSubmit(null, values)}
+            onCancel={() => setShowForm(false)}
+          />
+        )}
+
+        {showForm && selectedType !== 'announcement' && (
           <div className="mb-8 bg-white shadow-md rounded-lg p-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-secondary">
@@ -888,41 +909,16 @@ export const AdminContent: React.FC = () => {
                     </div>
                   )}
 
-                  {selectedType === 'announcement' && (
-                    <div>
-                      <label htmlFor="announcementCategory" className="block text-sm font-medium text-gray-700">
-                        Category
-                      </label>
-                      <select
-                        id="announcementCategory"
-                        value={getAnnouncementCategory(formData.category)}
-                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                      >
-                        {ANNOUNCEMENT_CATEGORIES.map((category) => (
-                          <option key={category.value} value={category.value}>
-                            {category.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      {selectedType === 'announcement' ? 'Attachment (Image or Document)' : 'Image'}
+                      Image
                     </label>
                     <input
                       type="file"
                       onChange={handleFileSelect}
-                      accept={selectedType === 'announcement' ? ANNOUNCEMENT_ACCEPT_EXTENSIONS : 'image/*'}
+                      accept="image/*"
                       className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
                     />
-                    {selectedType === 'announcement' && (
-                      <p className="mt-1 text-sm text-gray-500">
-                        Supported: PDF, Word, Excel, Text files, and Images
-                      </p>
-                    )}
                     {selectedFile && (
                       <p className="mt-2 text-sm text-green-600">
                         Selected: {selectedFile.name} ({getFileTypeDisplay(selectedFile.type)}, {formatFileSize(selectedFile.size)})
@@ -1029,7 +1025,7 @@ export const AdminContent: React.FC = () => {
                           return;
                         }
                         const flags = getItemFlagsFromVisibility(visibility);
-                        setFormData({ ...formData, ...flags, is_pinned: flags.is_featured ? formData.is_pinned : false });
+                        setFormData({ ...formData, ...flags });
                       }}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
                     >
@@ -1043,92 +1039,6 @@ export const AdminContent: React.FC = () => {
                       {VISIBILITY_OPTIONS.find(opt => opt.value === getVisibilityFromItem(formData))?.description}
                     </p>
                   </div>
-
-                  {selectedType === 'announcement' && (
-                    <>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label htmlFor="announcementPublishAt" className="block text-sm font-medium text-gray-700">
-                            Publish on (optional)
-                          </label>
-                          <input
-                            type="datetime-local"
-                            id="announcementPublishAt"
-                            value={toLocalInput(formData.publish_at)}
-                            onChange={(e) => setFormData({ ...formData, publish_at: fromLocalInput(e.target.value) })}
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                          />
-                          <p className="mt-1 text-xs text-gray-500">Leave empty to publish right away. Visitors cannot see it before this time.</p>
-                        </div>
-                        <div>
-                          <label htmlFor="announcementExpiresAt" className="block text-sm font-medium text-gray-700">
-                            Remove from homepage on (optional)
-                          </label>
-                          <input
-                            type="datetime-local"
-                            id="announcementExpiresAt"
-                            value={toLocalInput(formData.expires_at)}
-                            onChange={(e) => setFormData({ ...formData, expires_at: fromLocalInput(e.target.value) })}
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                          />
-                          <p className="mt-1 text-xs text-gray-500">It leaves the home page but stays on the News page.</p>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label htmlFor="announcementPinned" className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                          <input
-                            type="checkbox"
-                            id="announcementPinned"
-                            checked={Boolean(formData.is_pinned)}
-                            disabled={getVisibilityFromItem(formData) !== 'featured'}
-                            onChange={(e) => setFormData({ ...formData, is_pinned: e.target.checked })}
-                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary disabled:opacity-50"
-                          />
-                          Pin to the top of the home page
-                        </label>
-                        <p className="mt-1 text-xs text-gray-500">
-                          {getVisibilityFromItem(formData) === 'featured'
-                            ? 'Replaces the announcement that is pinned now.'
-                            : 'Set Homepage Visibility to Featured to pin it.'}
-                        </p>
-                      </div>
-
-                      <div>
-                        <p className="mb-2 text-sm font-medium text-gray-700">Preview, as visitors see it</p>
-                        <p className="mb-2 text-xs text-gray-500">
-                          {(() => {
-                            const status = getAnnouncementStatus({
-                              status: formData.status ?? 'draft',
-                              publish_at: formData.publish_at,
-                              expires_at: formData.expires_at
-                            });
-                            if (status === 'draft') return 'Draft. Visitors do not see it.';
-                            if (status === 'scheduled') {
-                              return `Scheduled. Visitors see it from ${new Date(formData.publish_at as string).toLocaleString()}.`;
-                            }
-                            if (status === 'expired') return 'Expired. It is off the home page and still on the News page.';
-                            return 'Live. Visitors see it now.';
-                          })()}
-                        </p>
-                        <AnnouncementLead
-                          preview
-                          item={{
-                            id: editingItem?.id ?? 'preview',
-                            title: formData.title || 'Your title appears here',
-                            description: formData.description || 'Your message appears here.',
-                            category: getAnnouncementCategory(formData.category),
-                            created_at: editingItem?.created_at ?? new Date().toISOString(),
-                            publish_at: formData.publish_at,
-                            is_pinned: formData.is_pinned,
-                            file_url: formData.file_url,
-                            file_type: formData.file_type,
-                            file_size: formData.file_size
-                          }}
-                        />
-                      </div>
-                    </>
-                  )}
                 </>
               )}
 

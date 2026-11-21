@@ -75,3 +75,115 @@ export const getAnnouncementStatus = (
   if (item.expires_at && Date.parse(item.expires_at) <= now) return 'expired';
   return 'live';
 };
+
+// ---- the editor's Status control: Draft / Scheduled / Published ----
+
+export type PublishMode = 'draft' | 'scheduled' | 'published';
+
+// Which of the three buttons an existing announcement starts on. An expired one counts as Published.
+export const getPublishMode = (
+  item: Pick<SchedulableItem, 'status' | 'publish_at'>,
+  now: number = Date.now()
+): PublishMode => {
+  if (item.status !== 'published') return 'draft';
+  if (item.publish_at && Date.parse(item.publish_at) > now) return 'scheduled';
+  return 'published';
+};
+
+export const getSaveLabel = (mode: PublishMode): string =>
+  mode === 'draft' ? 'Save draft' : mode === 'scheduled' ? 'Save and schedule' : 'Save and publish';
+
+const formatMoment = (iso: string): string =>
+  new Date(iso).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  });
+
+// The line under the Status control, for example "Goes live Mar 1, 2026, 8:00 AM and leaves the home page Apr 2, 2026, 12:00 AM."
+export const describeSchedule = (
+  mode: PublishMode,
+  publishAt: string | null | undefined,
+  expiresAt: string | null | undefined,
+  now: number = Date.now()
+): string => {
+  const leaves = expiresAt ? ` and leaves the home page ${formatMoment(expiresAt)}.` : '. It stays until you remove it.';
+  if (mode === 'draft') return 'Not visible to visitors until you choose Scheduled or Published.';
+  if (mode === 'scheduled') {
+    if (!publishAt) return 'Choose when it should go live.';
+    if (Date.parse(publishAt) <= now) return 'That time has already passed. Pick a time in the future, or choose Published.';
+    return `Goes live ${formatMoment(publishAt)}${leaves}`;
+  }
+  return `Live as soon as you save${leaves}`;
+};
+
+export interface AnnouncementSaveInput {
+  mode: PublishMode;
+  is_featured: boolean;
+  is_pinned: boolean;
+  publish_at: string | null;
+  expires_at: string | null;
+  // Status the announcement had when the editor opened (null for a new one)
+  previousStatus: 'draft' | 'published' | null;
+}
+
+export interface AnnouncementSaveValues {
+  status: 'draft' | 'published';
+  featured: boolean;
+  is_featured: boolean;
+  is_pinned: boolean;
+  publish_at: string | null;
+  expires_at: string | null;
+}
+
+export type AnnouncementSaveResult = { ok: true; values: AnnouncementSaveValues } | { ok: false; error: string };
+
+// Turns what the editor shows into what is saved, or says what is wrong.
+export const prepareAnnouncementForSave = (
+  input: AnnouncementSaveInput,
+  now: number = Date.now()
+): AnnouncementSaveResult => {
+  const { mode, previousStatus } = input;
+  const publishAt = input.publish_at;
+  const expiresAt = input.expires_at;
+
+  if (mode === 'scheduled') {
+    if (!publishAt) return { ok: false, error: 'Choose when it should go live, or pick Published to publish now.' };
+    if (Date.parse(publishAt) <= now) {
+      return { ok: false, error: 'The publish time must be in the future. Pick Published to go live now.' };
+    }
+  }
+
+  // Published means live now. Going live from a draft or a schedule stamps the moment, so visitors see the day it went
+  // live; an announcement that is already live keeps its date.
+  let publishOut = publishAt;
+  if (mode === 'published') {
+    const inFuture = Boolean(publishAt) && Date.parse(publishAt as string) > now;
+    if (inFuture || (!publishAt && previousStatus !== 'published')) publishOut = new Date(now).toISOString();
+  }
+
+  if (expiresAt) {
+    if (publishOut && Date.parse(expiresAt) <= Date.parse(publishOut)) {
+      return {
+        ok: false,
+        error: mode === 'published' ? 'The "Remove on" time must be in the future.' : '"Remove on" must be after "Publish on".'
+      };
+    }
+  }
+
+  // A draft is never on the home page; a pin needs "Show on the home page"
+  const featured = mode !== 'draft' && input.is_featured;
+  return {
+    ok: true,
+    values: {
+      status: mode === 'draft' ? 'draft' : 'published',
+      featured,
+      is_featured: featured,
+      is_pinned: featured && input.is_pinned,
+      publish_at: publishOut,
+      expires_at: expiresAt
+    }
+  };
+};
