@@ -9,19 +9,24 @@ const TONE_CLASSES: Record<PaymentTone, string> = {
 };
 
 // Payment status as words plus a colored dot, so color is never the only signal.
-export const PaymentStatusBadge: React.FC<{ state: PaymentState; showDetail?: boolean }> = ({
+// `method` (for example "PayPal") goes on the grey line under the pill, before the detail.
+export const PaymentStatusBadge: React.FC<{ state: PaymentState; showDetail?: boolean; method?: string | null }> = ({
   state,
-  showDetail = true
-}) => (
-  <div>
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${TONE_CLASSES[state.tone]}`}
-    >
-      <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
-      {state.label}
-    </span>
-    {showDetail && state.detail && <p className="mt-0.5 text-xs text-gray-500">{state.detail}</p>}
-  </div>
-);
+  showDetail = true,
+  method = null
+}) => {
+  const subline = showDetail ? [method, state.detail].filter(Boolean).join(' · ') : '';
+  return (
+    <div>
+      <span
+        className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11.5px] font-bold ${TONE_CLASSES[state.tone]}`}
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
+        {state.label}
+      </span>
+      {subline && <p className="mt-0.5 text-xs text-gray-500">{subline}</p>}
+    </div>
+  );
+};
 
 export default PaymentStatusBadge;

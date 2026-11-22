@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import { sendEmail } from '../_shared/email.ts';
+import { describeEmailError, logRegistrationEmail } from '../_shared/emailLog.ts';
 import { generatePaymentReceiptEmail, type PaymentReceiptData } from '../_shared/emailTemplates.ts';
 import { sanitizeString, sanitizeUuid } from '../_shared/sanitize.ts';
 import { fetchSettings, formatRemittanceAddressPlain } from '../_shared/settings.ts';
@@ -215,6 +216,17 @@ Deno.serve(async (req) => {
       to: emailData.email,
       subject: `Payment Receipt - ${emailData.firstName} ${emailData.lastName} (PO: ${emailData.poNumber})`,
       html: emailHtml
+    });
+
+    // Record the attempt for the registration's timeline (never blocks or fails the email)
+    await logRegistrationEmail(supabaseAdmin, {
+      registrationType: registrationType as 'conference' | 'tech_conference' | 'exhibitor',
+      registrationId: registrationId,
+      kind: 'receipt',
+      recipient: emailData.email,
+      status: emailResult.success ? 'sent' : 'failed',
+      error: emailResult.success ? null : describeEmailError(emailResult.error),
+      sentBy: null
     });
 
     if (!emailResult.success) {

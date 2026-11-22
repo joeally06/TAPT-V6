@@ -28,5 +28,14 @@ export const useRowSelection = () => {
 
   const clear = useCallback(() => setSelected(new Set()), []);
 
-  return { selected, toggle, togglePage, clear };
+  // Unticks these ids (for example the rows a bulk action has just finished with)
+  const deselect = useCallback((ids: string[]) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) next.delete(id);
+      return next;
+    });
+  }, []);
+
+  return { selected, toggle, togglePage, clear, deselect };
 };

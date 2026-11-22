@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2.39.3";
 import { sendEmail } from '../_shared/email.ts';
+import { describeEmailError, logRegistrationEmail } from '../_shared/emailLog.ts';
 
 const allowedOrigins = [
   'https://tapt.org',
@@ -196,6 +197,17 @@ Deno.serve(async (req) => {
       to: registration.email,
       subject: `Registration Confirmed - ${eventName}${selectedRegions.length > 1 ? ` (${selectedRegions.length} events)` : ''}`,
       html: emailHtml
+    });
+
+    // Record the attempt for the registration's timeline (never blocks or fails the email)
+    await logRegistrationEmail(supabaseAdmin, {
+      registrationType: 'regional_luncheon',
+      registrationId: registration.id,
+      kind: 'confirmation',
+      recipient: registration.email,
+      status: emailResult.success ? 'sent' : 'failed',
+      error: emailResult.success ? null : describeEmailError(emailResult.error),
+      sentBy: user.id
     });
 
     if (!emailResult.success) {

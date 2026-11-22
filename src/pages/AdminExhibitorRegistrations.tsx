@@ -1,22 +1,51 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Download, Search, ChevronDown, ChevronUp, Trash2, Eye, Users, Send, Loader2, Mail } from 'lucide-react';
+import { BellRing, CheckCircle, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import AdminLayout from '../components/AdminLayout';
 import { PaymentSummaryStrip } from '../components/admin/PaymentSummaryStrip';
 import { PaymentFilterChips } from '../components/admin/PaymentFilterChips';
+import {
+  DeleteRegistrationButton,
+  PageHeading,
+  RegistrantCell,
+  SearchBox,
+  TableCard,
+  ToolbarButton
+} from '../components/admin/RegistrationListParts';
 import { PaymentStatusBadge } from '../components/admin/PaymentStatusBadge';
 import { BulkSelectionBar } from '../components/admin/BulkSelectionBar';
 import { MarkPaidPanel } from '../components/admin/MarkPaidPanel';
+import { PageSelectCheckbox } from '../components/admin/PageSelectCheckbox';
+import { PaginationBar } from '../components/admin/PaginationBar';
+import { RegistrationPanel, RegistrationSplit, PanelFields, PanelSection } from '../components/admin/RegistrationPanel';
+import { RegistrationEmailActions } from '../components/admin/RegistrationEmailActions';
+import { BulkMarkPaidDialog, BulkRemindersDialog } from '../components/admin/BulkRegistrationDialogs';
+import { formatMoney } from '../lib/dashboard';
+import {
+  TD_CLASS,
+  TH_CLASS,
+  formatCellDate,
+  fullDate,
+  openBarClass,
+  paymentMethodLabel,
+  rowClass,
+  rowClickHandler
+} from '../lib/registrationList';
+import { toCsv, downloadCsv, dateStamp } from '../lib/csv';
+import { fetchRowsForExport } from '../lib/registrationExport';
+import { buildTimeline, describeWhen } from '../lib/registrationEmails';
+import { useEmailLog, useLastReminders } from '../lib/useEmailLog';
 import { useRowSelection } from '../lib/useRowSelection';
 import {
   applyPaymentFilter,
   buildSearchFilter,
+  formatShortDate,
+  getErrorMessage,
   getPaymentState,
   type PaymentFilter
 } from '../lib/registrationPayments';
-import { PageSelectCheckbox } from '../components/admin/PageSelectCheckbox';
 import { usePaymentSummary } from '../lib/usePaymentSummary';
 import { useLatestRequest } from '../lib/useLatestRequest';
 import { useDebouncedValue } from '../lib/useDebouncedValue';
@@ -48,6 +77,7 @@ interface ExhibitorRegistration {
   created_at: string;
   updated_at: string;
   user_id: string | null;
+  total_amount: number | null;
   // Payment fields
   payment_method: string | null;
   payment_status: string | null;
@@ -60,6 +90,7 @@ interface ExhibitorRegistration {
 }
 
 const PAGE_SIZE = 20;
+const SELECT = '*, participants:exhibitor_participants(*)';
 
 const AdminExhibitorRegistrations: React.FC = () => {
   const navigate = useNavigate();
@@ -71,14 +102,14 @@ const AdminExhibitorRegistrations: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  const [selectedRegistration, setSelectedRegistration] = useState<ExhibitorRegistration | null>(null);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [panelRegistration, setPanelRegistration] = useState<ExhibitorRegistration | null>(null);
   const [sortField, setSortField] = useState<keyof ExhibitorRegistration>('created_at');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  const [resendingEmail, setResendingEmail] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
+  const [bulkDialog, setBulkDialog] = useState<'reminders' | 'markPaid' | null>(null);
   const { summary, failed: summaryFailed, reload: loadSummary } = usePaymentSummary(
     'exhibitor_registrations',
     !authLoading && user?.role === 'admin'
@@ -86,7 +117,13 @@ const AdminExhibitorRegistrations: React.FC = () => {
   const startRequest = useLatestRequest();
   // The search box updates at once; the server is asked once typing pauses
   const searchQuery = useDebouncedValue(searchTerm, 250);
-  const { selected, toggle, togglePage, clear: clearSelection } = useRowSelection();
+  const { selected, toggle, togglePage, clear: clearSelection, deselect } = useRowSelection();
+  const pageIds = registrations.map((registration) => registration.id);
+  const { reminders, reload: reloadReminders } = useLastReminders('exhibitor', pageIds);
+  const { entries: emailLog, loading: emailLogLoading, reload: reloadEmailLog } = useEmailLog(
+    'exhibitor',
+    panelRegistration?.id ?? null
+  );
 
   useEffect(() => {
     if (!authLoading) {
@@ -109,9 +146,7 @@ const AdminExhibitorRegistrations: React.FC = () => {
       setLoading(true);
       const from = (page - 1) * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
-      let query = supabase
-        .from('exhibitor_registrations')
-        .select(`*, participants:exhibitor_participants(*)`, { count: 'exact' });
+      let query = supabase.from('exhibitor_registrations').select(SELECT, { count: 'exact' });
 
       const searchFilter = buildSearchFilter(searchQuery, [
         'business_name',
@@ -120,27 +155,32 @@ const AdminExhibitorRegistrations: React.FC = () => {
         'email',
         'products_description'
       ]);
-      if (searchFilter) {
-        query = query.or(searchFilter);
-      }
+      if (searchFilter) query = query.or(searchFilter);
       query = applyPaymentFilter(query, paymentFilter);
 
       // The chosen sort first, then id, so rows do not repeat or go missing between pages
-      const { data, error, count } = await query
+      const { data, error: fetchError, count } = await query
         .order(sortField, { ascending: sortDirection === 'asc' })
         .order('id', { ascending: true })
         .range(from, to);
 
-      if (error) throw error;
+      if (fetchError) throw fetchError;
       if (!isCurrent()) return;
-      setRegistrations(data || []);
+      setRegistrations((data ?? []) as ExhibitorRegistration[]);
       setTotalCount(count || 0);
-    } catch (error: any) {
-      console.error('Error fetching registrations:', error);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching registrations:', err);
       if (isCurrent()) setError('Failed to load registrations');
     } finally {
       if (isCurrent()) setLoading(false);
     }
+  };
+
+  const refreshAll = () => {
+    loadSummary();
+    fetchRegistrations();
+    reloadReminders();
   };
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -164,114 +204,54 @@ const AdminExhibitorRegistrations: React.FC = () => {
     }
   };
 
-  const handleDeleteRegistration = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this registration?')) {
-      return;
-    }
+  const handleDeleteRegistration = async (registration: ExhibitorRegistration) => {
+    if (!confirm(`Are you sure you want to delete the registration for ${registration.business_name}?`)) return;
 
+    setDeleting(registration.id);
+    setDeleteError(null);
     try {
       setError(null);
       setSuccess(null);
 
-      // Get the Supabase URL from environment variables
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      if (!supabaseUrl) {
-        throw new Error('VITE_SUPABASE_URL is not defined');
-      }
+      if (!supabaseUrl) throw new Error('VITE_SUPABASE_URL is not defined');
 
-      // Call the Edge Function to delete registration
+      // A fresh session token, not the one the page loaded with
+      const {
+        data: { session }
+      } = await supabase.auth.getSession();
+      if (!session) throw new Error('You must be logged in to do this');
+
       const response = await fetch(`${supabaseUrl}/functions/v1/admin-exhibitor-registrations`, {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user?.access_token}`
-        },
-        body: JSON.stringify({ id })
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ id: registration.id })
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || 'Failed to delete exhibitor registration');
       }
 
       setSuccess('Registration deleted successfully!');
-      clearSelection();
-      loadSummary();
-      
-      // Remove the deleted registration from the list
-      setRegistrations(prev => prev.filter(reg => reg.id !== id));
-      setTotalCount(prev => prev - 1);
-      
-      // Close the modal if the deleted registration was being viewed
-      if (selectedRegistration?.id === id) {
-        setSelectedRegistration(null);
-        setShowDetailsModal(false);
-      }
-    } catch (error: any) {
-      console.error('Error deleting registration:', error);
-      setError(`Failed to delete registration: ${error.message}`);
-    }
-  };
-
-  // Resend confirmation email
-  const handleResendEmail = async (registrationId: string) => {
-    setResendingEmail(true);
-    setEmailSent(false);
-    
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        alert('You must be logged in to perform this action');
-        return;
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resend-exhibitor-confirmation`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ registrationId }),
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to resend email');
-      }
-
-      setEmailSent(true);
-      setTimeout(() => setEmailSent(false), 3000);
-    } catch (error) {
-      console.error('Error resending email:', error);
-      alert(error instanceof Error ? error.message : 'Failed to resend confirmation email');
+      deselect([registration.id]);
+      if (panelRegistration?.id === registration.id) setPanelRegistration(null);
+      refreshAll();
+    } catch (err) {
+      console.error('Error deleting registration:', err);
+      setError(`Failed to delete registration: ${getErrorMessage(err)}`);
+      setDeleteError(`Could not delete this registration: ${getErrorMessage(err)}`);
     } finally {
-      setResendingEmail(false);
+      setDeleting(null);
     }
   };
 
   const exportToCSV = async (onlyIds?: Set<string>) => {
     try {
       setExporting(true);
-
-      // Fetch ALL registrations (no pagination) for export
-      const { data: everyRegistration, error: fetchError } = await supabase
-        .from('exhibitor_registrations')
-        .select(`
-          *,
-          participants:exhibitor_participants(*)
-        `)
-        .order(sortField, { ascending: sortDirection === 'asc' });
-
-      if (fetchError) throw fetchError;
-      // When rows are ticked, keep only those
-      const allRegistrations = onlyIds
-        ? (everyRegistration ?? []).filter((reg) => onlyIds.has(reg.id))
-        : everyRegistration;
-      if (!allRegistrations || allRegistrations.length === 0) return;
+      setError(null);
+      const rows = await fetchRowsForExport<ExhibitorRegistration>('exhibitor_registrations', SELECT, onlyIds);
+      if (rows.length === 0) return;
 
       const headers = [
         'Business Name',
@@ -287,6 +267,7 @@ const AdminExhibitorRegistrations: React.FC = () => {
         'Products Description',
         'Additional Comments',
         'Registration Date',
+        'Total Amount',
         'Payment Method',
         'Payment Status',
         'PO Number',
@@ -297,11 +278,10 @@ const AdminExhibitorRegistrations: React.FC = () => {
         'Participant Names'
       ];
 
-      const csvData = allRegistrations.map(reg => {
-        const participantNames = reg.participants
-          ?.map((p: any) => `${p.first_name} ${p.last_name}${p.role ? ` (${p.role})` : ''}`)
-          .join('; ') || '';
-          
+      const csvData = rows.map((reg) => {
+        const participantNames =
+          reg.participants?.map((p) => `${p.first_name} ${p.last_name}${p.role ? ` (${p.role})` : ''}`).join('; ') || '';
+
         return [
           reg.business_name,
           `${reg.first_name} ${reg.last_name}`,
@@ -316,6 +296,7 @@ const AdminExhibitorRegistrations: React.FC = () => {
           reg.products_description || '',
           reg.additional_comments || '',
           new Date(reg.created_at).toLocaleDateString(),
+          `$${(Number(reg.total_amount) || 0).toFixed(2)}`,
           reg.payment_method || '',
           reg.payment_status || '',
           reg.po_number || '',
@@ -327,20 +308,8 @@ const AdminExhibitorRegistrations: React.FC = () => {
         ];
       });
 
-      const csvContent = [
-        headers.join(','),
-        ...csvData.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-      ].join('\n');
-
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `exhibitor-registrations${onlyIds ? '-selected' : ''}-${new Date().toISOString().split('T')[0]}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (err: any) {
+      downloadCsv(`exhibitor-registrations${onlyIds ? '-selected' : ''}-${dateStamp()}.csv`, toCsv(headers, csvData));
+    } catch (err) {
       console.error('Error exporting registrations:', err);
       setError('Failed to export registrations');
     } finally {
@@ -348,72 +317,76 @@ const AdminExhibitorRegistrations: React.FC = () => {
     }
   };
 
-  // Search and the payment filter run on the server, so the page shows exactly what was fetched
-  const filteredRegistrations = registrations;
-
-  const pageIds = filteredRegistrations.map((registration) => registration.id);
-
-  const SortIcon = ({ field }: { field: keyof ExhibitorRegistration }) => {
-    if (field !== sortField) return null;
-    return sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />;
+  // A function, not a component, so the button keeps keyboard focus when the table re-renders after a sort
+  const sortHeader = (field: keyof ExhibitorRegistration, label: string, align: 'left' | 'right' = 'left') => {
+    const active = field === sortField;
+    return (
+      <th
+        scope="col"
+        className={`${TH_CLASS} ${align === 'right' ? 'text-right' : ''}`}
+        aria-sort={active ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+      >
+        <button
+          type="button"
+          onClick={() => handleSort(field)}
+          className={`flex items-center gap-1 uppercase tracking-wider ${align === 'right' ? 'ml-auto' : ''}`}
+        >
+          {label}
+          {active && (sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" aria-hidden="true" /> : <ChevronDown className="h-4 w-4" aria-hidden="true" />)}
+        </button>
+      </th>
+    );
   };
+
+  const bulkActions = [
+    { key: 'reminders', label: 'Send reminders', icon: <BellRing className="h-4 w-4" aria-hidden="true" />, onClick: () => setBulkDialog('reminders') },
+    { key: 'mark-paid', label: 'Mark paid', icon: <CheckCircle className="h-4 w-4" aria-hidden="true" />, onClick: () => setBulkDialog('markPaid') }
+  ];
+
+  const panelState = panelRegistration ? getPaymentState(panelRegistration) : null;
+
+  // A delete error belongs to the registration it happened on
+  useEffect(() => {
+    setDeleteError(null);
+  }, [panelRegistration?.id]);
 
   return (
     <AdminLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Exhibitor Registrations</h1>
-          <p className="mt-1 text-gray-600">Manage and track exhibitor registrations</p>
-        </div>
+      <div className="space-y-4">
+        <PageHeading title="Exhibitor Registrations" subtitle="Manage and track exhibitor registrations" />
 
-        {/* Main Content */}
         {error && (
-          <div className="mb-6 bg-red-50 border-l-4 border-red-400 p-4">
-            <p className="text-red-700">{error}</p>
+          <div role="alert" className="rounded-md bg-red-50 p-4">
+            <p className="text-sm font-medium text-red-800">{error}</p>
           </div>
         )}
 
         {success && (
-          <div className="mb-6 bg-green-50 border-l-4 border-green-400 p-4">
-            <p className="text-green-700">{success}</p>
+          <div role="status" className="rounded-md bg-green-50 p-4">
+            <p className="text-sm font-medium text-green-800">{success}</p>
           </div>
         )}
 
         <PaymentSummaryStrip summary={summary} unavailable={summaryFailed} />
-        <PaymentFilterChips value={paymentFilter} onChange={handlePaymentFilter} />
 
-        {/* Controls */}
-        <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search registrations..."
-              value={searchTerm}
-              onChange={handleSearch}
-              className="pl-10 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-            />
-          </div>
-          
-          <div className="flex gap-4">
-            <button
+        <div className="flex flex-wrap items-center gap-2">
+          <SearchBox
+            id="registration-search"
+            label="Search registrations"
+            placeholder="Search business, contact or email"
+            value={searchTerm}
+            onChange={handleSearch}
+          />
+          <PaymentFilterChips value={paymentFilter} onChange={handlePaymentFilter} />
+          <div className="ml-auto flex gap-2">
+            <ToolbarButton
               onClick={() => exportToCSV()}
-              disabled={exporting || summary?.registered === 0}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
+              busy={exporting}
+              disabled={summary?.registered === 0}
+              icon={<Download className="h-4 w-4" aria-hidden="true" />}
             >
-              {exporting ? (
-                <>
-                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                  Exporting...
-                </>
-              ) : (
-                <>
-                  <Download className="h-5 w-5 mr-2" />
-                  Export all to CSV
-                </>
-              )}
-            </button>
+              {exporting ? 'Exporting...' : 'Export all to CSV'}
+            </ToolbarButton>
           </div>
         </div>
 
@@ -422,416 +395,263 @@ const AdminExhibitorRegistrations: React.FC = () => {
           exporting={exporting}
           onExport={() => exportToCSV(selected)}
           onClear={clearSelection}
+          actions={bulkActions}
         />
 
-        {/* Registrations Table */}
-        <div className="bg-white shadow-md rounded-lg overflow-hidden">
-          {loading ? (
-            <div className="p-8 text-center">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary border-t-transparent"></div>
-              <p className="mt-2 text-gray-600">Loading registrations...</p>
-            </div>
-          ) : filteredRegistrations.length === 0 ? (
-            <div className="p-8 text-center">
-              <p className="text-gray-500">No registrations found</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+        <RegistrationSplit panelOpen={panelRegistration !== null}>
+          <div className="min-w-0 space-y-3">
+            <TableCard loading={loading} isEmpty={registrations.length === 0} emptyText="No registrations found">
+              <table className="min-w-full text-sm">
+                <caption className="sr-only">Exhibitor registrations</caption>
+                <thead>
                   <tr>
-                    <th scope="col" className="w-10 px-4 py-3">
+                    <th scope="col" className={`${TH_CLASS} w-10`}>
                       <PageSelectCheckbox ids={pageIds} selected={selected} onToggle={togglePage} />
                     </th>
-                    <th 
-                      scope="col" 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                      onClick={() => handleSort('business_name')}
-                    >
-                      <div className="flex items-center">
-                        Business Name
-                        <SortIcon field="business_name" />
-                      </div>
-                    </th>
-                    <th 
-                      scope="col" 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                      onClick={() => handleSort('last_name')}
-                    >
-                      <div className="flex items-center">
-                        Contact
-                        <SortIcon field="last_name" />
-                      </div>
-                    </th>
-                    <th 
-                      scope="col" 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                      onClick={() => handleSort('email')}
-                    >
-                      <div className="flex items-center">
-                        Email
-                        <SortIcon field="email" />
-                      </div>
-                    </th>
-                    <th 
-                      scope="col" 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                      onClick={() => handleSort('created_at')}
-                    >
-                      <div className="flex items-center">
-                        Registration Date
-                        <SortIcon field="created_at" />
-                      </div>
-                    </th>
-                    <th 
-                      scope="col" 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                      onClick={() => handleSort('payment_status')}
-                    >
-                      <div className="flex items-center">
-                        Payment Status
-                        <SortIcon field="payment_status" />
-                      </div>
-                    </th>
-                    <th 
-                      scope="col" 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Participants
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
+                    {sortHeader('business_name', 'Business')}
+                    {sortHeader('payment_status', 'Payment')}
+                    {sortHeader('total_amount', 'Amount', 'right')}
+                    {sortHeader('created_at', 'Registered')}
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredRegistrations.map((registration) => (
-                    <tr key={registration.id} className={`hover:bg-gray-50 ${selected.has(registration.id) ? 'bg-blue-50' : ''}`}>
-                      <td className="w-10 px-4 py-4">
-                        <input
-                          type="checkbox"
-                          aria-label={`Select ${registration.business_name}`}
-                          checked={selected.has(registration.id)}
-                          onChange={() => toggle(registration.id)}
-                          className="rounded border-gray-300 text-primary focus:ring-primary"
-                        />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {registration.business_name}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {registration.first_name} {registration.last_name}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {registration.phone}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {registration.email}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(registration.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <PaymentStatusBadge state={getPaymentState(registration)} />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {registration.participants && registration.participants.length > 0 ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            <Users className="h-3 w-3 mr-1" />
-                            {registration.participants.length}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button
-                          onClick={() => {
-                            setSelectedRegistration(registration);
-                            setShowDetailsModal(true);
-                          }}
-                          className="text-primary hover:text-primary/80 mr-3"
-                          title="View details"
-                        >
-                          <Eye className="h-5 w-5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteRegistration(registration.id)}
-                          className="text-red-600 hover:text-red-800"
-                          title="Delete registration"
-                        >
-                          <Trash2 className="h-5 w-5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                <tbody>
+                  {registrations.map((registration) => {
+                    const state = getPaymentState(registration);
+                    const isOpen = panelRegistration?.id === registration.id;
+                    const open = () => setPanelRegistration(registration);
+                    const participantCount = registration.participants?.length ?? 0;
+                    return (
+                      <tr
+                        key={registration.id}
+                        onClick={rowClickHandler(open)}
+                        className={rowClass(selected.has(registration.id), isOpen)}
+                      >
+                        <td className={`${TD_CLASS} w-10 ${openBarClass(isOpen)}`}>
+                          <input
+                            type="checkbox"
+                            aria-label={`Select ${registration.business_name}`}
+                            checked={selected.has(registration.id)}
+                            onChange={() => toggle(registration.id)}
+                            className="rounded border-gray-300 text-primary focus:ring-primary"
+                          />
+                        </td>
+                        <td className={TD_CLASS}>
+                          <RegistrantCell
+                            name={registration.business_name}
+                            lines={[
+                              `${registration.first_name} ${registration.last_name}`,
+                              participantCount > 0 && `${participantCount} ${participantCount === 1 ? 'participant' : 'participants'}`
+                            ]}
+                            open={isOpen}
+                            onOpen={open}
+                          />
+                        </td>
+                        <td className={TD_CLASS}>
+                          <PaymentStatusBadge state={state} method={paymentMethodLabel(registration.payment_method)} />
+                          {reminders[registration.id] && !state.isPaid && (
+                            <p className="text-xs text-gray-500">Reminded {formatShortDate(reminders[registration.id])}</p>
+                          )}
+                        </td>
+                        <td className={`${TD_CLASS} text-right tabular-nums`}>
+                          {registration.total_amount === null || registration.total_amount === undefined
+                            ? '—'
+                            : formatMoney(Number(registration.total_amount) || 0)}
+                        </td>
+                        <td className={`${TD_CLASS} whitespace-nowrap text-gray-600`} title={fullDate(registration.created_at)}>
+                          {formatCellDate(registration.created_at)}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
-            </div>
-          )}
-        </div>
+            </TableCard>
 
-        {/* Pagination Controls */}
-        <div className="flex justify-between items-center mt-4">
-          <div>
-            Showing {registrations.length ? (page - 1) * PAGE_SIZE + 1 : 0}
-            -{(page - 1) * PAGE_SIZE + registrations.length} of {totalCount}
+            <PaginationBar page={page} pageSize={PAGE_SIZE} shown={registrations.length} total={totalCount} onPageChange={setPage} />
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="px-3 py-1 rounded bg-gray-200 disabled:opacity-50"
-            >
-              Previous
-            </button>
-            <span>Page {page}</span>
-            <button
-              onClick={() => setPage((p) => (p * PAGE_SIZE < totalCount ? p + 1 : p))}
-              disabled={page * PAGE_SIZE >= totalCount}
-              className="px-3 py-1 rounded bg-gray-200 disabled:opacity-50"
-            >
-              Next
-            </button>
-          </div>
-        </div>
 
-        {/* Details Modal */}
-        {showDetailsModal && selectedRegistration && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg max-w-4xl w-full mx-4 p-6 max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="text-xl font-bold text-secondary">Registration Details</h3>
-                <button
-                  onClick={() => setShowDetailsModal(false)}
-                  className="text-gray-400 hover:text-gray-500"
-                >
-                  <span className="sr-only">Close</span>
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div>
-                  <h4 className="font-medium text-gray-700 mb-2">Business Information</h4>
-                  <div className="bg-gray-50 p-4 rounded-md">
-                    <p className="text-lg font-semibold text-gray-900">{selectedRegistration.business_name}</p>
-                    <p className="text-gray-600 mt-2">
-                      {selectedRegistration.street_address}
-                      {selectedRegistration.street_address2 && <span>, {selectedRegistration.street_address2}</span>}
-                      <br />
-                      {selectedRegistration.city}, {selectedRegistration.state} {selectedRegistration.zip_code}
-                    </p>
-                  </div>
-                </div>
-                
-                <div>
-                  <h4 className="font-medium text-gray-700 mb-2">Contact Information</h4>
-                  <div className="bg-gray-50 p-4 rounded-md">
-                    <p className="text-lg font-semibold text-gray-900">
-                      {selectedRegistration.first_name} {selectedRegistration.last_name}
-                    </p>
-                    <p className="text-gray-600 mt-1">
-                      <a href={`mailto:${selectedRegistration.email}`} className="text-primary hover:underline">
-                        {selectedRegistration.email}
-                      </a>
-                    </p>
-                    <p className="text-gray-600 mt-1">
-                      <span className="font-medium">Phone:</span> {selectedRegistration.phone}
-                    </p>
-                    {selectedRegistration.mobile_phone && (
-                      <p className="text-gray-600 mt-1">
-                        <span className="font-medium">Mobile:</span> {selectedRegistration.mobile_phone}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-              
-              <div className="mb-6">
-                <h4 className="font-medium text-gray-700 mb-2">Booth Requirements</h4>
-                <div className="bg-gray-50 p-4 rounded-md">
-                  {selectedRegistration.booth_requirements ? (
-                    <p className="text-gray-700">{selectedRegistration.booth_requirements}</p>
-                  ) : (
-                    <p className="text-gray-500 italic">No specific requirements provided</p>
-                  )}
-                </div>
-              </div>
-              
-              <div className="mb-6">
-                <h4 className="font-medium text-gray-700 mb-2">Products/Services Description</h4>
-                <div className="bg-gray-50 p-4 rounded-md">
-                  {selectedRegistration.products_description ? (
-                    <p className="text-gray-700">{selectedRegistration.products_description}</p>
-                  ) : (
-                    <p className="text-gray-500 italic">No description provided</p>
-                  )}
-                </div>
-              </div>
-              
-              <div className="mb-6">
-                <h4 className="font-medium text-gray-700 mb-2">Additional Comments</h4>
-                <div className="bg-gray-50 p-4 rounded-md">
-                  {selectedRegistration.additional_comments ? (
-                    <p className="text-gray-700">{selectedRegistration.additional_comments}</p>
-                  ) : (
-                    <p className="text-gray-500 italic">No additional comments</p>
-                  )}
-                </div>
-              </div>
-              
-              {/* Booth Participants */}
-              {selectedRegistration.participants && selectedRegistration.participants.length > 0 && (
-                <div className="mb-6">
-                  <h4 className="font-medium text-gray-700 mb-2">
-                    Additional Booth Participants ({selectedRegistration.participants.length})
-                  </h4>
-                  <div className="bg-gray-50 p-4 rounded-md">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {selectedRegistration.participants.map((participant, index) => (
-                        <div key={participant.id} className="bg-white p-3 rounded border border-gray-200">
-                          <p className="font-medium text-gray-900">
-                            {index + 1}. {participant.first_name} {participant.last_name}
-                          </p>
-                          {participant.role && (
-                            <p className="text-sm text-gray-600 mt-1">
-                              <span className="font-medium">Role:</span> {participant.role}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {/* Payment Information */}
-              <div className="mb-6">
-                <h4 className="font-medium text-gray-700 mb-2">Payment Information</h4>
-                <div className="bg-gray-50 p-4 rounded-md">
-                  <dl className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">Payment Method</dt>
-                      <dd className="mt-1 text-sm text-gray-900">{selectedRegistration.payment_method?.toUpperCase() || 'N/A'}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">Payment Status</dt>
-                      <dd className="mt-1">
-                        <PaymentStatusBadge state={getPaymentState(selectedRegistration)} showDetail={false} />
-                      </dd>
-                    </div>
-                    {selectedRegistration.po_number && (
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">PO Number</dt>
-                        <dd className="mt-1 text-sm text-gray-900">{selectedRegistration.po_number}</dd>
-                      </div>
-                    )}
-                    {selectedRegistration.paypal_transaction_id && (
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">PayPal Transaction ID</dt>
-                        <dd className="mt-1 text-sm text-gray-900">{selectedRegistration.paypal_transaction_id}</dd>
-                      </div>
-                    )}
-                    {selectedRegistration.paypal_payer_email && (
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">PayPal Payer Email</dt>
-                        <dd className="mt-1 text-sm text-gray-900">{selectedRegistration.paypal_payer_email}</dd>
-                      </div>
-                    )}
-                    {selectedRegistration.payment_completed_at && (
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">Payment Completed At</dt>
-                        <dd className="mt-1 text-sm text-gray-900">{new Date(selectedRegistration.payment_completed_at).toLocaleString()}</dd>
-                      </div>
-                    )}
-                  </dl>
-                </div>
-              </div>
-
-              <div className="mb-6">
+          <RegistrationPanel
+            open={panelRegistration !== null}
+            title={panelRegistration?.business_name ?? ''}
+            subtitle={panelRegistration ? `${panelRegistration.first_name} ${panelRegistration.last_name}` : undefined}
+            onClose={() => setPanelRegistration(null)}
+            top={
+              panelRegistration && (
                 <MarkPaidPanel
-                  registration={selectedRegistration}
+                  key={panelRegistration.id}
+                  registration={panelRegistration}
                   type="exhibitor"
-                  onMarkedPaid={(id, changes) => {
-                    setSelectedRegistration((previous) => (previous && previous.id === id ? { ...previous, ...changes } : previous));
+                  timeline={buildTimeline(panelRegistration, emailLog, { payments: true })}
+                  timelineLoading={emailLogLoading}
+                  onConflict={() => {
                     clearSelection();
-                    loadSummary();
-                    fetchRegistrations();
+                    refreshAll();
+                  }}
+                  onMarkedPaid={(id, changes) => {
+                    setPanelRegistration((previous) => (previous && previous.id === id ? { ...previous, ...changes } : previous));
+                    deselect([id]);
+                    refreshAll();
+                    reloadEmailLog();
                   }}
                 />
-              </div>
+              )
+            }
+            actions={
+              panelRegistration && (
+                <RegistrationEmailActions
+                  key={panelRegistration.id}
+                  type="exhibitor"
+                  registrationId={panelRegistration.id}
+                  email={panelRegistration.email}
+                  canRemind={Boolean(panelState?.canMarkPaid)}
+                  onEmailSent={() => {
+                    reloadEmailLog();
+                    reloadReminders();
+                  }}
+                />
+              )
+            }
+          >
+            {panelRegistration && (
+              <>
+                <PanelSection title="Business">
+                  <PanelFields
+                    fields={[
+                      { label: 'Business name', value: panelRegistration.business_name },
+                      {
+                        label: 'Address',
+                        value: (
+                          <>
+                            {panelRegistration.street_address}
+                            {panelRegistration.street_address2 && <span>, {panelRegistration.street_address2}</span>}
+                            <br />
+                            {panelRegistration.city}, {panelRegistration.state} {panelRegistration.zip_code}
+                          </>
+                        )
+                      }
+                    ]}
+                  />
+                </PanelSection>
 
-              <div className="mb-6">
-                <h4 className="font-medium text-gray-700 mb-2">Registration Information</h4>
-                <div className="bg-gray-50 p-4 rounded-md">
-                  <p className="text-gray-600">
-                    <span className="font-medium">Registration Date:</span> {new Date(selectedRegistration.created_at).toLocaleString()}
+                <PanelSection title="Contact">
+                  <PanelFields
+                    fields={[
+                      { label: 'Name', value: `${panelRegistration.first_name} ${panelRegistration.last_name}` },
+                      {
+                        label: 'Email',
+                        value: (
+                          <a href={`mailto:${panelRegistration.email}`} className="text-primary hover:underline">
+                            {panelRegistration.email}
+                          </a>
+                        )
+                      },
+                      { label: 'Phone', value: panelRegistration.phone },
+                      ...(panelRegistration.mobile_phone ? [{ label: 'Mobile', value: panelRegistration.mobile_phone }] : [])
+                    ]}
+                  />
+                </PanelSection>
+
+                <PanelSection title="Booth requirements">
+                  <p className="rounded-md bg-gray-50 p-3 text-sm text-gray-700">
+                    {panelRegistration.booth_requirements || <span className="italic text-gray-500">No specific requirements provided</span>}
                   </p>
-                  {selectedRegistration.updated_at && selectedRegistration.updated_at !== selectedRegistration.created_at && (
-                    <p className="text-gray-600 mt-1">
-                      <span className="font-medium">Last Updated:</span> {new Date(selectedRegistration.updated_at).toLocaleString()}
-                    </p>
-                  )}
-                </div>
-              </div>
-              
-              <div className="flex flex-col gap-3">
-                {emailSent && (
-                  <div className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-800 rounded-lg text-sm">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Confirmation email sent successfully!
-                  </div>
+                </PanelSection>
+
+                <PanelSection title="Products and services">
+                  <p className="rounded-md bg-gray-50 p-3 text-sm text-gray-700">
+                    {panelRegistration.products_description || <span className="italic text-gray-500">No description provided</span>}
+                  </p>
+                </PanelSection>
+
+                <PanelSection title="Additional comments">
+                  <p className="rounded-md bg-gray-50 p-3 text-sm text-gray-700">
+                    {panelRegistration.additional_comments || <span className="italic text-gray-500">No additional comments</span>}
+                  </p>
+                </PanelSection>
+
+                {panelRegistration.participants && panelRegistration.participants.length > 0 && (
+                  <PanelSection title={`Additional booth participants (${panelRegistration.participants.length})`}>
+                    <ul className="space-y-2 rounded-lg bg-gray-50 p-3 text-sm">
+                      {panelRegistration.participants.map((participant, index) => (
+                        <li key={participant.id}>
+                          <span className="font-medium text-gray-900">
+                            {index + 1}. {participant.first_name} {participant.last_name}
+                          </span>
+                          {participant.role && <span className="ml-2 text-gray-500">({participant.role})</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  </PanelSection>
                 )}
-                <div className="flex justify-end space-x-3">
-                  <button
-                    onClick={() => handleResendEmail(selectedRegistration.id)}
-                    disabled={resendingEmail}
-                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {resendingEmail ? (
-                      <>
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Sending...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="mr-2 h-5 w-5" />
-                        Resend Confirmation
-                      </>
-                    )}
-                  </button>
-                  <a
-                    href={`mailto:${selectedRegistration.email}`}
-                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
-                  >
-                    <Mail className="mr-2 h-5 w-5" />
-                    New Email
-                  </a>
-                  <button
-                    onClick={() => handleDeleteRegistration(selectedRegistration.id)}
-                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
-                  >
-                    <Trash2 className="mr-2 h-5 w-5" />
-                    Delete Registration
-                  </button>
-                  <button
-                    onClick={() => setShowDetailsModal(false)}
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+
+                <PanelSection title="Payment details">
+                  <PanelFields
+                    fields={[
+                      {
+                        label: 'Total amount',
+                        value:
+                          panelRegistration.total_amount === null || panelRegistration.total_amount === undefined
+                            ? ''
+                            : formatMoney(Number(panelRegistration.total_amount) || 0)
+                      },
+                      { label: 'Payment method', value: panelRegistration.payment_method?.toUpperCase() ?? '' },
+                      ...(panelRegistration.po_number ? [{ label: 'PO number', value: panelRegistration.po_number }] : []),
+                      ...(panelRegistration.paypal_transaction_id
+                        ? [{ label: 'PayPal transaction ID', value: panelRegistration.paypal_transaction_id }]
+                        : []),
+                      ...(panelRegistration.paypal_payer_email
+                        ? [{ label: 'PayPal payer email', value: panelRegistration.paypal_payer_email }]
+                        : []),
+                      ...(panelRegistration.payment_completed_at
+                        ? [{ label: 'Payment completed', value: describeWhen(panelRegistration.payment_completed_at) }]
+                        : [])
+                    ]}
+                  />
+                </PanelSection>
+
+                <PanelSection title="Registration">
+                  <PanelFields
+                    fields={[
+                      { label: 'Registered', value: new Date(panelRegistration.created_at).toLocaleString() },
+                      ...(panelRegistration.updated_at && panelRegistration.updated_at !== panelRegistration.created_at
+                        ? [{ label: 'Last updated', value: new Date(panelRegistration.updated_at).toLocaleString() }]
+                        : [])
+                    ]}
+                  />
+                </PanelSection>
+
+                <DeleteRegistrationButton
+                  onClick={() => handleDeleteRegistration(panelRegistration)}
+                  busy={deleting === panelRegistration.id}
+                  error={deleteError}
+                />
+              </>
+            )}
+          </RegistrationPanel>
+        </RegistrationSplit>
+
+        <BulkRemindersDialog
+          open={bulkDialog === 'reminders'}
+          type="exhibitor"
+          ids={Array.from(selected)}
+          onClose={() => setBulkDialog(null)}
+          onFinished={(processedIds) => {
+            deselect(processedIds);
+            reloadReminders();
+            reloadEmailLog();
+          }}
+        />
+        <BulkMarkPaidDialog
+          open={bulkDialog === 'markPaid'}
+          type="exhibitor"
+          ids={Array.from(selected)}
+          onClose={() => setBulkDialog(null)}
+          onFinished={(processedIds) => {
+            deselect(processedIds);
+            refreshAll();
+            reloadEmailLog();
+          }}
+        />
       </div>
     </AdminLayout>
   );

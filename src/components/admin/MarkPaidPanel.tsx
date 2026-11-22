@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { CheckCircle } from 'lucide-react';
 import { formatMoney } from '../../lib/dashboard';
 import {
+  NOT_AWAITING_PAYMENT_MESSAGE,
   formatShortDate,
   getErrorMessage,
   getPaymentState,
@@ -9,7 +10,9 @@ import {
   type PaymentRow,
   type RegistrationType
 } from '../../lib/registrationPayments';
+import type { TimelineItem } from '../../lib/registrationEmails';
 import { PaymentStatusBadge } from './PaymentStatusBadge';
+import { PaymentTimeline } from './PaymentTimeline';
 
 export interface MarkPaidRegistration extends PaymentRow {
   id: string;
@@ -25,10 +28,22 @@ interface MarkPaidPanelProps {
   // Called after the payment is recorded, with the id that was marked and the fields that changed, so the page can
   // refresh. The id lets the page ignore the answer if a different registration is open by then.
   onMarkedPaid: (id: string, changes: { payment_status: string; payment_completed_at: string }) => void;
+  // Registered, emails sent and payment, when the page has the history. Without it a short two-line version is shown.
+  timeline?: TimelineItem[];
+  timelineLoading?: boolean;
+  // Someone else already paid it (or the list is out of date): the page should reload
+  onConflict?: () => void;
 }
 
-// The "Payment" section of a registration's details pop-up.
-export const MarkPaidPanel: React.FC<MarkPaidPanelProps> = ({ registration, type, onMarkedPaid }) => {
+// The "Payment" section at the top of a registration's panel: status, amount, history and the Mark paid button.
+export const MarkPaidPanel: React.FC<MarkPaidPanelProps> = ({
+  registration,
+  type,
+  onMarkedPaid,
+  timeline,
+  timelineLoading = false,
+  onConflict
+}) => {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -72,23 +87,29 @@ export const MarkPaidPanel: React.FC<MarkPaidPanelProps> = ({ registration, type
     } catch (err) {
       console.error('Error marking payment as paid:', err);
       setError(`Failed to update payment status: ${getErrorMessage(err)}`);
+      if (getErrorMessage(err) === NOT_AWAITING_PAYMENT_MESSAGE) onConflict?.();
     } finally {
       setProcessing(false);
     }
   };
 
   return (
-    <section aria-labelledby="payment-panel-heading" className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-      <h4 id="payment-panel-heading" className="text-sm font-semibold uppercase tracking-wide text-gray-600">
+    <section aria-labelledby="payment-panel-heading">
+      <h3 id="payment-panel-heading" className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
         Payment
-      </h4>
+      </h3>
 
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
         <PaymentStatusBadge state={state} showDetail={false} />
         {Number.isFinite(amount) && <span className="text-sm font-medium text-gray-900">{formatMoney(amount)}</span>}
       </div>
 
-      <ol className="mt-3 space-y-1.5 border-l-2 border-gray-300 pl-3 text-sm text-gray-700">
+      {timeline ? (
+        <div className="mt-3">
+          <PaymentTimeline items={timeline} loading={timelineLoading} />
+        </div>
+      ) : (
+      <ol className="mt-3 space-y-1.5 border-l-2 border-gray-200 pl-3 text-sm text-gray-700">
         <li>Registered {formatShortDate(registration.created_at)}</li>
         {state.isPaid ? (
           <li>
@@ -98,6 +119,7 @@ export const MarkPaidPanel: React.FC<MarkPaidPanelProps> = ({ registration, type
           state.detail && <li className="text-gray-500">{state.detail}</li>
         )}
       </ol>
+      )}
 
       {state.canMarkPaid && (
         <div className="mt-4">
@@ -105,7 +127,7 @@ export const MarkPaidPanel: React.FC<MarkPaidPanelProps> = ({ registration, type
             type="button"
             onClick={handleMarkPaid}
             disabled={processing}
-            className="inline-flex items-center gap-2 rounded-md bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800 disabled:opacity-50"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-tapt-blue px-3 py-2 text-sm font-semibold text-white hover:bg-tapt-navy disabled:opacity-50"
           >
             <CheckCircle className="h-4 w-4" aria-hidden="true" />
             {processing ? 'Saving…' : 'Mark as paid and email receipt'}

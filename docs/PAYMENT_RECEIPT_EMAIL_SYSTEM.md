@@ -203,6 +203,33 @@ For testing, use:
 - Check inline CSS rendering
 - Verify template HTML structure
 
+## Registration Pages: Side Panel, Bulk Actions, Reminders and Email History
+
+The Conference, Tech Conference, Exhibitor and Regional Luncheon registration pages (Admin > each program > Registrations) share one set of parts.
+
+### What an admin can do
+- **Layout (all four pages):** one toolbar row (search, filter chips, Export, View archives), a compact table (Conference and Tech Conference: Registrant, Payment, Amount, Registered; Exhibitor: Business, Payment, Amount, Registered, sortable; Regional Luncheon: Registrant, Regions, Attendees, Registered), and summary cards above. Email, phone and the other details are in the panel.
+- **Side panel:** click anywhere on a row (or its name) to open the registration. On a screen 1280 px wide or more the panel sits beside the list and stays in view while the list scrolls; clicking another row switches it. On narrower screens it slides in over the list as a dialog. It shows the payment status and **history** (Registered, every logged email, Payment received or "Payment not received yet"), then the buttons (Mark as paid for purchase orders, Send payment reminder for unpaid purchase orders, Resend confirmation, New email), then the details, and Delete at the bottom. Escape or the close button closes it and focus returns to the row. The eye and trash columns were removed.
+- **Bulk actions:** tick rows (ticks survive paging) and use the bar that appears:
+  - **Send reminders** emails each unpaid purchase order a reminder. The server skips, with a reason: registrations that are paid, PayPal, have no email or amount, or were reminded in the last 24 hours. A results list shows who was sent, skipped and failed. Up to 25 are sent per request; the page sends larger selections in batches.
+  - **Mark paid** first lists how many of the ticked rows are unpaid purchase orders and their total, then records them one at a time (each emails its receipt), up to 50 per run. A results list flags "paid, but the receipt email failed" and any row that could not be changed.
+  - **Export selected** downloads only the ticked rows.
+- Under an unpaid row the list shows "Reminded Mar 3" when a reminder went out.
+
+### Reminder email
+`send-payment-reminders` (admin only) sends the reminder to the billing contact when the registration has one (conference and tech conference), otherwise to the registrant. It shows the event, PO number, amount due, the remittance address and payment contact from the payment settings, and the event's payment instructions. Amount, status and recipient come from the database. Sends are spaced about 150 ms apart (the email service allows 10 requests per second per team).
+
+### Email history
+Table `registration_email_log` (migration `20261124000000_registration_email_log.sql`) holds one row per confirmation, reminder or receipt attempt (sent or failed, with the reason). Only edge functions write it (service role); admins can read it. It is written by `send-payment-reminders`, the four `resend-*-confirmation` functions and `send-payment-receipt`. The history only starts with the first email sent after this change, and the confirmation emails sent at sign-up are not logged. The reminder function refuses to send anything if the log cannot be read, because it needs the log to enforce the one-reminder-a-day rule.
+
+`_shared/email.ts` now treats an error returned by the email service (for example a rate limit) as a failure; before, only thrown errors counted, so a rejected email could be reported as sent.
+
+### Deploy order
+Apply the migration, deploy `send-payment-reminders`, `resend-conference-confirmation`, `resend-tech-conference-confirmation`, `resend-exhibitor-confirmation`, `resend-regional-luncheon-confirmation` and `send-payment-receipt`, then the site. The pages work without the history table (the history is just empty), but the reminder buttons need both the table and the function.
+
+### Code
+`src/components/admin/`: `PaymentRegistrationsPage` (Conference and Tech pages are configurations of it), `RegistrationListParts` (search box, toolbar button, stat card, table card, name cell, Delete button) with `src/lib/registrationList` (table classes, row click) and `useMediaQuery` (panel beside the list or over it), `RegistrationPanel` (and `RegistrationSplit`), `PaymentTimeline`, `RegistrationEmailActions`, `BulkRegistrationDialogs`, `BulkSelectionBar`, `PaginationBar`, `MarkPaidPanel`. `src/lib/`: `registrationEmails` (history, reminders, timeline), `bulkPayments`, `registrationExport` and `csv` (exports escape quotes and formula-looking cells), `luncheonRegistrations`, `useDialogFocus`.
+
 ## Future Enhancements
 
 ### Potential Improvements:
@@ -228,8 +255,7 @@ For testing, use:
    - CC school district finance department
 
 6. **Scheduled Reminders:**
-   - Send reminder if payment not received after X days
-   - Automated follow-up for pending POs
+   - Reminders are sent by hand from the registration pages (see above); sending them automatically after X days is still open
 
 7. **Email Analytics:**
    - Track open rates

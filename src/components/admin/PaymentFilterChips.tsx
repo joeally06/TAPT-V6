@@ -1,5 +1,6 @@
 import React from 'react';
 import { PAYMENT_FILTERS, type PaymentFilter } from '../../lib/registrationPayments';
+import { chipClass } from '../../lib/registrationList';
 
 interface PaymentFilterChipsProps {
   value: PaymentFilter;
@@ -7,7 +8,7 @@ interface PaymentFilterChipsProps {
 }
 
 export const PaymentFilterChips: React.FC<PaymentFilterChipsProps> = ({ value, onChange }) => (
-  <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by payment">
+  <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter by payment">
     {PAYMENT_FILTERS.map((filter) => {
       const active = filter.value === value;
       return (
@@ -16,11 +17,7 @@ export const PaymentFilterChips: React.FC<PaymentFilterChipsProps> = ({ value, o
           type="button"
           onClick={() => onChange(filter.value)}
           aria-pressed={active}
-          className={`rounded-full border px-3 py-1 text-sm font-medium ${
-            active
-              ? 'border-tapt-navy bg-tapt-navy text-white'
-              : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-          }`}
+          className={chipClass(active)}
         >
           {filter.label}
         </button>

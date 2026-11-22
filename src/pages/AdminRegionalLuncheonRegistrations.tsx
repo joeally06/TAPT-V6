@@ -1,599 +1,442 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { Trash2, Search, Calendar, MapPin, Users, Building, User, RefreshCw, Mail, Eye, X, Send, Loader2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import AdminLayout from '../components/AdminLayout';
+import { BulkSelectionBar } from '../components/admin/BulkSelectionBar';
+import { PageSelectCheckbox } from '../components/admin/PageSelectCheckbox';
+import {
+  DeleteRegistrationButton,
+  PageHeading,
+  RegistrantCell,
+  SearchBox,
+  StatCard,
+  TableCard,
+  ToolbarButton
+} from '../components/admin/RegistrationListParts';
+import { PaginationBar } from '../components/admin/PaginationBar';
+import { RegistrationPanel, RegistrationSplit, PanelFields, PanelSection } from '../components/admin/RegistrationPanel';
+import { RegistrationEmailActions } from '../components/admin/RegistrationEmailActions';
+import { PaymentTimeline } from '../components/admin/PaymentTimeline';
+import { toCsv, downloadCsv, dateStamp } from '../lib/csv';
+import {
+  TD_CLASS,
+  TH_CLASS,
+  chipClass,
+  formatCellDate,
+  fullDate,
+  openBarClass,
+  rowClass,
+  rowClickHandler
+} from '../lib/registrationList';
+import { fetchRowsForExport } from '../lib/registrationExport';
+import { buildTimeline } from '../lib/registrationEmails';
+import { useEmailLog } from '../lib/useEmailLog';
+import { useRowSelection } from '../lib/useRowSelection';
+import { useLatestRequest } from '../lib/useLatestRequest';
+import { useDebouncedValue } from '../lib/useDebouncedValue';
+import { getErrorMessage } from '../lib/registrationPayments';
+import {
+  LUNCHEON_REGIONS,
+  applyLuncheonFilters,
+  fetchLuncheonForExport,
+  getDisplayRegions,
+  useLuncheonSummary,
+  type LuncheonRegistration
+} from '../lib/luncheonRegistrations';
 
-interface RegionalLuncheonRegistration {
-  id: string;
-  name: string;
-  email: string;
-  district_organization: string;
-  number_of_attendees: number;
-  preferred_region: string;
-  selected_regions?: string[];
-  created_at: string;
-}
+const PAGE_SIZE = 20;
+
+const CSV_HEADERS = ['Name', 'Email', 'District/Organization', 'Number of Attendees', 'Selected Regions', 'Submitted'];
 
 const AdminRegionalLuncheonRegistrations: React.FC = () => {
-  const [registrations, setRegistrations] = useState<RegionalLuncheonRegistration[]>([]);
+  const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+  const [registrations, setRegistrations] = useState<LuncheonRegistration[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterRegion, setFilterRegion] = useState<string>('all');
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  const [viewRegistration, setViewRegistration] = useState<RegionalLuncheonRegistration | null>(null);
-  const [resendingEmail, setResendingEmail] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
+  const [region, setRegion] = useState('all');
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [exporting, setExporting] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [eventName, setEventName] = useState<string | null>(null);
+  const [panelRegistration, setPanelRegistration] = useState<LuncheonRegistration | null>(null);
 
-  const regions = ['West Region', 'Middle Region', 'Cookeville Region', 'Greeneville Region', 'East Region'];
+  const startRequest = useLatestRequest();
+  // The search box updates at once; the server is asked once typing pauses
+  const searchQuery = useDebouncedValue(searchTerm, 250);
+  const { selected, toggle, togglePage, clear: clearSelection, deselect } = useRowSelection();
+  const isAdmin = !authLoading && user?.role === 'admin';
+  const { summary, failed: summaryFailed, reload: loadSummary } = useLuncheonSummary(isAdmin);
+  const { entries: emailLog, loading: emailLogLoading, reload: reloadEmailLog } = useEmailLog(
+    'regional_luncheon',
+    panelRegistration?.id ?? null
+  );
+  const pageIds = registrations.map((registration) => registration.id);
 
   useEffect(() => {
-    fetchRegistrations();
-    fetchEventName();
-  }, []);
+    if (!authLoading) {
+      if (!user) {
+        navigate('/admin/login');
+        return;
+      }
+      if (user.role !== 'admin') {
+        navigate('/');
+        return;
+      }
+      fetchRegistrations();
+    }
+    // eslint-disable-next-line
+  }, [authLoading, user, page, searchQuery, region]);
 
   // The event these registrations are for (the one that is active now)
-  const fetchEventName = async () => {
-    const { data } = await supabase
+  useEffect(() => {
+    if (!isAdmin) return;
+    supabase
       .from('regional_luncheon_settings')
       .select('name')
       .eq('is_active', true)
-      .maybeSingle();
-    setEventName(data?.name ?? null);
-  };
+      .maybeSingle()
+      .then(({ data }) => setEventName(data?.name ?? null));
+  }, [isAdmin]);
 
   const fetchRegistrations = async () => {
+    const isCurrent = startRequest();
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('regional_luncheon_registrations')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching registrations:', error);
-        return;
-      }
-
-      setRegistrations(data || []);
-    } catch (error) {
-      console.error('Error:', error);
+      const from = (page - 1) * PAGE_SIZE;
+      const query = applyLuncheonFilters(
+        supabase.from('regional_luncheon_registrations').select('*', { count: 'exact' }),
+        { search: searchQuery, region }
+      );
+      // A fixed order keeps rows from repeating or going missing between pages
+      const { data, error: fetchError, count } = await query
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, from + PAGE_SIZE - 1);
+      if (fetchError) throw fetchError;
+      if (!isCurrent()) return;
+      setRegistrations((data ?? []) as LuncheonRegistration[]);
+      setTotalCount(count || 0);
+      setError('');
+    } catch (err) {
+      console.error('Error fetching registrations:', err);
+      if (isCurrent()) setError('Failed to load registrations');
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+    setPage(1);
+    clearSelection();
+  };
+
+  const handleRegion = (next: string) => {
+    setRegion(next);
+    setPage(1);
+    clearSelection();
+  };
+
+  const handleDelete = async (registration: LuncheonRegistration) => {
+    if (!confirm(`Delete the registration for ${registration.name}? This cannot be undone.`)) return;
+    setDeleting(registration.id);
+    setError('');
+    setDeleteError(null);
     try {
-      const { error } = await supabase
+      const { error: deleteError } = await supabase
         .from('regional_luncheon_registrations')
         .delete()
-        .eq('id', id);
-
-      if (error) {
-        console.error('Error deleting registration:', error);
-        alert('Failed to delete registration');
-        return;
-      }
-
-      setRegistrations(registrations.filter(reg => reg.id !== id));
-      setConfirmDelete(null);
-    } catch (error) {
-      console.error('Error:', error);
-      alert('Failed to delete registration');
-    }
-  };
-
-  const filteredRegistrations = registrations.filter(reg => {
-    const matchesSearch = 
-      reg.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      reg.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      reg.district_organization.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesRegion = filterRegion === 'all' || reg.preferred_region === filterRegion;
-
-    return matchesSearch && matchesRegion;
-  });
-
-  // Calculate statistics
-  const stats = {
-    total: registrations.length,
-    byRegion: regions.map(region => ({
-      name: region,
-      count: registrations.filter(r => r.preferred_region === region).length,
-      attendees: registrations
-        .filter(r => r.preferred_region === region)
-        .reduce((sum, r) => sum + r.number_of_attendees, 0)
-    })),
-    totalAttendees: registrations.reduce((sum, r) => sum + r.number_of_attendees, 0)
-  };
-
-  if (loading) {
-    return (
-      <AdminLayout>
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        </div>
-      </AdminLayout>
-    );
-  }
-
-  // Get regions to display (use selected_regions if available, otherwise preferred_region)
-  const getDisplayRegions = (reg: RegionalLuncheonRegistration): string[] => {
-    if (reg.selected_regions && Array.isArray(reg.selected_regions) && reg.selected_regions.length > 0) {
-      return reg.selected_regions;
-    }
-    return reg.preferred_region ? [reg.preferred_region] : [];
-  };
-
-  // Resend confirmation email
-  const handleResendEmail = async (registrationId: string) => {
-    setResendingEmail(true);
-    setEmailSent(false);
-    
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        alert('You must be logged in to perform this action');
-        return;
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resend-regional-luncheon-confirmation`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ registrationId }),
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to resend email');
-      }
-
-      setEmailSent(true);
-      // Reset success message after 3 seconds
-      setTimeout(() => setEmailSent(false), 3000);
-    } catch (error) {
-      console.error('Error resending email:', error);
-      alert(error instanceof Error ? error.message : 'Failed to resend confirmation email');
+        .eq('id', registration.id);
+      if (deleteError) throw deleteError;
+      setSuccess('Registration deleted successfully!');
+      deselect([registration.id]);
+      if (panelRegistration?.id === registration.id) setPanelRegistration(null);
+      loadSummary();
+      fetchRegistrations();
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(`Failed to delete registration: ${getErrorMessage(err)}`);
+      setDeleteError(`Could not delete this registration: ${getErrorMessage(err)}`);
     } finally {
-      setResendingEmail(false);
+      setDeleting(null);
     }
   };
+
+  // Ticked rows, or everything matching the current search and region
+  const exportToCSV = async (onlyIds?: Set<string>) => {
+    try {
+      setExporting(true);
+      setError('');
+      const rows = onlyIds
+        ? await fetchRowsForExport<LuncheonRegistration>('regional_luncheon_registrations', '*', onlyIds)
+        : await fetchLuncheonForExport({ search: searchQuery, region });
+      if (rows.length === 0) return;
+      downloadCsv(
+        `regional-luncheon-registrations${onlyIds ? '-selected' : ''}-${dateStamp()}.csv`,
+        toCsv(
+          CSV_HEADERS,
+          rows.map((reg) => [
+            reg.name,
+            reg.email,
+            reg.district_organization,
+            reg.number_of_attendees,
+            getDisplayRegions(reg).join('; '),
+            new Date(reg.created_at).toLocaleString()
+          ])
+        )
+      );
+    } catch (err) {
+      console.error('Error exporting registrations:', err);
+      setError('Failed to export registrations');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // A delete error belongs to the registration it happened on
+  useEffect(() => {
+    setDeleteError(null);
+  }, [panelRegistration?.id]);
+
+  const regionCount = (name: string): number | null => summary?.byRegion.find((r) => r.name === name)?.count ?? null;
+  const filtered = searchQuery.trim() !== '' || region !== 'all';
 
   return (
     <AdminLayout>
-      {/* View Registration Modal */}
-      {viewRegistration && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-blue-600 rounded-t-lg">
-              <h3 className="text-xl font-bold text-white">Registration Details</h3>
-              <button
-                onClick={() => setViewRegistration(null)}
-                className="text-white hover:text-gray-200 transition-colors"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            
-            {/* Modal Body */}
-            <div className="p-6 space-y-4">
-              {/* Name */}
-              <div className="flex items-start gap-3">
-                <User className="w-5 h-5 text-gray-400 mt-0.5" />
-                <div>
-                  <p className="text-sm text-gray-500">Name</p>
-                  <p className="text-gray-900 font-medium">{viewRegistration.name}</p>
-                </div>
-              </div>
+      <div className="space-y-4">
+        <PageHeading title="Regional Luncheon Registrations" subtitle={eventName} />
 
-              {/* Email */}
-              <div className="flex items-start gap-3">
-                <Mail className="w-5 h-5 text-gray-400 mt-0.5" />
-                <div>
-                  <p className="text-sm text-gray-500">Email</p>
-                  <a 
-                    href={`mailto:${viewRegistration.email}`}
-                    className="text-blue-600 hover:text-blue-800 font-medium"
+        {success && (
+          <div role="status" className="rounded-md bg-green-50 p-4">
+            <p className="text-sm font-medium text-green-800">{success}</p>
+          </div>
+        )}
+        {error && (
+          <div role="alert" className="rounded-md bg-red-50 p-4">
+            <p className="text-sm font-medium text-red-800">{error}</p>
+          </div>
+        )}
+
+        {summary ? (
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3" role="group" aria-label="Registration summary">
+            <StatCard label="Registrations" value={String(summary.total)} />
+            <StatCard label="Attendees" value={String(summary.totalAttendees)} />
+            <StatCard
+              label="Average group size"
+              value={summary.total > 0 ? (summary.totalAttendees / summary.total).toFixed(1) : '0'}
+            />
+          </div>
+        ) : summaryFailed ? (
+          <p role="status" className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Totals could not be loaded. The list below still works.
+          </p>
+        ) : (
+          <div className="h-[62px] animate-pulse rounded-lg bg-gray-200" aria-hidden="true" />
+        )}
+
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <SearchBox
+              id="registration-search"
+              label="Search registrations"
+              placeholder="Search name, email or organization"
+              value={searchTerm}
+              onChange={handleSearch}
+            />
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter by region">
+              {['all', ...LUNCHEON_REGIONS].map((name) => {
+                const active = name === region;
+                const count = name === 'all' ? summary?.total ?? null : regionCount(name);
+                return (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => handleRegion(name)}
+                    aria-pressed={active}
+                    className={chipClass(active)}
                   >
-                    {viewRegistration.email}
-                  </a>
-                </div>
-              </div>
-
-              {/* Organization */}
-              <div className="flex items-start gap-3">
-                <Building className="w-5 h-5 text-gray-400 mt-0.5" />
-                <div>
-                  <p className="text-sm text-gray-500">District/Organization</p>
-                  <p className="text-gray-900 font-medium">{viewRegistration.district_organization}</p>
-                </div>
-              </div>
-
-              {/* Number of Attendees */}
-              <div className="flex items-start gap-3">
-                <Users className="w-5 h-5 text-gray-400 mt-0.5" />
-                <div>
-                  <p className="text-sm text-gray-500">Number of Attendees</p>
-                  <p className="text-gray-900 font-medium">{viewRegistration.number_of_attendees} {viewRegistration.number_of_attendees > 1 ? 'people' : 'person'}</p>
-                </div>
-              </div>
-
-              {/* Selected Regions */}
-              <div className="flex items-start gap-3">
-                <MapPin className="w-5 h-5 text-blue-600 mt-0.5" />
-                <div>
-                  <p className="text-sm text-gray-500">Registered Region(s)</p>
-                  <div className="flex flex-wrap gap-2 mt-1">
-                    {getDisplayRegions(viewRegistration).map((region, idx) => (
-                      <span 
-                        key={idx}
-                        className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
-                      >
-                        {region}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Submitted Date */}
-              <div className="flex items-start gap-3">
-                <Calendar className="w-5 h-5 text-gray-400 mt-0.5" />
-                <div>
-                  <p className="text-sm text-gray-500">Submitted</p>
-                  <p className="text-gray-900 font-medium">
-                    {new Date(viewRegistration.created_at).toLocaleDateString('en-US', {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </p>
-                </div>
-              </div>
-
-              {/* Registration ID */}
-              <div className="pt-4 border-t border-gray-200">
-                <p className="text-xs text-gray-400">Registration ID: {viewRegistration.id}</p>
-              </div>
+                    {name === 'all' ? 'All regions' : name}
+                    {count !== null && <span className="ml-1.5 tabular-nums opacity-80">({count})</span>}
+                  </button>
+                );
+              })}
             </div>
-
-            {/* Modal Footer */}
-            <div className="flex flex-col gap-3 p-6 border-t border-gray-200 bg-gray-50 rounded-b-lg">
-              {emailSent && (
-                <div className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-800 rounded-lg text-sm">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Confirmation email sent successfully!
-                </div>
-              )}
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => handleResendEmail(viewRegistration.id)}
-                  disabled={resendingEmail}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {resendingEmail ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Sending...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-4 h-4" />
-                      Resend Confirmation
-                    </>
-                  )}
-                </button>
-                <a
-                  href={`mailto:${viewRegistration.email}`}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                >
-                  <Mail className="w-4 h-4" />
-                  New Email
-                </a>
-                <button
-                  onClick={() => setViewRegistration(null)}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Regional Luncheon Registrations</h1>
-            {eventName && <p className="text-gray-600 mt-1">{eventName}</p>}
-          </div>
-          <button
-            onClick={fetchRegistrations}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Refresh
-          </button>
-        </div>
-
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Registrations</p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">{stats.total}</p>
-              </div>
-              <Calendar className="w-12 h-12 text-blue-600 opacity-20" />
-            </div>
-          </div>
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Attendees</p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">{stats.totalAttendees}</p>
-              </div>
-              <Users className="w-12 h-12 text-green-600 opacity-20" />
-            </div>
-          </div>
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Average Group Size</p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">
-                  {stats.total > 0 ? (stats.totalAttendees / stats.total).toFixed(1) : '0'}
-                </p>
-              </div>
-              <User className="w-12 h-12 text-purple-600 opacity-20" />
-            </div>
-          </div>
-        </div>
-
-        {/* Regional Breakdown */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Registration by Region</h2>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            {stats.byRegion.map(region => (
-              <div key={region.name} className="border border-gray-200 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <MapPin className="w-4 h-4 text-blue-600" />
-                  <p className="font-semibold text-sm text-gray-900">{region.name}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-2xl font-bold text-gray-900">{region.count}</p>
-                  <p className="text-xs text-gray-500">{region.attendees} attendees</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-2">
-                <Search className="inline w-4 h-4 mr-1" />
-                Search
-              </label>
-              <input
-                type="text"
-                id="search"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search by name or organization..."
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            <div className="md:w-64">
-              <label htmlFor="filterRegion" className="block text-sm font-medium text-gray-700 mb-2">
-                <MapPin className="inline w-4 h-4 mr-1" />
-                Filter by Region
-              </label>
-              <select
-                id="filterRegion"
-                value={filterRegion}
-                onChange={(e) => setFilterRegion(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            <div className="ml-auto flex gap-2">
+              <ToolbarButton
+                onClick={() => exportToCSV()}
+                busy={exporting}
+                disabled={totalCount === 0}
+                icon={<Download className="h-4 w-4" aria-hidden="true" />}
               >
-                <option value="all">All Regions</option>
-                {regions.map(region => (
-                  <option key={region} value={region}>{region}</option>
-                ))}
-              </select>
+                {exporting ? 'Exporting...' : filtered ? `Export ${totalCount} matching to CSV` : 'Export all to CSV'}
+              </ToolbarButton>
             </div>
           </div>
+          <p className="mt-1 text-xs text-gray-500">Someone who signed up for several regions is counted in each of them.</p>
         </div>
 
-        {/* Registrations Table */}
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Email
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    District/Organization
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Attendees
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Preferred Region
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Submitted
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredRegistrations.length === 0 ? (
+        <BulkSelectionBar
+          count={selected.size}
+          exporting={exporting}
+          onExport={() => exportToCSV(selected)}
+          onClear={clearSelection}
+        />
+
+        <RegistrationSplit panelOpen={panelRegistration !== null}>
+          <div className="min-w-0 space-y-3">
+            <TableCard
+              loading={loading}
+              isEmpty={registrations.length === 0}
+              emptyText={filtered ? 'No registrations match your filters' : 'No registrations yet'}
+            >
+              <table className="min-w-full text-sm">
+                <caption className="sr-only">Regional luncheon registrations</caption>
+                <thead>
                   <tr>
-                    <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
-                      {searchTerm || filterRegion !== 'all' 
-                        ? 'No registrations match your filters'
-                        : 'No registrations yet'}
-                    </td>
+                    <th scope="col" className={`${TH_CLASS} w-10`}>
+                      <PageSelectCheckbox ids={pageIds} selected={selected} onToggle={togglePage} />
+                    </th>
+                    <th scope="col" className={TH_CLASS}>Registrant</th>
+                    <th scope="col" className={TH_CLASS}>Regions</th>
+                    <th scope="col" className={`${TH_CLASS} text-right`}>Attendees</th>
+                    <th scope="col" className={TH_CLASS}>Registered</th>
                   </tr>
-                ) : (
-                  filteredRegistrations.map((reg) => (
-                    <tr key={reg.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <User className="w-4 h-4 text-gray-400 mr-2" />
-                          <div className="text-sm font-medium text-gray-900">{reg.name}</div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <Mail className="w-4 h-4 text-gray-400 mr-2" />
-                          <a 
-                            href={`mailto:${reg.email}`}
-                            className="text-sm text-blue-600 hover:text-blue-800"
-                          >
-                            {reg.email}
+                </thead>
+                <tbody>
+                  {registrations.map((reg) => {
+                    const regions = getDisplayRegions(reg);
+                    const isOpen = panelRegistration?.id === reg.id;
+                    const open = () => setPanelRegistration(reg);
+                    return (
+                      <tr key={reg.id} onClick={rowClickHandler(open)} className={rowClass(selected.has(reg.id), isOpen)}>
+                        <td className={`${TD_CLASS} w-10 ${openBarClass(isOpen)}`}>
+                          <input
+                            type="checkbox"
+                            aria-label={`Select ${reg.name}`}
+                            checked={selected.has(reg.id)}
+                            onChange={() => toggle(reg.id)}
+                            className="rounded border-gray-300 text-primary focus:ring-primary"
+                          />
+                        </td>
+                        <td className={TD_CLASS}>
+                          <RegistrantCell name={reg.name} lines={[reg.district_organization]} open={isOpen} onOpen={open} />
+                        </td>
+                        <td className={TD_CLASS}>
+                          {regions.length > 1 ? (
+                            <span
+                              className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800"
+                              title={regions.join(', ')}
+                            >
+                              {regions.length} regions
+                              <span className="sr-only">: {regions.join(', ')}</span>
+                            </span>
+                          ) : (
+                            regions[0] ?? ''
+                          )}
+                        </td>
+                        <td className={`${TD_CLASS} text-right tabular-nums`}>{reg.number_of_attendees}</td>
+                        <td className={`${TD_CLASS} whitespace-nowrap text-gray-600`} title={fullDate(reg.created_at)}>
+                          {formatCellDate(reg.created_at)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </TableCard>
+
+            <PaginationBar page={page} pageSize={PAGE_SIZE} shown={registrations.length} total={totalCount} onPageChange={setPage} />
+          </div>
+
+          <RegistrationPanel
+            open={panelRegistration !== null}
+            title={panelRegistration?.name ?? ''}
+            subtitle={panelRegistration?.district_organization}
+            onClose={() => setPanelRegistration(null)}
+            top={
+              panelRegistration && (
+                <PanelSection title="History">
+                  <PaymentTimeline
+                    items={buildTimeline(panelRegistration, emailLog, { payments: false })}
+                    loading={emailLogLoading}
+                  />
+                </PanelSection>
+              )
+            }
+            actions={
+              panelRegistration && (
+                <RegistrationEmailActions
+                  key={panelRegistration.id}
+                  type="regional_luncheon"
+                  registrationId={panelRegistration.id}
+                  email={panelRegistration.email}
+                  onEmailSent={reloadEmailLog}
+                />
+              )
+            }
+          >
+            {panelRegistration && (
+              <>
+                <PanelSection title="Registration">
+                  <PanelFields
+                    fields={[
+                      { label: 'Name', value: panelRegistration.name },
+                      {
+                        label: 'Email',
+                        value: (
+                          <a href={`mailto:${panelRegistration.email}`} className="text-blue-600 hover:text-blue-800">
+                            {panelRegistration.email}
                           </a>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center">
-                          <Building className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" />
-                          <div className="text-sm text-gray-900">{reg.district_organization}</div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <Users className="w-4 h-4 text-gray-400 mr-2" />
-                          <span className="text-sm text-gray-900">{reg.number_of_attendees}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1">
-                          <MapPin className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                          <div className="text-sm text-gray-900">
-                            {getDisplayRegions(reg).length > 1 ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                {getDisplayRegions(reg).length} regions
-                              </span>
-                            ) : (
-                              reg.preferred_region
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(reg.created_at).toLocaleDateString('en-US', {
+                        )
+                      },
+                      { label: 'District/Organization', value: panelRegistration.district_organization },
+                      {
+                        label: 'Attendees',
+                        value: `${panelRegistration.number_of_attendees} ${panelRegistration.number_of_attendees > 1 ? 'people' : 'person'}`
+                      },
+                      {
+                        label: 'Submitted',
+                        value: new Date(panelRegistration.created_at).toLocaleString('en-US', {
+                          weekday: 'long',
                           year: 'numeric',
-                          month: 'short',
+                          month: 'long',
                           day: 'numeric',
                           hour: '2-digit',
                           minute: '2-digit'
-                        })}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        {confirmDelete === reg.id ? (
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => handleDelete(reg.id)}
-                              className="text-red-600 hover:text-red-900 font-semibold"
-                            >
-                              Confirm
-                            </button>
-                            <button
-                              onClick={() => setConfirmDelete(null)}
-                              className="text-gray-600 hover:text-gray-900"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-end gap-3">
-                            <button
-                              onClick={() => setViewRegistration(reg)}
-                              className="text-blue-600 hover:text-blue-900"
-                              title="View registration details"
-                            >
-                              <Eye className="w-4 h-4 inline" />
-                            </button>
-                            <button
-                              onClick={() => setConfirmDelete(reg.id)}
-                              className="text-red-600 hover:text-red-900"
-                              title="Delete registration"
-                            >
-                              <Trash2 className="w-4 h-4 inline" />
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                        })
+                      }
+                    ]}
+                  />
+                </PanelSection>
 
-        {/* Export Button */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <button
-            onClick={() => {
-              // Helper to escape CSV values that contain commas or quotes
-              const escapeCSV = (value: string | number): string => {
-                const str = String(value);
-                if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-                  return `"${str.replace(/"/g, '""')}"`;
-                }
-                return str;
-              };
+                <PanelSection title="Registered regions">
+                  <ul className="flex flex-wrap gap-2">
+                    {getDisplayRegions(panelRegistration).map((name) => (
+                      <li key={name} className="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800">
+                        {name}
+                      </li>
+                    ))}
+                  </ul>
+                </PanelSection>
 
-              const csv = [
-                ['Name', 'Email', 'District/Organization', 'Number of Attendees', 'Selected Regions', 'Submitted'],
-                ...filteredRegistrations.map(reg => [
-                  escapeCSV(reg.name),
-                  escapeCSV(reg.email),
-                  escapeCSV(reg.district_organization),
-                  reg.number_of_attendees,
-                  escapeCSV(getDisplayRegions(reg).join('; ')),
-                  escapeCSV(new Date(reg.created_at).toLocaleString())
-                ])
-              ].map(row => row.join(',')).join('\n');
+                <p className="border-t border-gray-200 pt-3 text-xs text-gray-500">Registration ID: {panelRegistration.id}</p>
 
-              const blob = new Blob([csv], { type: 'text/csv' });
-              const url = window.URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `regional-luncheon-registrations-${new Date().toISOString().split('T')[0]}.csv`;
-              a.click();
-            }}
-            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-          >
-            Export to CSV ({filteredRegistrations.length} registrations)
-          </button>
-        </div>
+                <DeleteRegistrationButton
+                  onClick={() => handleDelete(panelRegistration)}
+                  busy={deleting === panelRegistration.id}
+                  error={deleteError}
+                />
+              </>
+            )}
+          </RegistrationPanel>
+        </RegistrationSplit>
       </div>
     </AdminLayout>
   );

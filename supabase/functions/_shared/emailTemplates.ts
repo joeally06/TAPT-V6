@@ -1348,3 +1348,126 @@ export function generateRegionalLuncheonConfirmationEmail(data: RegionalLuncheon
   `;
 }
 
+/**
+ * Payment Reminder Email Data Interface
+ */
+export interface PaymentReminderData {
+  registrationType: 'conference' | 'tech_conference' | 'exhibitor';
+  // Who the email is addressed to (the billing contact when there is one)
+  recipientName: string;
+  // Whose registration it is
+  registrantName: string;
+  organization?: string;
+  poNumber: string;
+  totalAmount: number;
+  registeredAt: string;
+  eventName?: string;
+  eventDate?: string;
+  paymentInstructions?: string;
+  remittanceAddress?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  organizationName?: string;
+}
+
+const escapeReminderHtml = (value: string): string =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+/**
+ * Generate HTML email reminding a registrant that a purchase order payment has not been received yet.
+ * Every value is escaped: names, the PO number and the settings text are all typed by people.
+ */
+export function generatePaymentReminderEmail(data: PaymentReminderData): string {
+  const registrationTypeLabel = data.registrationType === 'conference'
+    ? 'Annual Conference Registration'
+    : data.registrationType === 'tech_conference'
+    ? 'Tech Conference Registration'
+    : 'Exhibitor Registration';
+
+  const registeredOn = new Date(data.registeredAt).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'America/Chicago'
+  });
+
+  const amount = Number.isFinite(Number(data.totalAmount)) ? Number(data.totalAmount) : 0;
+  const contactEmail = escapeReminderHtml(data.contactEmail || 'info@tapt.org');
+  const contactPhone = escapeReminderHtml(data.contactPhone || '');
+  const orgName = escapeReminderHtml(data.organizationName || 'Tennessee Association of Pupil Transportation');
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f3f4f6; }
+        .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .header { background: #1e3a8a; color: white; padding: 30px 20px; text-align: center; }
+        .header h1 { margin: 0 0 8px 0; font-size: 26px; }
+        .content { padding: 30px 20px; }
+        .summary-box { background: #fffbeb; border: 2px solid #f59e0b; border-radius: 8px; padding: 20px; margin: 20px 0; }
+        .summary-box h2 { margin: 0 0 15px 0; color: #92400e; font-size: 18px; }
+        .info-row { padding: 10px 0; border-bottom: 1px solid #fde68a; }
+        .info-row:last-child { border-bottom: none; }
+        .label { font-weight: 600; color: #4b5563; display: inline-block; min-width: 140px; }
+        .amount { font-size: 26px; font-weight: bold; color: #92400e; }
+        .info-box { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0; border-radius: 4px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Payment Reminder</h1>
+          <p style="margin: 0; font-size: 15px; opacity: 0.95;">${registrationTypeLabel}${data.eventName ? ` &middot; ${escapeReminderHtml(data.eventName)}` : ''}</p>
+        </div>
+
+        <div class="content">
+          <p>Dear ${escapeReminderHtml(data.recipientName)},</p>
+
+          <p>This is a friendly reminder that we have not yet received payment for the registration below. Your purchase order payment is still outstanding.</p>
+
+          <div class="summary-box">
+            <h2>Payment due</h2>
+            <div class="info-row"><span class="label">Registration:</span> ${escapeReminderHtml(data.registrantName)}</div>
+            ${data.organization ? `<div class="info-row"><span class="label">Organization:</span> ${escapeReminderHtml(data.organization)}</div>` : ''}
+            <div class="info-row"><span class="label">Registered on:</span> ${escapeReminderHtml(registeredOn)}</div>
+            <div class="info-row"><span class="label">PO number:</span> <strong>${escapeReminderHtml(data.poNumber || 'Not provided')}</strong></div>
+            ${data.eventDate ? `<div class="info-row"><span class="label">Event date:</span> ${escapeReminderHtml(data.eventDate)}</div>` : ''}
+            <div class="info-row"><span class="label">Amount due:</span> <span class="amount">$${amount.toFixed(2)}</span></div>
+          </div>
+
+          ${data.remittanceAddress ? `
+            <div class="info-box">
+              <h3 style="margin: 0 0 10px 0; color: #1e40af;">Please send payment to</h3>
+              <div style="white-space: pre-line;">${escapeReminderHtml(data.remittanceAddress)}</div>
+              <p style="margin: 10px 0 0 0;">Please include the PO number above with your payment.</p>
+            </div>
+          ` : ''}
+
+          ${data.paymentInstructions ? `
+            <div class="info-box">
+              <h3 style="margin: 0 0 10px 0; color: #1e40af;">Payment instructions</h3>
+              <div style="white-space: pre-line;">${escapeReminderHtml(data.paymentInstructions)}</div>
+            </div>
+          ` : ''}
+
+          <p>If your payment is already on its way, thank you, and please disregard this message. If you have questions, contact us at <a href="mailto:${contactEmail}" style="color: #1e3a8a;">${contactEmail}</a>${contactPhone ? ` or ${contactPhone}` : ''}.</p>
+
+          <p style="margin-top: 30px; margin-bottom: 0;">
+            Best regards,<br>
+            <strong>${orgName}</strong>
+          </p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}

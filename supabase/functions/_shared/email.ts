@@ -36,6 +36,12 @@ export async function sendEmail(params: {
       html
     });
     
+    // resend-node 2.x returns { data, error } for API errors (for example a rate limit) instead of throwing
+    if (result && (result as any).error) {
+      console.error('❌ Email send rejected:', (result as any).error);
+      return { success: false, error: (result as any).error };
+    }
+
     console.log('✅ Email sent successfully:', result);
     return { success: true, data: result };
   } catch (error) {

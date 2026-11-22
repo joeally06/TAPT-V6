@@ -4,10 +4,16 @@ interface PageSelectCheckboxProps {
   ids: string[];
   selected: Set<string>;
   onToggle: (ids: string[]) => void;
+  label?: string;
 }
 
 // Header checkbox that selects every row on the page. Shows a dash when only some are selected.
-export const PageSelectCheckbox: React.FC<PageSelectCheckboxProps> = ({ ids, selected, onToggle }) => {
+export const PageSelectCheckbox: React.FC<PageSelectCheckboxProps> = ({
+  ids,
+  selected,
+  onToggle,
+  label = 'Select all registrations on this page'
+}) => {
   const ref = useRef<HTMLInputElement>(null);
   const count = ids.filter((id) => selected.has(id)).length;
   const all = ids.length > 0 && count === ids.length;
@@ -20,7 +26,7 @@ export const PageSelectCheckbox: React.FC<PageSelectCheckboxProps> = ({ ids, sel
     <input
       ref={ref}
       type="checkbox"
-      aria-label="Select all registrations on this page"
+      aria-label={label}
       // The selection bar returns focus here when it closes
       data-bulk-return-focus=""
       checked={all}

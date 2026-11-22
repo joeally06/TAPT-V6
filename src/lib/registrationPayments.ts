@@ -239,6 +239,8 @@ export const markRegistrationPaid = async (type: RegistrationType, registrationI
       payment_completed_at: new Date().toISOString()
     })
     .eq('id', registrationId)
+    // Only purchase orders are recorded by hand; PayPal payments are recorded automatically
+    .eq('payment_method', 'po')
     .or(AWAITING_OR)
     .select('id');
 
