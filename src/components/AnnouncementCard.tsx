@@ -2,13 +2,13 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Paperclip, Pin } from 'lucide-react';
 import {
+  ANNOUNCEMENT_CATEGORY_CLASSES,
   effectiveDate,
   getAnnouncementCategory,
   getAnnouncementCategoryLabel,
   getAttachmentLabel,
   isNewlyPosted,
-  isTrustedAttachmentUrl,
-  type AnnouncementCategory
+  isTrustedAttachmentUrl
 } from '../lib/announcements';
 import { formatFileSize } from '../lib/upload';
 
@@ -30,13 +30,6 @@ interface AnnouncementCardProps {
   // The editor preview shows the card without making it a link.
   preview?: boolean;
 }
-
-const CATEGORY_CLASSES: Record<AnnouncementCategory, string> = {
-  event: 'bg-blue-100 text-blue-800',
-  deadline: 'bg-amber-100 text-amber-900',
-  safety: 'bg-red-100 text-red-800',
-  general: 'bg-gray-100 text-gray-700'
-};
 
 const formatLongDate = (iso: string): string =>
   new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -122,7 +115,7 @@ export const AnnouncementRow: React.FC<AnnouncementCardProps> = ({ item, preview
       </time>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${CATEGORY_CLASSES[category]}`}>
+          <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${ANNOUNCEMENT_CATEGORY_CLASSES[category]}`}>
             {getAnnouncementCategoryLabel(category)}
           </span>
           {isNewlyPosted(item) && (

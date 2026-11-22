@@ -1,15 +1,40 @@
-export type AnnouncementCategory = 'event' | 'deadline' | 'safety' | 'general';
+export type AnnouncementCategory = 'general' | 'event' | 'deadline' | 'safety' | 'regulations' | 'industry';
 
+// News is part of announcements, so its categories (regulations, industry) are here too.
 export const ANNOUNCEMENT_CATEGORIES: { value: AnnouncementCategory; label: string }[] = [
   { value: 'general', label: 'General' },
   { value: 'event', label: 'Event' },
   { value: 'deadline', label: 'Deadline' },
-  { value: 'safety', label: 'Safety' }
+  { value: 'safety', label: 'Safety' },
+  { value: 'regulations', label: 'Regulations' },
+  { value: 'industry', label: 'Industry News' }
 ];
 
+// Colours of the category pill on cards and lists
+export const ANNOUNCEMENT_CATEGORY_CLASSES: Record<AnnouncementCategory, string> = {
+  general: 'bg-gray-100 text-gray-700',
+  event: 'bg-blue-100 text-blue-800',
+  deadline: 'bg-amber-100 text-amber-900',
+  safety: 'bg-red-100 text-red-800',
+  regulations: 'bg-purple-100 text-purple-800',
+  industry: 'bg-teal-100 text-teal-800'
+};
+
+// News used its own category names before it became part of announcements; rows not converted yet still read well.
+const LEGACY_CATEGORIES = new Map<string, AnnouncementCategory>([
+  ['announcements', 'general'],
+  ['events', 'event']
+]);
+
 // Announcements saved before categories existed have none; they show as General.
-export const getAnnouncementCategory = (value: string | null | undefined): AnnouncementCategory =>
-  ANNOUNCEMENT_CATEGORIES.some((c) => c.value === value) ? (value as AnnouncementCategory) : 'general';
+export const getAnnouncementCategory = (value: string | null | undefined): AnnouncementCategory => {
+  if (ANNOUNCEMENT_CATEGORIES.some((c) => c.value === value)) return value as AnnouncementCategory;
+  return (value && LEGACY_CATEGORIES.get(value)) || 'general';
+};
+
+// The News page filter: 'all' or one category
+export const matchesAnnouncementCategory = (itemCategory: string | null | undefined, filter: string): boolean =>
+  filter === 'all' || getAnnouncementCategory(itemCategory) === filter;
 
 export const getAnnouncementCategoryLabel = (value: string | null | undefined): string =>
   ANNOUNCEMENT_CATEGORIES.find((c) => c.value === getAnnouncementCategory(value))?.label ?? 'General';

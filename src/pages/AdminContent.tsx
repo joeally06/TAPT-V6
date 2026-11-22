@@ -17,14 +17,13 @@ import {
   Link as LinkIcon,
   ExternalLink
 } from 'lucide-react';
-import { NEWS_CATEGORIES } from '../lib/types/news';
 import { useAuth } from '../context/AuthContext';
 import { uploadFile } from '../lib/upload';
 import { getPublicUrl } from '../lib/storage';
 import { compressImage } from '../lib/imageCompression';
 import AdminLayout from '../components/AdminLayout';
 import AnnouncementEditor from '../components/admin/AnnouncementEditor';
-import { getAnnouncementCategory, getAnnouncementStatus } from '../lib/announcements';
+import { getAnnouncementCategory, getAnnouncementCategoryLabel, getAnnouncementStatus } from '../lib/announcements';
 
 interface ContentItem {
   id: string;
@@ -504,7 +503,7 @@ export const AdminContent: React.FC = () => {
             file_type: fileType,
             file_size: fileSize,
             type: selectedType,
-            // Announcements only use the four announcement categories; drop a stale news category
+            // Announcements use the shared category list; an unknown or old news category becomes General
             ...(selectedType === 'announcement' ? { category: getAnnouncementCategory(data.category) } : {}),
             id: editingItem?.id, // Pass id for update, undefined for insert
             linked_form_type: data.linked_form_type
@@ -534,7 +533,7 @@ export const AdminContent: React.FC = () => {
         status: 'draft',
         featured: false,
         is_featured: false,
-        category: selectedType === 'news' ? NEWS_CATEGORIES[1].id : null,
+        category: null,
         linked_form_type: null
       });
     } catch (error: any) {
@@ -677,9 +676,8 @@ export const AdminContent: React.FC = () => {
 
   const contentTypes = [
     { id: 'event', label: 'Events', icon: Calendar },
-    { id: 'announcement', label: 'Announcements', icon: Bell },
-    { id: 'resource', label: 'Resources', icon: FileText },
-    { id: 'news', label: 'News', icon: FileText }
+    { id: 'announcement', label: 'News & announcements', icon: Bell },
+    { id: 'resource', label: 'Resources', icon: FileText }
   ] as const;
 
   const formatFileSize = (bytes: number): string => {
@@ -741,7 +739,7 @@ export const AdminContent: React.FC = () => {
                 status: 'draft',
                 featured: false,
                 is_featured: false,
-                category: selectedType === 'news' ? NEWS_CATEGORIES[1].id : null,
+                category: null,
                 linked_form_type: null
               });
               setShowForm(!showForm);
@@ -888,27 +886,6 @@ export const AdminContent: React.FC = () => {
                 </>
               ) : (
                 <>
-                  {selectedType === 'news' && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Category
-                      </label>
-                      <select
-                        value={formData.category || ''}
-                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                        required
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                      >
-                        <option value="">Select Category</option>
-                        {NEWS_CATEGORIES.slice(1).map(category => (
-                          <option key={category.id} value={category.id}>
-                            {category.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
                       Image
@@ -1165,7 +1142,7 @@ export const AdminContent: React.FC = () => {
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Title
                     </th>
-                    {selectedType === 'news' && (
+                    {selectedType === 'announcement' && (
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Category
                       </th>
@@ -1225,10 +1202,10 @@ export const AdminContent: React.FC = () => {
                           </div>
                         </div>
                       </td>
-                      {selectedType === 'news' && (
+                      {selectedType === 'announcement' && (
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-500">
-                            {NEWS_CATEGORIES.find(cat => cat.id === item.category)?.name || item.category}
+                            {getAnnouncementCategoryLabel(item.category)}
                           </div>
                         </td>
                       )}

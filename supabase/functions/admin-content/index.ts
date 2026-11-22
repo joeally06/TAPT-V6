@@ -188,7 +188,8 @@ Deno.serve(async (req) => {
 
       // Validate announcement categories (stored in the existing category column)
       if (body.type === 'announcement' && body.category) {
-        const validAnnouncementCategories = ['event', 'deadline', 'safety', 'general'];
+        // News is now part of announcements, so its categories (regulations, industry) are announcement categories too
+        const validAnnouncementCategories = ['general', 'event', 'deadline', 'safety', 'regulations', 'industry'];
         if (!validAnnouncementCategories.includes(body.category)) {
           throw new Error('Invalid announcement category');
         }

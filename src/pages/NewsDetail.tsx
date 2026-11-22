@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Calendar, ExternalLink, Paperclip } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { NEWS_CATEGORIES } from '../lib/types/news';
 import {
   effectiveDate,
   getAnnouncementCategoryLabel,
@@ -123,10 +122,7 @@ export const NewsDetail: React.FC = () => {
   }
 
   const posted = item.type === 'announcement' ? effectiveDate(item) : item.date || item.created_at;
-  const categoryLabel =
-    item.type === 'announcement'
-      ? getAnnouncementCategoryLabel(item.category)
-      : NEWS_CATEGORIES.find((c) => c.id === item.category)?.name;
+  const categoryLabel = getAnnouncementCategoryLabel(item.category);
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">

@@ -7,7 +7,7 @@ export interface NewsItem {
   featured: boolean;
   image_url: string | null;
   date: string;
-  category: NewsCategory;
+  category: string;
   link: string | null;
   created_at: string;
   is_featured: boolean;
@@ -19,23 +19,8 @@ export interface NewsItem {
   file_size?: number | null;
 }
 
-export type NewsCategory = 'announcements' | 'events' | 'safety' | 'regulations' | 'industry';
-
-export interface CategoryOption {
-  id: NewsCategory | 'all';
-  name: string;
-}
-
 export interface NewsFilters {
   searchQuery: string;
-  category: NewsCategory | 'all';
+  // 'all' or one of the announcement categories
+  category: string;
 }
-
-export const NEWS_CATEGORIES: CategoryOption[] = [
-  { id: 'all', name: 'All Categories' },
-  { id: 'announcements', name: 'Announcements' },
-  { id: 'events', name: 'Events' },
-  { id: 'safety', name: 'Safety' },
-  { id: 'regulations', name: 'Regulations' },
-  { id: 'industry', name: 'Industry News' },
-];

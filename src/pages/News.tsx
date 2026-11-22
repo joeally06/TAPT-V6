@@ -1,9 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Calendar, ChevronDown, Search, Tag } from 'lucide-react';
+import { Calendar, ChevronDown, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { NewsFilters } from '../lib/types/news';
-import { getAnnouncementCategoryLabel } from '../lib/announcements';
+import {
+  ANNOUNCEMENT_CATEGORIES,
+  ANNOUNCEMENT_CATEGORY_CLASSES,
+  getAnnouncementCategory,
+  getAnnouncementCategoryLabel,
+  matchesAnnouncementCategory
+} from '../lib/announcements';
 
 interface NewsItem {
   id: string;
@@ -25,7 +31,7 @@ interface CategoryOption {
   name: string;
 }
 
-const NewsCard: React.FC<{ item: NewsItem; categoryName: string }> = React.memo(({ item, categoryName }) => (
+const NewsCard: React.FC<{ item: NewsItem }> = React.memo(({ item }) => (
   <article className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-all">
     {item.image_url && (
       <img src={item.image_url} alt={item.title} className="w-full h-48 object-cover" />
@@ -34,16 +40,11 @@ const NewsCard: React.FC<{ item: NewsItem; categoryName: string }> = React.memo(
       <div className="flex items-center text-sm text-gray-500 mb-4">
         <Calendar className="h-4 w-4 mr-2" />
         {new Date(item.publish_at || item.date || item.created_at).toLocaleDateString()}
-        {item.type === 'announcement' ? (
-          <span className="ml-4 px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-            Announcement · {getAnnouncementCategoryLabel(item.category)}
-          </span>
-        ) : (
-          <>
-            <Tag className="h-4 w-4 ml-4 mr-2" />
-            {categoryName}
-          </>
-        )}
+        <span
+          className={`ml-4 px-2 py-1 text-xs font-medium rounded-full ${ANNOUNCEMENT_CATEGORY_CLASSES[getAnnouncementCategory(item.category)]}`}
+        >
+          {getAnnouncementCategoryLabel(item.category)}
+        </span>
       </div>
       <h2 className="text-xl font-bold text-secondary mb-2">{item.title}</h2>
       <p className="text-gray-600 mb-4">{item.description}</p>
@@ -114,20 +115,8 @@ export const News: React.FC = () => {
   // Memoized categories
   const categories: CategoryOption[] = useMemo(() => [
     { id: 'all', name: 'All Categories' },
-    { id: 'announcements', name: 'Announcements' },
-    { id: 'events', name: 'Events' },
-    { id: 'safety', name: 'Safety' },
-    { id: 'regulations', name: 'Regulations' },
-    { id: 'industry', name: 'Industry News' },
+    ...ANNOUNCEMENT_CATEGORIES.map((category) => ({ id: category.value, name: category.label })),
   ], []);
-
-  // Memoized category lookup map
-  const categoryMap = useMemo(() => {
-    return categories.reduce((acc, category) => {
-      acc[category.id] = category.name;
-      return acc;
-    }, {} as Record<string, string>);
-  }, [categories]);
 
   // Debounced filter updates
   const updateFilters = useCallback((updates: Partial<NewsFilters>) => {
@@ -153,15 +142,7 @@ export const News: React.FC = () => {
         item.title.toLowerCase().includes(filters.searchQuery.toLowerCase()) || 
         item.description.toLowerCase().includes(filters.searchQuery.toLowerCase());
         
-      // For announcements, check if the filter is 'all' or 'announcements'
-      if (item.type === 'announcement') {
-        return matchesSearch && (filters.category === 'all' || filters.category === 'announcements');
-      }
-      
-      // For news items, check category as before
-      const matchesCategory = filters.category === 'all' || item.category === filters.category;
-      
-      return matchesSearch && matchesCategory;
+      return matchesSearch && matchesAnnouncementCategory(item.category, filters.category);
     });
   }, [filters, newsItems]);
 
@@ -192,7 +173,7 @@ export const News: React.FC = () => {
               />
             </div>
             
-            <div className="flex space-x-2">
+            <div className="flex flex-wrap gap-2">
               {categories.map((category) => (
                 <button
                   key={category.id}
@@ -225,11 +206,7 @@ export const News: React.FC = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {filteredNews.map((item) => (
-                <NewsCard 
-                  key={item.id} 
-                  item={item} 
-                  categoryName={item.type === 'announcement' ? 'Announcement' : (categoryMap[item.category] || 'Uncategorized')} 
-                />
+                <NewsCard key={item.id} item={item} />
               ))}
             </div>
           )}
