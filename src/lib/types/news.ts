@@ -9,6 +9,7 @@ export interface NewsItem {
   date: string;
   category: string;
   link: string | null;
+  linked_form_type?: string | null;
   created_at: string;
   is_featured: boolean;
   is_pinned?: boolean;

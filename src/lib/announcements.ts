@@ -146,6 +146,9 @@ export const describeSchedule = (
 
 export interface AnnouncementSaveInput {
   mode: PublishMode;
+  // An Event needs a date and is never pinned
+  category?: string | null;
+  date?: string | null;
   is_featured: boolean;
   is_pinned: boolean;
   publish_at: string | null;
@@ -173,6 +176,9 @@ export const prepareAnnouncementForSave = (
   const { mode, previousStatus } = input;
   const publishAt = input.publish_at;
   const expiresAt = input.expires_at;
+  const isEvent = getAnnouncementCategory(input.category) === 'event';
+
+  if (isEvent && !input.date) return { ok: false, error: 'Choose the date of the event.' };
 
   if (mode === 'scheduled') {
     if (!publishAt) return { ok: false, error: 'Choose when it should go live, or pick Published to publish now.' };
@@ -206,7 +212,7 @@ export const prepareAnnouncementForSave = (
       status: mode === 'draft' ? 'draft' : 'published',
       featured,
       is_featured: featured,
-      is_pinned: featured && input.is_pinned,
+      is_pinned: featured && input.is_pinned && !isEvent,
       publish_at: publishOut,
       expires_at: expiresAt
     }

@@ -121,7 +121,7 @@ export const ADMIN_NAV: NavGroup[] = [
   {
     label: 'Website',
     items: [
-      { name: 'News & announcements', icon: Newspaper, path: '/admin/content' },
+      { name: 'Notifications', icon: Newspaper, path: '/admin/content' },
       { name: 'Photos', icon: Image, path: '/admin/photo-gallery' },
       { name: 'Board members', icon: Award, path: '/admin/board-members' },
       { name: 'Site settings', icon: Settings, path: '/admin/site-settings' }

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, MapPin, Clock, Users, ChevronRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { EVENT_FILTER, getEventButtonText, getEventLink, isExternalEventLink } from '../lib/events';
 
 interface Event {
   id: string;
@@ -36,7 +37,7 @@ export const Events: React.FC = () => {
       const { data, error } = await supabase
         .from('content')
         .select('*')
-        .eq('type', 'event')
+        .or(EVENT_FILTER)
         .eq('status', 'published')
         .order('date', { ascending: true });
 
@@ -62,45 +63,6 @@ export const Events: React.FC = () => {
 
   // Find featured event
   const featuredEvent = events.find(event => event.is_featured);
-
-  // Function to get the correct link for an event
-  const getEventLink = (event: Event) => {
-    if (event.linked_form_type) {
-      switch (event.linked_form_type) {
-        case 'conference':
-          return '/conference-registration';
-        case 'tech-conference':
-          return '/tech-conference-registration';
-        case 'regional-luncheon':
-          return '/regional-luncheon-registration';
-        case 'exhibitor':
-          return '/exhibitor-registration';
-        case 'hall-of-fame':
-          return '/hall-of-fame-nomination';
-        case 'student-scholarship':
-          return '/student-scholarship-application';
-        case 'regional-director-nomination':
-          return '/regional-director-nomination';
-        case 'president-nomination':
-          return '/president-nomination';
-        default:
-          return `/events/${event.id}`;
-      }
-    }
-    
-    // If there's a custom link, use it
-    if (event.link) {
-      return event.link;
-    }
-    
-    // Default fallback
-    return `/events/${event.id}`;
-  };
-
-  // Function to determine if the link is external
-  const isExternalLink = (event: Event) => {
-    return event.link && (event.link.startsWith('http://') || event.link.startsWith('https://'));
-  };
 
   return (
     <div className="pt-16">
@@ -150,7 +112,7 @@ export const Events: React.FC = () => {
                   <p className="mt-4 text-gray-600">
                     {featuredEvent.description}
                   </p>
-                  {isExternalLink(featuredEvent) ? (
+                  {isExternalEventLink(featuredEvent) ? (
                     <a
                       href={featuredEvent.link!}
                       target="_blank"
@@ -165,7 +127,7 @@ export const Events: React.FC = () => {
                       to={getEventLink(featuredEvent)}
                       className="mt-6 inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary/90"
                     >
-                      {featuredEvent.linked_form_type?.includes('nomination') ? 'Nominate Now' : featuredEvent.linked_form_type ? 'Register Now' : 'Event Details'}
+                      {getEventButtonText(featuredEvent, 'Event Details')}
                       <ChevronRight className="ml-2 h-5 w-5" />
                     </Link>
                   )}
@@ -254,7 +216,7 @@ export const Events: React.FC = () => {
                       {event.description}
                     </p>
                     
-                    {isExternalLink(event) ? (
+                    {isExternalEventLink(event) ? (
                       <a
                         href={event.link!}
                         target="_blank"
@@ -268,7 +230,7 @@ export const Events: React.FC = () => {
                         to={getEventLink(event)}
                         className="inline-block text-primary font-medium hover:underline"
                       >
-                        {event.linked_form_type?.includes('nomination') ? 'Nominate Now' : event.linked_form_type ? 'Register Now' : 'Event Details'} <ChevronRight className="inline h-4 w-4" />
+                        {getEventButtonText(event, 'Event Details')} <ChevronRight className="inline h-4 w-4" />
                       </Link>
                     )}
                   </div>

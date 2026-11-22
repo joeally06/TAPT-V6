@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Loader2, Save, Trash2 } from 'lucide-react';
 import { AnnouncementLead } from '../AnnouncementCard';
 import {
@@ -13,6 +12,7 @@ import {
   type PublishMode
 } from '../../lib/announcements';
 import { fromLocalInput, toLocalInput } from '../../lib/datetime';
+import { EVENT_FORMS, type EventFormType } from '../../lib/events';
 
 // The fields of an announcement the editor shows and changes
 export interface AnnouncementEditorValues {
@@ -28,6 +28,10 @@ export interface AnnouncementEditorValues {
   file_url: string | null;
   file_type: string | null;
   file_size: number | null;
+  // Only for the Event category
+  date: string | null;
+  link: string | null;
+  linked_form_type: EventFormType | null;
 }
 
 interface AnnouncementEditorProps {
@@ -84,6 +88,7 @@ export const AnnouncementEditor: React.FC<AnnouncementEditorProps> = ({
 
   const now = Date.now();
   const showsOnHome = mode !== 'draft' && Boolean(values.is_featured);
+  const isEvent = getAnnouncementCategory(values.category) === 'event';
 
   const changeMode = (next: PublishMode) => {
     setMode(next);
@@ -95,6 +100,8 @@ export const AnnouncementEditor: React.FC<AnnouncementEditorProps> = ({
     event.preventDefault();
     const result = prepareAnnouncementForSave({
       mode,
+      category: values.category ?? null,
+      date: values.date ?? null,
       is_featured: Boolean(values.is_featured),
       is_pinned: Boolean(values.is_pinned),
       publish_at: values.publish_at ?? null,
@@ -178,7 +185,7 @@ export const AnnouncementEditor: React.FC<AnnouncementEditorProps> = ({
             <select
               id="announcementCategory"
               value={getAnnouncementCategory(values.category)}
-              onChange={(e) => onChange({ category: e.target.value })}
+              onChange={(e) => onChange(e.target.value === 'event' ? { category: 'event', is_pinned: false } : { category: e.target.value })}
               className={FIELD_CLASS}
             >
               {ANNOUNCEMENT_CATEGORIES.map((category) => (
@@ -188,6 +195,65 @@ export const AnnouncementEditor: React.FC<AnnouncementEditorProps> = ({
               ))}
             </select>
           </div>
+
+          {isEvent && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="announcementEventDate" className="block text-sm font-medium text-gray-700">
+                  Event date
+                </label>
+                <input
+                  id="announcementEventDate"
+                  type="date"
+                  value={(values.date ?? '').slice(0, 10)}
+                  onChange={(e) => onChange({ date: e.target.value || null })}
+                  required
+                  className={FIELD_CLASS}
+                />
+              </div>
+              <div>
+                <label htmlFor="announcementEventForm" className="block text-sm font-medium text-gray-700">
+                  Link to form
+                </label>
+                <select
+                  id="announcementEventForm"
+                  value={values.linked_form_type ?? ''}
+                  onChange={(e) => {
+                    const form = (e.target.value || null) as EventFormType | null;
+                    // A form replaces a custom link
+                    onChange(form ? { linked_form_type: form, link: null } : { linked_form_type: null });
+                  }}
+                  aria-describedby="announcementEventFormHint"
+                  className={FIELD_CLASS}
+                >
+                  <option value="">None (no form link)</option>
+                  {EVENT_FORMS.map((form) => (
+                    <option key={form.value} value={form.value}>
+                      {form.label}
+                    </option>
+                  ))}
+                </select>
+                <p id="announcementEventFormHint" className="mt-1 text-xs text-gray-500">
+                  The event shows a button to this form.
+                </p>
+              </div>
+              {!values.linked_form_type && (
+                <div className="sm:col-span-2">
+                  <label htmlFor="announcementEventLink" className="block text-sm font-medium text-gray-700">
+                    Custom link <span className="font-normal text-gray-500">(optional)</span>
+                  </label>
+                  <input
+                    id="announcementEventLink"
+                    type="url"
+                    value={values.link ?? ''}
+                    onChange={(e) => onChange({ link: e.target.value || null })}
+                    placeholder="https://example.com"
+                    className={FIELD_CLASS}
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           <div>
             <label htmlFor="announcementMessage" className="block text-sm font-medium text-gray-700">
@@ -309,10 +375,13 @@ export const AnnouncementEditor: React.FC<AnnouncementEditorProps> = ({
                 <p className="mt-1 ml-6 text-xs text-gray-500">
                   {mode === 'draft'
                     ? 'Choose Scheduled or Published first.'
-                    : 'Without this it appears on the News page only.'}
+                    : isEvent
+                      ? 'Shows in Featured Events on the home page. Without this it appears on the Events and News pages only.'
+                      : 'Without this it appears on the News page only.'}
                 </p>
               </div>
 
+              {!isEvent && (
               <div>
                 <label htmlFor="announcementPinned" className="flex items-center gap-2 text-sm font-medium text-gray-700">
                   <input
@@ -329,17 +398,14 @@ export const AnnouncementEditor: React.FC<AnnouncementEditorProps> = ({
                   {showsOnHome ? 'Replaces the announcement that is pinned now.' : 'Needs "Show on the home page".'}
                 </p>
               </div>
+              )}
             </div>
 
             <p role="status" className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-900">
               {describeSchedule(mode, values.publish_at, values.expires_at, now)}
             </p>
             <p className="text-xs text-gray-500">
-              For a notice across the whole site, use{' '}
-              <Link to="/admin/site-settings" className="font-medium text-primary underline">
-                Site settings, Alert Bar
-              </Link>
-              .
+              For a notice across the whole site, use the Alert bar tab above.
             </p>
           </div>
 

@@ -352,7 +352,9 @@ Deno.serve(async (req) => {
     const { count: upcomingEvents, error: eventsError } = await supabaseAdmin
       .from('content')
       .select('*', { count: 'exact', head: true })
-      .eq('type', 'event')
+      // Events are announcements in the Event category that have a date (older rows still use type 'event')
+      .or('type.eq.event,and(type.eq.announcement,category.eq.event,date.not.is.null)')
+      .or(`publish_at.is.null,publish_at.lte.${new Date().toISOString()}`)
       .eq('status', 'published')
       .gte('date', today);
 

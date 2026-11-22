@@ -5,16 +5,15 @@ import {
   Plus, 
   Trash2, 
   Edit, 
-  Calendar,
   FileText,
   Bell,
+  Megaphone,
   Image,
   Save,
   X,
   Upload,
   Star,
   Pin,
-  Link as LinkIcon,
   ExternalLink
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -23,7 +22,9 @@ import { getPublicUrl } from '../lib/storage';
 import { compressImage } from '../lib/imageCompression';
 import AdminLayout from '../components/AdminLayout';
 import AnnouncementEditor from '../components/admin/AnnouncementEditor';
+import SiteAlertSettings from '../components/admin/SiteAlertSettings';
 import { getAnnouncementCategory, getAnnouncementCategoryLabel, getAnnouncementStatus } from '../lib/announcements';
+import { findEventForm, type EventFormType } from '../lib/events';
 
 interface ContentItem {
   id: string;
@@ -44,8 +45,11 @@ interface ContentItem {
   is_pinned?: boolean;
   publish_at?: string | null;
   expires_at?: string | null;
-  linked_form_type: 'conference' | 'tech-conference' | 'regional-luncheon' | 'hall-of-fame' | 'student-scholarship' | 'exhibitor' | null;
+  linked_form_type: EventFormType | null;
 }
+
+// Events are announcements in the Event category, so there is no Events tab
+type ContentTab = 'announcement' | 'alert' | 'resource';
 
 // Allowed file types for announcements (documents + images)
 const ANNOUNCEMENT_ALLOWED_TYPES = [
@@ -162,7 +166,9 @@ export const AdminContent: React.FC = () => {
   const [success, setSuccess] = useState<string | null>(null);
   const [contentItems, setContentItems] = useState<ContentItem[]>([]);
   const [resources, setResources] = useState<ResourceItem[]>([]);
-  const [selectedType, setSelectedType] = useState<ContentItem['type']>('event');
+  const [selectedType, setSelectedType] = useState<ContentTab>('announcement');
+  // What a new or saved item is stored as (the Alert bar tab has no items)
+  const contentType: ContentItem['type'] = selectedType === 'resource' ? 'resource' : 'announcement';
   const [showForm, setShowForm] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [editingItem, setEditingItem] = useState<ContentItem | null>(null);
@@ -172,7 +178,7 @@ export const AdminContent: React.FC = () => {
   const [formData, setFormData] = useState<Partial<ContentItem>>({
     title: '',
     description: '',
-    type: selectedType,
+    type: 'announcement',
     status: 'draft',
     featured: false,
     is_featured: false,
@@ -192,7 +198,7 @@ export const AdminContent: React.FC = () => {
       }
       if (selectedType === 'resource') {
         fetchResources();
-      } else {
+      } else if (selectedType === 'announcement') {
         fetchContent();
       }
     }
@@ -205,7 +211,7 @@ export const AdminContent: React.FC = () => {
       const { data, error } = await supabase
         .from('content')
         .select('*')
-        .eq('type', selectedType)
+        .eq('type', 'announcement')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -502,7 +508,7 @@ export const AdminContent: React.FC = () => {
             file_url: fileUrl,
             file_type: fileType,
             file_size: fileSize,
-            type: selectedType,
+            type: contentType,
             // Announcements use the shared category list; an unknown or old news category becomes General
             ...(selectedType === 'announcement' ? { category: getAnnouncementCategory(data.category) } : {}),
             id: editingItem?.id, // Pass id for update, undefined for insert
@@ -529,7 +535,7 @@ export const AdminContent: React.FC = () => {
       setFormData({
         title: '',
         description: '',
-        type: selectedType,
+        type: contentType,
         status: 'draft',
         featured: false,
         is_featured: false,
@@ -675,8 +681,8 @@ export const AdminContent: React.FC = () => {
   };
 
   const contentTypes = [
-    { id: 'event', label: 'Events', icon: Calendar },
     { id: 'announcement', label: 'News & announcements', icon: Bell },
+    { id: 'alert', label: 'Alert bar', icon: Megaphone },
     { id: 'resource', label: 'Resources', icon: FileText }
   ] as const;
 
@@ -728,6 +734,7 @@ export const AdminContent: React.FC = () => {
           </nav>
         </div>
 
+        {selectedType !== 'alert' && (
         <div className="mb-6">
           <button
             onClick={() => {
@@ -735,7 +742,7 @@ export const AdminContent: React.FC = () => {
               setFormData({
                 title: '',
                 description: '',
-                type: selectedType,
+                type: contentType,
                 status: 'draft',
                 featured: false,
                 is_featured: false,
@@ -750,6 +757,13 @@ export const AdminContent: React.FC = () => {
             Add New {selectedType.charAt(0).toUpperCase() + selectedType.slice(1)}
           </button>
         </div>
+        )}
+
+        {selectedType === 'alert' && (
+          <div className="bg-white shadow-md rounded-lg p-6">
+            <SiteAlertSettings />
+          </div>
+        )}
 
         {showForm && selectedType === 'announcement' && (
           <AnnouncementEditor
@@ -779,7 +793,7 @@ export const AdminContent: React.FC = () => {
           />
         )}
 
-        {showForm && selectedType !== 'announcement' && (
+        {showForm && selectedType === 'resource' && (
           <div className="mb-8 bg-white shadow-md rounded-lg p-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-secondary">
@@ -820,8 +834,7 @@ export const AdminContent: React.FC = () => {
                 />
               </div>
 
-              {selectedType === 'resource' ? (
-                <>
+              <>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
                       Category
@@ -883,141 +896,7 @@ export const AdminContent: React.FC = () => {
                       )}
                     </div>
                   )}
-                </>
-              ) : (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Image
-                    </label>
-                    <input
-                      type="file"
-                      onChange={handleFileSelect}
-                      accept="image/*"
-                      className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
-                    />
-                    {selectedFile && (
-                      <p className="mt-2 text-sm text-green-600">
-                        Selected: {selectedFile.name} ({getFileTypeDisplay(selectedFile.type)}, {formatFileSize(selectedFile.size)})
-                      </p>
-                    )}
-                    {/* Show existing file info when editing */}
-                    {editingItem && !selectedFile && (editingItem.file_url || editingItem.image_url) && (
-                      <div className="mt-2 flex items-center gap-3">
-                        <p className="text-sm text-gray-500">
-                          Current: {editingItem.file_url ? `Document (${getFileTypeDisplay(editingItem.file_type)})` : 'Image'}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={handleDeleteCurrentAttachment}
-                          disabled={deletingAttachment}
-                          className="inline-flex items-center px-2.5 py-1 border border-red-300 rounded-md text-xs font-medium text-red-700 bg-white hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Trash2 className="h-3.5 w-3.5 mr-1" />
-                          {deletingAttachment ? 'Deleting...' : 'Delete'}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {selectedType === 'event' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                          Date
-                        </label>
-                        <input
-                          type="date"
-                          value={formData.date || ''}
-                          onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                          Link to Form
-                        </label>
-                        <select
-                          value={formData.linked_form_type || ''}
-                          onChange={(e) => {
-                            const value = e.target.value || null;
-                            setFormData({ 
-                              ...formData, 
-                              linked_form_type: value as any,
-                              // Clear manual link if form type is selected
-                              link: value ? null : formData.link
-                            });
-                          }}
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                        >
-                          <option value="">None (No Form Link)</option>
-                          <option value="conference">Conference Registration</option>
-                          <option value="tech-conference">Tech Conference Registration</option>
-                          <option value="regional-luncheon">Regional Luncheon Registration</option>
-                          <option value="hall-of-fame">Hall of Fame Nomination</option>
-                          <option value="student-scholarship">Student Scholarship Application</option>
-                          <option value="exhibitor">Exhibitor Registration</option>
-                          <option value="regional-director-nomination">Regional Director Nomination</option>
-                          <option value="president-nomination">President Nomination</option>
-                        </select>
-                        <p className="mt-1 text-sm text-gray-500">
-                          When published, this event will link to the selected form
-                        </p>
-                      </div>
-                      
-                      {!formData.linked_form_type && (
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700">
-                            Custom Link (Optional)
-                          </label>
-                          <div className="mt-1 relative rounded-md shadow-sm">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                              <LinkIcon className="h-5 w-5 text-gray-400" />
-                            </div>
-                            <input
-                              type="url"
-                              value={formData.link || ''}
-                              onChange={(e) => setFormData({ ...formData, link: e.target.value })}
-                              className="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                              placeholder="https://example.com"
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Homepage Visibility
-                    </label>
-                    <select
-                      value={getVisibilityFromItem(formData)}
-                      onChange={(e) => {
-                        const visibility = e.target.value as HomepageVisibility;
-                        // Validate the visibility value (security: prevent invalid values)
-                        if (!VISIBILITY_OPTIONS.some(opt => opt.value === visibility)) {
-                          console.error('Invalid visibility value:', visibility);
-                          return;
-                        }
-                        const flags = getItemFlagsFromVisibility(visibility);
-                        setFormData({ ...formData, ...flags });
-                      }}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
-                    >
-                      {VISIBILITY_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="mt-1 text-sm text-gray-500">
-                      {VISIBILITY_OPTIONS.find(opt => opt.value === getVisibilityFromItem(formData))?.description}
-                    </p>
-                  </div>
-                </>
-              )}
+              </>
 
               <div className="flex justify-end space-x-3">
                 <button
@@ -1052,6 +931,7 @@ export const AdminContent: React.FC = () => {
           </div>
         )}
 
+        {selectedType !== 'alert' && (
         <div className="bg-white shadow-md rounded-lg overflow-hidden">
           {loading ? (
             <div className="p-8 text-center">
@@ -1147,11 +1027,6 @@ export const AdminContent: React.FC = () => {
                         Category
                       </th>
                     )}
-                    {selectedType === 'event' && (
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Form Link
-                      </th>
-                    )}
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Visibility
                     </th>
@@ -1207,30 +1082,11 @@ export const AdminContent: React.FC = () => {
                           <div className="text-sm text-gray-500">
                             {getAnnouncementCategoryLabel(item.category)}
                           </div>
-                        </td>
-                      )}
-                      {selectedType === 'event' && (
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-500">
-                            {item.linked_form_type ? (
-                              <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                                {item.linked_form_type === 'conference' && 'Conference Registration'}
-                                {item.linked_form_type === 'tech-conference' && 'Tech Conference Registration'}
-                                {item.linked_form_type === 'regional-luncheon' && 'Regional Luncheon Registration'}
-                                {item.linked_form_type === 'hall-of-fame' && 'Hall of Fame Nomination'}
-                                {item.linked_form_type === 'student-scholarship' && 'Student Scholarship'}
-                                {item.linked_form_type === 'exhibitor' && 'Exhibitor Registration'}
-                                {item.linked_form_type === 'regional-director-nomination' && 'Regional Director Nomination'}
-                                {item.linked_form_type === 'president-nomination' && 'President Nomination'}
-                              </span>
-                            ) : item.link ? (
-                              <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
-                                Custom Link
-                              </span>
-                            ) : (
-                              <span className="text-gray-400">None</span>
-                            )}
-                          </div>
+                          {getAnnouncementCategory(item.category) === 'event' && (
+                            <div className="text-xs text-gray-500">
+                              {findEventForm(item.linked_form_type)?.label ?? (item.link ? 'Custom link' : 'No form link')}
+                            </div>
+                          )}
                         </td>
                       )}
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -1284,6 +1140,7 @@ export const AdminContent: React.FC = () => {
             </div>
           )}
         </div>
+        )}
       </div>
     </AdminLayout>
   );

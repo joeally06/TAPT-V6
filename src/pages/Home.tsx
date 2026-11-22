@@ -6,6 +6,7 @@ import type { NewsItem } from '../lib/types/news';
 import { getSiteSetting } from '../lib/siteSettings';
 import { sortForHome } from '../lib/announcements';
 import { AnnouncementLead, AnnouncementRow } from '../components/AnnouncementCard';
+import { EVENT_FILTER, getEventButtonText, getEventLink, isEventListing, isExternalEventLink } from '../lib/events';
 
 export const Home: React.FC = () => {
   const [featuredEvents, setFeaturedEvents] = useState<NewsItem[]>([]);
@@ -36,9 +37,10 @@ export const Home: React.FC = () => {
         const { data, error } = await supabase
           .from('content')
           .select('*')
-          .eq('type', 'event')
+          .or(EVENT_FILTER)
           .eq('status', 'published')
           .eq('is_featured', true)
+          .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
           .order('date', { ascending: true });
 
         if (error) throw error;
@@ -58,8 +60,8 @@ export const Home: React.FC = () => {
           console.error('Error fetching announcements:', announcementsError);
           // Don't throw - allow page to load even if announcements fail
         } else {
-          // Pinned first, then newest; the home page shows five at most
-          setAnnouncements(sortForHome(announcementsData || []).slice(0, 5));
+          // Events show in Featured Events above, not here. Pinned first, then newest; five at most
+          setAnnouncements(sortForHome((announcementsData || []).filter((item) => !isEventListing(item))).slice(0, 5));
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -70,45 +72,6 @@ export const Home: React.FC = () => {
 
     fetchData();
   }, []);
-
-  // Function to get the correct link for an event
-  const getEventLink = (event: any) => {
-    if (event.linked_form_type) {
-      switch (event.linked_form_type) {
-        case 'conference':
-          return '/conference-registration';
-        case 'tech-conference':
-          return '/tech-conference-registration';
-        case 'exhibitor':
-          return '/exhibitor-registration';
-        case 'hall-of-fame':
-          return '/hall-of-fame-nomination';
-        case 'student-scholarship':
-          return '/student-scholarship-application';
-        case 'regional-luncheon':
-          return '/regional-luncheon-registration';
-        case 'regional-director-nomination':
-          return '/regional-director-nomination';
-        case 'president-nomination':
-          return '/president-nomination';
-        default:
-          return `/events/${event.id}`;
-      }
-    }
-    
-    // If there's a custom link, use it
-    if (event.link) {
-      return event.link;
-    }
-    
-    // Default fallback
-    return `/events/${event.id}`;
-  };
-
-  // Function to determine if the link is external
-  const isExternalLink = (event: any) => {
-    return event.link && (event.link.startsWith('http://') || event.link.startsWith('https://'));
-  };
 
   return (
     <div className="pt-16">
@@ -206,7 +169,7 @@ export const Home: React.FC = () => {
                         {event.description}
                       </p>
                       
-                      {isExternalLink(event) ? (
+                      {isExternalEventLink(event) ? (
                         <a
                           href={event.link!}
                           target="_blank"
@@ -221,7 +184,7 @@ export const Home: React.FC = () => {
                           to={getEventLink(event)}
                           className="inline-flex items-center text-tapt-blue hover:text-tapt-navy font-semibold text-sm group/link"
                         >
-                          {event.linked_form_type?.includes('nomination') ? 'Nominate Now' : event.linked_form_type ? 'Register Now' : 'Learn More'}
+                          {getEventButtonText(event, 'Learn More')}
                           <ArrowRight className="ml-2 h-4 w-4 group-hover/link:translate-x-1 transition-transform" />
                         </Link>
                       )}

@@ -195,6 +195,12 @@ Deno.serve(async (req) => {
         }
       }
 
+      // Events are announcements in the Event category; they need a date to be listed as events
+      const isEventAnnouncement = body.type === 'announcement' && body.category === 'event';
+      if (isEventAnnouncement && (typeof body.date !== 'string' || Number.isNaN(Date.parse(body.date)))) {
+        throw new Error('An event needs a valid date');
+      }
+
       // Validate scheduling dates: a valid date string or empty
       const parseOptionalDate = (value: unknown, label: string): string | null => {
         if (value === null || value === undefined || value === '') return null;
@@ -219,11 +225,12 @@ Deno.serve(async (req) => {
         return Boolean(value);
       };
 
-      // Only a published, featured announcement can be pinned. Anything else is quietly unpinned,
+      // Only a published, featured announcement can be pinned (never an event). Anything else is quietly unpinned,
       // because the quick visibility toggle re-sends the whole row.
       const isFeatured = validateBoolean(body.is_featured);
       const isPinned = validateBoolean(body.is_pinned)
         && body.type === 'announcement'
+        && !isEventAnnouncement
         && body.status === 'published'
         && isFeatured;
 

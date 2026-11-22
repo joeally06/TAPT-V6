@@ -10,6 +10,7 @@ import {
   getAnnouncementCategoryLabel,
   matchesAnnouncementCategory
 } from '../lib/announcements';
+import { getEventButtonText, getEventLink, isEventListing, isExternalEventLink } from '../lib/events';
 
 interface NewsItem {
   id: string;
@@ -22,6 +23,7 @@ interface NewsItem {
   date: string;
   category: string;
   link: string | null;
+  linked_form_type?: string | null;
   created_at: string;
   publish_at?: string | null;
 }
@@ -31,7 +33,9 @@ interface CategoryOption {
   name: string;
 }
 
-const NewsCard: React.FC<{ item: NewsItem }> = React.memo(({ item }) => (
+const NewsCard: React.FC<{ item: NewsItem }> = React.memo(({ item }) => {
+  const isEvent = isEventListing(item);
+  return (
   <article className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-all">
     {item.image_url && (
       <img src={item.image_url} alt={item.title} className="w-full h-48 object-cover" />
@@ -39,7 +43,7 @@ const NewsCard: React.FC<{ item: NewsItem }> = React.memo(({ item }) => (
     <div className="p-6">
       <div className="flex items-center text-sm text-gray-500 mb-4">
         <Calendar className="h-4 w-4 mr-2" />
-        {new Date(item.publish_at || item.date || item.created_at).toLocaleDateString()}
+        {new Date(isEvent ? item.date : item.publish_at || item.date || item.created_at).toLocaleDateString()}
         <span
           className={`ml-4 px-2 py-1 text-xs font-medium rounded-full ${ANNOUNCEMENT_CATEGORY_CLASSES[getAnnouncementCategory(item.category)]}`}
         >
@@ -48,7 +52,22 @@ const NewsCard: React.FC<{ item: NewsItem }> = React.memo(({ item }) => (
       </div>
       <h2 className="text-xl font-bold text-secondary mb-2">{item.title}</h2>
       <p className="text-gray-600 mb-4">{item.description}</p>
-      {item.link ? (
+      {isEvent ? (
+        isExternalEventLink(item) ? (
+          <a
+            href={item.link as string}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:text-primary/80 font-medium"
+          >
+            {getEventButtonText(item, 'Event Details')} →
+          </a>
+        ) : (
+          <Link to={getEventLink(item)} className="text-primary hover:text-primary/80 font-medium">
+            {getEventButtonText(item, 'Event Details')} →
+          </Link>
+        )
+      ) : item.link ? (
         <a
           href={item.link}
           target="_blank"
@@ -67,7 +86,8 @@ const NewsCard: React.FC<{ item: NewsItem }> = React.memo(({ item }) => (
       )}
     </div>
   </article>
-));
+  );
+});
 
 export const News: React.FC = () => {
   useEffect(() => {
@@ -99,7 +119,9 @@ export const News: React.FC = () => {
 
         if (error) throw error;
         // Newest first by the date shown on each card (an announcement shows when it went live)
-        const shownDate = (item: NewsItem) => Date.parse(item.publish_at || item.date || item.created_at);
+        // An event is listed by when it was posted; its card shows the event date
+        const shownDate = (item: NewsItem) =>
+          Date.parse(isEventListing(item) ? item.publish_at || item.created_at : item.publish_at || item.date || item.created_at);
         setNewsItems([...(data || [])].sort((a, b) => shownDate(b) - shownDate(a)));
       } catch (err) {
         console.error('Error fetching news:', err);

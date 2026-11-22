@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Calendar, MapPin, Clock, ArrowLeft, ExternalLink } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import DOMPurify from 'dompurify';
+import { EVENT_FILTER, findEventForm } from '../lib/events';
 
 interface Event {
   id: string;
@@ -67,7 +68,7 @@ export const EventDetail: React.FC = () => {
         .from('content')
         .select('*')
         .eq('id', id)
-        .eq('type', 'event')
+        .or(EVENT_FILTER)
         .eq('status', 'published')
         .single();
 
@@ -111,24 +112,8 @@ export const EventDetail: React.FC = () => {
   const getActionLink = (): { href: string; text: string; isExternal: boolean } | null => {
     if (!event) return null;
 
-    if (event.linked_form_type) {
-      switch (event.linked_form_type) {
-        case 'conference':
-          return { href: '/conference-registration', text: 'Register for Conference', isExternal: false };
-        case 'tech-conference':
-          return { href: '/tech-conference-registration', text: 'Register for Tech Conference', isExternal: false };
-        case 'hall-of-fame':
-          return { href: '/hall-of-fame-nomination', text: 'Submit Nomination', isExternal: false };
-        case 'student-scholarship':
-          return { href: '/student-scholarship-application', text: 'Apply for Scholarship', isExternal: false };
-        case 'regional-director-nomination':
-          return { href: '/regional-director-nomination', text: 'Submit Nomination', isExternal: false };
-        case 'president-nomination':
-          return { href: '/president-nomination', text: 'Submit Nomination', isExternal: false };
-        default:
-          return null;
-      }
-    }
+    const form = findEventForm(event.linked_form_type);
+    if (form) return { href: form.path, text: form.actionText, isExternal: false };
 
     if (event.link) {
       const isExternal = event.link.startsWith('http://') || event.link.startsWith('https://');
