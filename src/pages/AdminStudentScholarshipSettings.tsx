@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { Calendar, MapPin, Save, AlertCircle, ArrowLeft, Trash2, Archive, ToggleLeft, ToggleRight, FileText } from 'lucide-react';
 import ConfirmationModal from '../components/ConfirmationModal';
 import AdminLayout from '../components/AdminLayout';
+import { UnsavedChangesDialog } from '../components/admin/UnsavedChangesDialog';
+import { useUnsavedChanges } from '../lib/useUnsavedChanges';
 import { useAuth } from '../context/AuthContext';
 import RolloverModal from '../components/admin/RolloverModal';
 import { runRollover, describeRolloverResult } from '../lib/rollover';
@@ -24,6 +26,7 @@ const AdminStudentScholarshipSettings: React.FC = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
+  const unsaved = useUnsavedChanges();
   const [saving, setSaving] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,6 +100,7 @@ const AdminStudentScholarshipSettings: React.FC = () => {
       setError(`Failed to load scholarship settings: ${error.message}`);
     } finally {
       setLoading(false);
+      unsaved.markClean();
     }
   };
 
@@ -198,6 +202,7 @@ const AdminStudentScholarshipSettings: React.FC = () => {
         throw new Error(errorData.error || 'Failed to clear scholarship settings');
       }
       setSuccess('Scholarship settings cleared successfully!');
+      unsaved.markClean();
       const uuid = await fetchUUID();
       setSettings({
         id: uuid,
@@ -426,7 +431,7 @@ const AdminStudentScholarshipSettings: React.FC = () => {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-white shadow-lg rounded-lg p-8">
+        <form onSubmit={handleSubmit} onChange={unsaved.markDirty} className="bg-white shadow-lg rounded-lg p-8">
           <div className="space-y-6">
             <div>
               <h2 className="text-xl font-bold text-secondary mb-4">Basic Information</h2>
@@ -593,10 +598,10 @@ const AdminStudentScholarshipSettings: React.FC = () => {
           type="student-scholarship"
           title="Rollover Scholarship"
           fields={[
-            { id: 'name', label: 'New Scholarship Name', type: 'text', value: settings.name, onChange: (value) => setSettings((previous) => ({ ...previous, name: value })) },
-            { id: 'start-date', label: 'New Start Date', type: 'date', value: settings.start_date, onChange: (value) => setSettings((previous) => ({ ...previous, start_date: value })) },
-            { id: 'end-date', label: 'New End Date', type: 'date', value: settings.end_date, onChange: (value) => setSettings((previous) => ({ ...previous, end_date: value })) },
-            { id: 'deadline', label: 'New Application Deadline', type: 'date', value: settings.application_deadline, onChange: (value) => setSettings((previous) => ({ ...previous, application_deadline: value })) }
+            { id: 'name', label: 'New Scholarship Name', type: 'text', value: settings.name, onChange: (value) => { unsaved.markDirty(); setSettings((previous) => ({ ...previous, name: value })); } },
+            { id: 'start-date', label: 'New Start Date', type: 'date', value: settings.start_date, onChange: (value) => { unsaved.markDirty(); setSettings((previous) => ({ ...previous, start_date: value })); } },
+            { id: 'end-date', label: 'New End Date', type: 'date', value: settings.end_date, onChange: (value) => { unsaved.markDirty(); setSettings((previous) => ({ ...previous, end_date: value })); } },
+            { id: 'deadline', label: 'New Application Deadline', type: 'date', value: settings.application_deadline, onChange: (value) => { unsaved.markDirty(); setSettings((previous) => ({ ...previous, application_deadline: value })); } }
           ]}
           submitting={isRollingOver}
           onConfirm={handleRollover}
@@ -615,6 +620,7 @@ const AdminStudentScholarshipSettings: React.FC = () => {
           loadingText="Clearing..."
         />
       </div>
+      <UnsavedChangesDialog blocker={unsaved.blocker} />
     </AdminLayout>
   );
 };

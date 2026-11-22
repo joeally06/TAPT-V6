@@ -7,6 +7,8 @@ import React, { useState, useEffect } from 'react';
 import { fetchSettingsByCategory, updateSetting, getSetting, upsertSetting } from '@/lib/settings';
 import type { ParsedSetting } from '@/types/settings';
 import AdminLayout from '../components/AdminLayout';
+import { UnsavedChangesDialog } from '../components/admin/UnsavedChangesDialog';
+import { useUnsavedChanges } from '../lib/useUnsavedChanges';
 
 export default function AdminPaymentSettings() {
   const [settings, setSettings] = useState<ParsedSetting[]>([]);
@@ -14,6 +16,7 @@ export default function AdminPaymentSettings() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [editedValues, setEditedValues] = useState<Record<string, string>>({});
+  const unsaved = useUnsavedChanges();
 
   useEffect(() => {
     loadSettings();
@@ -122,6 +125,11 @@ export default function AdminPaymentSettings() {
     };
     return descriptions[key] || null;
   };
+
+  // The Save button is only active when something changed, so that is also when leaving should ask first
+  useEffect(() => {
+    unsaved.setDirty(hasAnyChanges());
+  });
 
   if (loading) {
     return (
@@ -234,6 +242,7 @@ export default function AdminPaymentSettings() {
         </div>
       )}
       </div>
+      <UnsavedChangesDialog blocker={unsaved.blocker} />
     </AdminLayout>
   );
 }

@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Home } from './pages/Home';
@@ -59,222 +58,213 @@ import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import './index.css';
 
+// Everything the site shows besides the sign-in provider. Its routes are the nested <Routes> inside.
+function AppShell() {
+  return (
+    <>
+      <SiteAlert />
+      <Navbar />
+      <Routes>
+        {/* Admin Routes - Must come BEFORE catch-all */}
+        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/admin" element={
+          <ProtectedRoute requireAdmin>
+            <AdminDashboard />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/payment-management" element={
+          <ProtectedRoute requireAdmin>
+            <AdminPaymentManagement />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/users" element={
+          <ProtectedRoute requireAdmin>
+            <AdminUsers />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/board-members" element={
+          <ProtectedRoute requireAdmin>
+            <AdminBoardMembers />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/content" element={
+          <ProtectedRoute requireAdmin>
+            <AdminContent />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/archives" element={
+          <ProtectedRoute requireAdmin>
+            <AdminArchives />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/memberships" element={
+          <ProtectedRoute requireAdmin>
+            <AdminMemberships />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/conference-registrations" element={
+          <ProtectedRoute requireAdmin>
+            <AdminConferenceRegistrations />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/tech-conference-registrations" element={
+          <ProtectedRoute requireAdmin>
+            <AdminTechConferenceRegistrations />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/exhibitor-registrations" element={
+          <ProtectedRoute requireAdmin>
+            <AdminExhibitorRegistrations />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/student-scholarship-applications" element={
+          <ProtectedRoute requireAdmin>
+            <AdminStudentScholarshipApplications />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/regional-luncheon-registrations" element={
+          <ProtectedRoute requireAdmin>
+            <AdminRegionalLuncheonRegistrations />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/conference-settings" element={
+          <ProtectedRoute requireAdmin>
+            <AdminConferenceSettings />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/tech-conference-settings" element={
+          <ProtectedRoute requireAdmin>
+            <AdminTechConferenceSettings />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/exhibitor-settings" element={
+          <ProtectedRoute requireAdmin>
+            <AdminExhibitorSettings />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/student-scholarship-settings" element={
+          <ProtectedRoute requireAdmin>
+            <AdminStudentScholarshipSettings />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/regional-luncheon-settings" element={
+          <ProtectedRoute requireAdmin>
+            <AdminRegionalLuncheonSettings />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/hall-of-fame-settings" element={
+          <ProtectedRoute requireAdmin>
+            <AdminHallOfFameSettings />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/hall-of-fame-nominations" element={
+          <ProtectedRoute requireAdmin>
+            <AdminHallOfFameNominations />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/hall-of-fame-members" element={
+          <ProtectedRoute requireAdmin>
+            <AdminHallOfFameMembers />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/regional-director-nomination-settings" element={
+          <ProtectedRoute requireAdmin>
+            <AdminRegionalDirectorNominationSettings />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/regional-director-nominations" element={
+          <ProtectedRoute requireAdmin>
+            <AdminRegionalDirectorNominations />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/president-nomination-settings" element={
+          <ProtectedRoute requireAdmin>
+            <AdminPresidentNominationSettings />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/president-nominations" element={
+          <ProtectedRoute requireAdmin>
+            <AdminPresidentNominations />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/site-settings" element={
+          <ProtectedRoute requireAdmin>
+            <AdminSiteSettings />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/payment-settings" element={
+          <ProtectedRoute requireAdmin>
+            <AdminPaymentSettings />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/contact-messages" element={
+          <ProtectedRoute requireAdmin>
+            <AdminContactMessages />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/photo-gallery" element={
+          <ProtectedRoute requireAdmin>
+            <AdminPhotoGallery />
+          </ProtectedRoute>
+        } />
+
+        {/* Public Routes - Catch-all with layout */}
+        <Route
+          path="/*"
+          element={
+            <div className="flex flex-col min-h-screen bg-gray-50">
+              <a
+                href="#main-content"
+                className="sr-only focus:not-sr-only focus:absolute focus:top-20 focus:left-4 focus:z-[60] focus:bg-white focus:text-tapt-navy focus:px-4 focus:py-2 focus:rounded focus:shadow-lg focus:font-semibold focus:outline-none focus:ring-2 focus:ring-tapt-blue"
+              >
+                Skip to main content
+              </a>
+              <main id="main-content" className="flex-grow">
+                <div className="container mx-auto px-4 py-8">
+                  <Routes>
+                    <Route path="/" element={<Home />} />
+                    <Route path="/about" element={<About />} />
+                    <Route path="/board-members" element={<BoardMembers />} />
+                    <Route path="/resources" element={<Resources />} />
+                    <Route path="/news" element={<News />} />
+                    <Route path="/news/:id" element={<NewsDetail />} />
+                    <Route path="/events" element={<Events />} />
+                    <Route path="/events/:id" element={<EventDetail />} />
+                    <Route path="/members" element={<Members />} />
+                    <Route path="/contact" element={<Contact />} />
+                    <Route path="/conference-registration" element={<ConferenceRegistration />} />
+                    <Route path="/tech-conference-registration" element={<TechConferenceRegistration />} />
+                    <Route path="/exhibitor-registration" element={<ExhibitorRegistration />} />
+                    <Route path="/student-scholarship-application" element={<StudentScholarshipApplication />} />
+                    <Route path="/regional-luncheon-registration" element={<RegionalLuncheonRegistration />} />
+                    <Route path="/hall-of-fame-nomination" element={<HallOfFameNomination />} />
+                    <Route path="/hall-of-fame-members" element={<HallOfFameMembers />} />
+                    <Route path="/regional-director-nomination" element={<RegionalDirectorNomination />} />
+                    <Route path="/president-nomination" element={<PresidentNomination />} />
+                    <Route path="/conference-gallery" element={<ConferenceGalleryPage />} />
+                    <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                    <Route path="/terms-of-service" element={<TermsOfService />} />
+                    <Route path="/accessibility" element={<Accessibility />} />
+                  </Routes>
+                </div>
+              </main>
+            </div>
+          }
+        />
+      </Routes>
+      <Footer />
+    </>
+  );
+}
+
+// One catch-all route: the app uses a data router so a settings page can hold a move away while it has unsaved
+// changes (useBlocker needs one). Which page shows is still decided by the <Routes> in AppShell.
+const router = createBrowserRouter([{ path: '*', element: <AppShell /> }]);
+
 function App() {
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="text-center">
-          <div className="w-16 h-16 border-t-4 border-b-4 border-primary rounded-full animate-spin mx-auto"></div>
-          <h2 className="mt-4 text-xl font-semibold text-gray-800">Loading TAPT...</h2>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <SiteAlert />
-        <Navbar />
-        <Routes>
-          {/* Admin Routes - Must come BEFORE catch-all */}
-          <Route path="/admin/login" element={<AdminLogin />} />
-          <Route path="/admin" element={
-            <ProtectedRoute requireAdmin>
-              <AdminDashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/payment-management" element={
-            <ProtectedRoute requireAdmin>
-              <AdminPaymentManagement />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/users" element={
-            <ProtectedRoute requireAdmin>
-              <AdminUsers />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/board-members" element={
-            <ProtectedRoute requireAdmin>
-              <AdminBoardMembers />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/content" element={
-            <ProtectedRoute requireAdmin>
-              <AdminContent />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/archives" element={
-            <ProtectedRoute requireAdmin>
-              <AdminArchives />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/memberships" element={
-            <ProtectedRoute requireAdmin>
-              <AdminMemberships />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/conference-registrations" element={
-            <ProtectedRoute requireAdmin>
-              <AdminConferenceRegistrations />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/tech-conference-registrations" element={
-            <ProtectedRoute requireAdmin>
-              <AdminTechConferenceRegistrations />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/exhibitor-registrations" element={
-            <ProtectedRoute requireAdmin>
-              <AdminExhibitorRegistrations />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/student-scholarship-applications" element={
-            <ProtectedRoute requireAdmin>
-              <AdminStudentScholarshipApplications />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/regional-luncheon-registrations" element={
-            <ProtectedRoute requireAdmin>
-              <AdminRegionalLuncheonRegistrations />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/conference-settings" element={
-            <ProtectedRoute requireAdmin>
-              <AdminConferenceSettings />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/tech-conference-settings" element={
-            <ProtectedRoute requireAdmin>
-              <AdminTechConferenceSettings />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/exhibitor-settings" element={
-            <ProtectedRoute requireAdmin>
-              <AdminExhibitorSettings />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/student-scholarship-settings" element={
-            <ProtectedRoute requireAdmin>
-              <AdminStudentScholarshipSettings />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/regional-luncheon-settings" element={
-            <ProtectedRoute requireAdmin>
-              <AdminRegionalLuncheonSettings />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/hall-of-fame-settings" element={
-            <ProtectedRoute requireAdmin>
-              <AdminHallOfFameSettings />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/hall-of-fame-nominations" element={
-            <ProtectedRoute requireAdmin>
-              <AdminHallOfFameNominations />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/hall-of-fame-members" element={
-            <ProtectedRoute requireAdmin>
-              <AdminHallOfFameMembers />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/regional-director-nomination-settings" element={
-            <ProtectedRoute requireAdmin>
-              <AdminRegionalDirectorNominationSettings />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/regional-director-nominations" element={
-            <ProtectedRoute requireAdmin>
-              <AdminRegionalDirectorNominations />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/president-nomination-settings" element={
-            <ProtectedRoute requireAdmin>
-              <AdminPresidentNominationSettings />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/president-nominations" element={
-            <ProtectedRoute requireAdmin>
-              <AdminPresidentNominations />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/site-settings" element={
-            <ProtectedRoute requireAdmin>
-              <AdminSiteSettings />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/payment-settings" element={
-            <ProtectedRoute requireAdmin>
-              <AdminPaymentSettings />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/contact-messages" element={
-            <ProtectedRoute requireAdmin>
-              <AdminContactMessages />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/photo-gallery" element={
-            <ProtectedRoute requireAdmin>
-              <AdminPhotoGallery />
-            </ProtectedRoute>
-          } />
-
-          {/* Public Routes - Catch-all with layout */}
-          <Route
-            path="/*"
-            element={
-              <div className="flex flex-col min-h-screen bg-gray-50">
-                <a
-                  href="#main-content"
-                  className="sr-only focus:not-sr-only focus:absolute focus:top-20 focus:left-4 focus:z-[60] focus:bg-white focus:text-tapt-navy focus:px-4 focus:py-2 focus:rounded focus:shadow-lg focus:font-semibold focus:outline-none focus:ring-2 focus:ring-tapt-blue"
-                >
-                  Skip to main content
-                </a>
-                <main id="main-content" className="flex-grow">
-                  <div className="container mx-auto px-4 py-8">
-                    <Routes>
-                      <Route path="/" element={<Home />} />
-                      <Route path="/about" element={<About />} />
-                      <Route path="/board-members" element={<BoardMembers />} />
-                      <Route path="/resources" element={<Resources />} />
-                      <Route path="/news" element={<News />} />
-                      <Route path="/news/:id" element={<NewsDetail />} />
-                      <Route path="/events" element={<Events />} />
-                      <Route path="/events/:id" element={<EventDetail />} />
-                      <Route path="/members" element={<Members />} />
-                      <Route path="/contact" element={<Contact />} />
-                      <Route path="/conference-registration" element={<ConferenceRegistration />} />
-                      <Route path="/tech-conference-registration" element={<TechConferenceRegistration />} />
-                      <Route path="/exhibitor-registration" element={<ExhibitorRegistration />} />
-                      <Route path="/student-scholarship-application" element={<StudentScholarshipApplication />} />
-                      <Route path="/regional-luncheon-registration" element={<RegionalLuncheonRegistration />} />
-                      <Route path="/hall-of-fame-nomination" element={<HallOfFameNomination />} />
-                      <Route path="/hall-of-fame-members" element={<HallOfFameMembers />} />
-                      <Route path="/regional-director-nomination" element={<RegionalDirectorNomination />} />
-                      <Route path="/president-nomination" element={<PresidentNomination />} />
-                      <Route path="/conference-gallery" element={<ConferenceGalleryPage />} />
-                      <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-                      <Route path="/terms-of-service" element={<TermsOfService />} />
-                      <Route path="/accessibility" element={<Accessibility />} />
-                    </Routes>
-                  </div>
-                </main>
-              </div>
-            }
-          />
-        </Routes>
-        <Footer />
-      </BrowserRouter>
+      <RouterProvider router={router} />
     </AuthProvider>
   );
 }

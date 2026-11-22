@@ -185,6 +185,16 @@ The Conference, Tech Conference, Exhibitor, Hall of Fame, Student Scholarship, P
 - **If it says an archive table is missing columns:** a column was added to a live table without adding it to its archive table. Run the migration's "bring archive tables in line" step again (the migration can be re-run) or add the column to the archive table, then retry. Nothing was lost; the rollover stopped before touching any data.
 - **Deploying:** run the pre-check query at the top of each migration (optional), apply `20261121000000_rollover_cycle.sql` and then `20261122000000_rollover_more_forms.sql`, then deploy these functions: `rollover`, `admin-exhibitor-registrations`, `admin-student-scholarship-applications`, `admin-president-settings`, `admin-regional-director-settings`, `send-payment-receipt`, `submit-regional-luncheon` and `submit-conference-registration`. The two submit functions now refuse a registration posted for an event or conference that is no longer the active one, so a form left open from last year cannot register against it. Then deploy the site.
 
+## Unsaved-Changes Warning
+
+The ten settings pages (Annual Conference, Tech Conference, Exhibitor, Regional Luncheon, Scholarship, Hall of Fame, Regional Director and President nomination settings, Email templates, Site settings) warn before you lose edits. After you change something and before you save it:
+
+- A menu link, Jump to or the browser Back button shows a "Leave without saving?" dialog. **Keep editing** is the default (it has focus, and Escape does the same); **Leave without saving** goes on.
+- Closing or reloading the tab shows the browser's own warning.
+- Saving, or reloading the settings from the server, clears the warning. A page you have not edited never asks.
+
+How it works: `src/lib/useUnsavedChanges.ts` keeps a "changed" flag and holds the move with React Router's `useBlocker`; `src/components/admin/UnsavedChangesDialog.tsx` is the dialog. `useBlocker` needs a data router, so `src/App.tsx` uses `createBrowserRouter` with one catch-all route that renders the usual `<Routes>`. To add the warning to another form page: call `useUnsavedChanges()`, put `onChange={unsaved.markDirty}` on the `<form>`, call `unsaved.markClean()` after a save or load, and render `<UnsavedChangesDialog blocker={unsaved.blocker} />`. Switching to another year's settings inside the same page is not covered.
+
 ## Public Read Access on Personal Data
 
 `hall_of_fame_nominations` and `membership_applications` were created with a policy that let anyone holding the public site key read every row (names, emails, phone numbers). Nothing on the website needs that: the admin pages read these tables while signed in as an admin, and the edge functions use the service role.

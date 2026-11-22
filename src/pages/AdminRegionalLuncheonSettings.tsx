@@ -5,6 +5,8 @@ import { Calendar, Save, AlertCircle, ArrowLeft, Archive, Trash2, ToggleLeft, To
 import ConfirmationModal from '../components/ConfirmationModal';
 import { useAuth } from '../context/AuthContext';
 import AdminLayout from '../components/AdminLayout';
+import { UnsavedChangesDialog } from '../components/admin/UnsavedChangesDialog';
+import { useUnsavedChanges } from '../lib/useUnsavedChanges';
 import RolloverModal from '../components/admin/RolloverModal';
 import { runRollover, describeRolloverResult } from '../lib/rollover';
 
@@ -30,6 +32,7 @@ const AdminRegionalLuncheonSettings: React.FC = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
+  const unsaved = useUnsavedChanges();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -125,6 +128,7 @@ const AdminRegionalLuncheonSettings: React.FC = () => {
       setError(`Failed to load settings: ${error.message}`);
     } finally {
       setLoading(false);
+      unsaved.markClean();
     }
   };
 
@@ -303,6 +307,7 @@ const AdminRegionalLuncheonSettings: React.FC = () => {
   };
 
   const handleCreateNew = () => {
+    unsaved.markDirty();
     setSettings({
       id: '',
       name: '',
@@ -388,7 +393,7 @@ const AdminRegionalLuncheonSettings: React.FC = () => {
             {settings.id ? 'Edit Settings' : 'Create New Settings'}
           </h2>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} onChange={unsaved.markDirty} className="space-y-6">
             {/* Event Name */}
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
@@ -598,14 +603,15 @@ const AdminRegionalLuncheonSettings: React.FC = () => {
           title="Rollover Regional Luncheon"
           note="The date, time and venue of each region on this page are used for the new event. Check them before you confirm."
           fields={[
-            { id: 'name', label: 'New Event Name', type: 'text', value: settings.name, onChange: (value) => setSettings((previous) => ({ ...previous, name: value })) },
-            { id: 'deadline', label: 'New Registration Deadline', type: 'date', value: settings.registration_deadline, onChange: (value) => setSettings((previous) => ({ ...previous, registration_deadline: value })) }
+            { id: 'name', label: 'New Event Name', type: 'text', value: settings.name, onChange: (value) => { unsaved.markDirty(); setSettings((previous) => ({ ...previous, name: value })); } },
+            { id: 'deadline', label: 'New Registration Deadline', type: 'date', value: settings.registration_deadline, onChange: (value) => { unsaved.markDirty(); setSettings((previous) => ({ ...previous, registration_deadline: value })); } }
           ]}
           submitting={isRollingOver}
           onConfirm={handleRollover}
           onClose={() => setShowRolloverModal(false)}
         />
       </div>
+      <UnsavedChangesDialog blocker={unsaved.blocker} />
     </AdminLayout>
   );
 };

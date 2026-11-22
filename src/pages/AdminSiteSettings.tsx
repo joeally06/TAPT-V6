@@ -6,6 +6,8 @@ import { supabase } from '../lib/supabase';
 import { getSiteSetting, updateSiteSetting } from '../lib/siteSettings';
 import { compressImage } from '../lib/imageCompression';
 import AdminLayout from '../components/AdminLayout';
+import { UnsavedChangesDialog } from '../components/admin/UnsavedChangesDialog';
+import { useUnsavedChanges } from '../lib/useUnsavedChanges';
 
 interface SiteSettingsState {
   heroImageUrl: string;
@@ -53,6 +55,7 @@ export const AdminSiteSettings: React.FC = () => {
   });
   
   const [loading, setLoading] = useState(true);
+  const unsaved = useUnsavedChanges();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -125,6 +128,7 @@ export const AdminSiteSettings: React.FC = () => {
       setError('Failed to load site settings');
     } finally {
       setLoading(false);
+      unsaved.markClean();
     }
   };
 
@@ -289,6 +293,7 @@ export const AdminSiteSettings: React.FC = () => {
       }));
       
       setSuccess('Site settings updated successfully!');
+      unsaved.markClean();
       setSelectedFile(null);
       setPreviewUrl(null);
     } catch (error: any) {
@@ -390,7 +395,7 @@ export const AdminSiteSettings: React.FC = () => {
           </nav>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8">
+        <form onSubmit={handleSubmit} onChange={unsaved.markDirty} className="p-8">
           {/* General Settings */}
           {activeTab === 'general' && (
             <div className="space-y-6">
@@ -844,6 +849,7 @@ export const AdminSiteSettings: React.FC = () => {
         </form>
       </div>
       </div>
+      <UnsavedChangesDialog blocker={unsaved.blocker} />
     </AdminLayout>
   );
 };
